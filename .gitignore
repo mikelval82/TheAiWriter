@@ -41,6 +41,14 @@ htmlcov/
 
 # Output files (optional - uncomment if you want to track outputs)
 # data/output/
+data/output/final/
+data/output/drafts/
+
+# Processed data (generated, can be regenerated)
+data/processed/
+
+# Audio files
+data/audio/
 
 # Temporary files
 data/output/powerpoint/temp_slides/
