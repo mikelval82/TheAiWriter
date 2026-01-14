@@ -179,16 +179,28 @@ class PDFProcessor:
         console.print("[cyan]📚 Extracting references...[/cyan]")
         references: list[Reference] = []
         
+        # Try multiple strategies to find references
+        references_text = ""
+        
         if references_content:
-            references = self.extraction_agent.extract_references(
-                references_content,
-                metadata.paper_id,
-            )
+            references_text = references_content
         else:
-            # Try to find references at the end of the document
-            last_portion = full_text[-20000:]
+            # Strategy 1: Look for "References" section in the text
+            import re
+            ref_match = re.search(
+                r'(?:^|\n)\s*(References|Bibliography|REFERENCES|BIBLIOGRAPHY)\s*\n',
+                full_text,
+                re.IGNORECASE
+            )
+            if ref_match:
+                references_text = full_text[ref_match.start():]
+            else:
+                # Strategy 2: Use last portion of document
+                references_text = full_text[-25000:]
+        
+        if references_text:
             references = self.extraction_agent.extract_references(
-                last_portion,
+                references_text,
                 metadata.paper_id,
             )
         
