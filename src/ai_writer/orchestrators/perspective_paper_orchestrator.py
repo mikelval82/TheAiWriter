@@ -14,6 +14,7 @@ from ai_writer.readers.markdown_reader import MarkdownReader
 from ai_writer.writers.markdown_writer import MarkdownWriter
 from ai_writer.utils.reference_index import ReferenceIndex
 from ai_writer.utils.reference_context_manager import ReferenceContextManager
+from ai_writer.utils.enhanced_context_manager import EnhancedContextManager
 from config.settings import settings
 
 console = Console()
@@ -43,6 +44,7 @@ class PerspectivePaperOrchestrator:
         abstract_path: Path | str | None = None,
         review_iterations: int = 2,
         top_k_references: int = 8,
+        use_enhanced_context: bool = True,
     ) -> None:
         """Initialize the orchestrator.
 
@@ -51,12 +53,16 @@ class PerspectivePaperOrchestrator:
                           Defaults to data/references/markdown/ABSTRACT.md
             review_iterations: Number of write-review iterations per section.
             top_k_references: Number of top references to use per section.
+            use_enhanced_context: If True, uses EnhancedContextManager with
+                                 ideas/claims indices. If False, uses the
+                                 legacy ReferenceContextManager.
         """
         self.abstract_path = Path(abstract_path) if abstract_path else (
             settings.paths.references_markdown_dir / "ABSTRACT.md"
         )
         self.review_iterations = max(1, review_iterations)
         self.top_k_references = top_k_references
+        self.use_enhanced_context = use_enhanced_context
         
         # Initialize components
         self.markdown_reader = MarkdownReader()
@@ -65,17 +71,11 @@ class PerspectivePaperOrchestrator:
         # Load abstract as base context
         self.abstract_context = self._load_abstract()
         
-        # Build reference index with embeddings
-        console.print("\n[cyan]📚 Construyendo índice de referencias...[/cyan]")
-        self.reference_index = ReferenceIndex()
-        self.reference_index.build()
-        
-        # Initialize reference context manager
-        self.context_manager = ReferenceContextManager(
-            reference_index=self.reference_index,
-            abstract_context=self.abstract_context,
-            top_k=self.top_k_references,
-        )
+        # Initialize context manager based on mode
+        if use_enhanced_context:
+            self._init_enhanced_context_manager()
+        else:
+            self._init_legacy_context_manager()
         
         # Initialize agents with shared context
         self.writer_agent = WriterAgent(abstract_context=self.abstract_context)
@@ -84,6 +84,32 @@ class PerspectivePaperOrchestrator:
         # Path for incremental output file
         self.output_file_path: Path | None = None
         self.current_paper_title: str = ""
+
+    def _init_enhanced_context_manager(self) -> None:
+        """Initialize the enhanced context manager with ideas/claims indices."""
+        console.print("\n[cyan]🧠 Cargando índices de ideas y claims...[/cyan]")
+        
+        try:
+            self.context_manager = EnhancedContextManager(
+                abstract_context=self.abstract_context,
+            )
+            console.print("[green]✓ EnhancedContextManager inicializado[/green]")
+        except FileNotFoundError as e:
+            console.print(f"[yellow]⚠ Índices no encontrados: {e}[/yellow]")
+            console.print("[yellow]  Usando ReferenceContextManager como fallback...[/yellow]")
+            self._init_legacy_context_manager()
+
+    def _init_legacy_context_manager(self) -> None:
+        """Initialize the legacy reference context manager."""
+        console.print("\n[cyan]📚 Construyendo índice de referencias...[/cyan]")
+        self.reference_index = ReferenceIndex()
+        self.reference_index.build()
+        
+        self.context_manager = ReferenceContextManager(
+            reference_index=self.reference_index,
+            abstract_context=self.abstract_context,
+            top_k=self.top_k_references,
+        )
 
     def _load_abstract(self) -> str:
         """Load the abstract from the configured path.
