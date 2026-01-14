@@ -80,6 +80,10 @@ class PerspectivePaperOrchestrator:
         # Initialize agents with shared context
         self.writer_agent = WriterAgent(abstract_context=self.abstract_context)
         self.reviewer_agent = ReviewerAgent(abstract_context=self.abstract_context)
+        
+        # Path for incremental output file
+        self.output_file_path: Path | None = None
+        self.current_paper_title: str = ""
 
     def _load_abstract(self) -> str:
         """Load the abstract from the configured path.
@@ -103,6 +107,48 @@ class PerspectivePaperOrchestrator:
             border_style="green",
         ))
         return content
+
+    def _initialize_output_file(self, title: str) -> Path:
+        """Initialize the output file, overwriting any existing content.
+
+        Args:
+            title: The paper title.
+
+        Returns:
+            Path to the output file.
+        """
+        output_dir = settings.paths.final_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate filename from title
+        safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in title)
+        safe_title = safe_title.replace(" ", "_")[:50]
+        
+        self.output_file_path = output_dir / f"{safe_title}.md"
+        self.current_paper_title = title
+        
+        # Write initial content (overwrite existing file)
+        initial_content = f"# {title}\n\n## Abstract\n\n{self.abstract_context}\n\n"
+        self.output_file_path.write_text(initial_content, encoding="utf-8")
+        
+        console.print(f"[dim]📄 Archivo de salida inicializado: {self.output_file_path}[/dim]")
+        return self.output_file_path
+
+    def _append_section_to_file(self, section: Section) -> None:
+        """Append a completed section to the output file.
+
+        Args:
+            section: The section to append.
+        """
+        if self.output_file_path is None:
+            return
+        
+        section_content = f"## {section.title}\n\n{section.content}\n\n"
+        
+        with open(self.output_file_path, "a", encoding="utf-8") as f:
+            f.write(section_content)
+        
+        console.print(f"  [dim]💾 Sección guardada en: {self.output_file_path.name}[/dim]")
 
     def _write_and_review_section(
         self,
@@ -149,6 +195,10 @@ class PerspectivePaperOrchestrator:
             )
         
         console.print(f"  [green]✓ {section_name} completado[/green]")
+        
+        # Append section to output file immediately
+        self._append_section_to_file(section)
+        
         return section
 
     def generate_paper(
@@ -173,6 +223,9 @@ class PerspectivePaperOrchestrator:
             title="🚀 TheAIWriter",
             border_style="blue",
         ))
+
+        # Initialize output file (overwrites any existing file)
+        self._initialize_output_file(title)
 
         # Use default perspective paper sections if not specified
         section_names = sections or PERSPECTIVE_PAPER_SECTIONS
@@ -241,45 +294,36 @@ class PerspectivePaperOrchestrator:
         Returns:
             Tuple of (paper path, critical review path).
         """
-        output_dir = Path(output_dir) if output_dir else settings.paths.drafts_dir
+        output_dir = Path(output_dir) if output_dir else settings.paths.final_dir
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate filename from title
+        # Generate filename from title (no timestamp for consistent naming)
         safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in title)
         safe_title = safe_title.replace(" ", "_")[:50]
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
-        # Generate paper
+        # Generate paper (sections are saved incrementally)
         paper = self.generate_paper(title=title)
 
-        # Save draft immediately in case final review fails
-        draft_path = output_dir / f"{safe_title}_{timestamp}_draft.md"
-        self.markdown_writer.write(paper, draft_path)
-        console.print(f"[dim]📄 Borrador guardado: {draft_path}[/dim]")
+        # Paper path is already set during generate_paper
+        paper_path = self.output_file_path or (output_dir / f"{safe_title}.md")
 
         # Final review (with error handling)
         reviewed_paper = paper
         critical_review = ""
         try:
             reviewed_paper, critical_review = self.final_review(paper)
+            # Overwrite with reviewed version
+            self.markdown_writer.write(reviewed_paper, paper_path)
+            console.print(f"[green]📄 Paper final guardado: {paper_path}[/green]")
         except Exception as e:
             console.print(f"[yellow]⚠️ Error en revisión final: {e}[/yellow]")
-            console.print("[yellow]  Guardando paper sin revisión final...[/yellow]")
-
-        # Export final paper
-        paper_path = output_dir / f"{safe_title}_{timestamp}.md"
-        self.markdown_writer.write(reviewed_paper, paper_path)
-        console.print(f"[green]📄 Paper guardado: {paper_path}[/green]")
+            console.print(f"[yellow]  Paper guardado sin revisión final: {paper_path}[/yellow]")
 
         # Export critical review if available
-        review_path = output_dir / f"{safe_title}_{timestamp}_critical_review.md"
+        review_path = output_dir / f"{safe_title}_critical_review.md"
         if critical_review:
             review_path.write_text(critical_review, encoding="utf-8")
             console.print(f"[green]📋 Revisión crítica guardada: {review_path}[/green]")
         else:
             review_path.write_text("# Revisión Crítica\n\nNo se pudo generar debido a un error de conexión.", encoding="utf-8")
             console.print(f"[yellow]📋 Revisión crítica pendiente: {review_path}[/yellow]")
-
-        # Clean up draft if final was successful
-        if draft_path.exists() and paper_path.exists():
-            draft_path.unlink()
