@@ -298,6 +298,7 @@ Write only the expanded content."""
         previous_paragraphs: list[str],
         reference_context: str,
         thesis: str,
+        memory_context: str = "",
     ) -> str:
         """Write a single paragraph based on a specific key idea.
         
@@ -312,6 +313,7 @@ Write only the expanded content."""
             previous_paragraphs: Already written paragraphs in this section.
             reference_context: Context from embeddings search.
             thesis: Paper's thesis statement.
+            memory_context: Summaries of previous sections for coherence.
             
         Returns:
             Written paragraph text.
@@ -321,6 +323,15 @@ Write only the expanded content."""
         supporting_text = ""
         if supporting_points:
             supporting_text = "\n".join(f"- {p}" for p in supporting_points)
+        
+        # Build memory section only if we have previous sections
+        memory_section = ""
+        if memory_context:
+            memory_section = f"""
+# CONTEXTO DE SECCIONES ANTERIORES
+(Resúmenes para mantener coherencia con lo ya escrito)
+{memory_context}
+"""
         
         user_prompt = f"""Escribe UN SOLO PÁRRAFO académico para la sección "{section_name}".
 
@@ -335,7 +346,7 @@ Write only the expanded content."""
 
 # PUNTOS DE APOYO A INCORPORAR
 {supporting_text}
-
+{memory_section}
 # PÁRRAFOS ANTERIORES EN ESTA SECCIÓN
 {previous_text if previous_text else "(Este es el primer párrafo de la sección)"}
 
@@ -348,7 +359,7 @@ Write only the expanded content."""
 3. Incorpora los puntos de apoyo de forma natural
 4. Cita la literatura proporcionada cuando sea relevante
 5. Asegura transición fluida desde el párrafo anterior
-6. Mantén consistencia con la tesis del paper
+6. Mantén consistencia con la tesis del paper y las secciones anteriores
 7. Escribe en español académico formal
 
 Escribe SOLO el párrafo, sin títulos ni comentarios adicionales."""

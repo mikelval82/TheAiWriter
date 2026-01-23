@@ -33,7 +33,7 @@ class AdvancedPerspectiveOrchestrator:
     def __init__(
         self,
         abstract_path: Path | str | None = None,
-        review_iterations: int = 2,
+        review_iterations: int = 1,
         n_clusters: int = 25,  # Increased from 12 for better embedding space coverage
         outline_review_iterations: int = 1,
         enable_logging: bool = True,
@@ -73,13 +73,19 @@ class AdvancedPerspectiveOrchestrator:
         # Initialize agents
         self.planner_agent = PlannerAgent()
         self.writer_agent = WriterAgent(abstract_context=self.abstract_context)
-        self.reviewer_agent = ReviewerAgent(abstract_context=self.abstract_context)
+        self.reviewer_agent = ReviewerAgent(
+            abstract_context=self.abstract_context,
+            context_manager=self.context_manager,
+        )
         
         # State
         self.current_outline: PaperOutline | None = None
         self.topic_centroids: dict = {}
         self.output_file_path: Path | None = None
         self.logger: PipelineLogger | None = None
+        
+        # Short-term memory: resúmenes de secciones escritas (manejado por orquestador)
+        self.section_memory: dict[str, str] = {}
 
     def _load_abstract(self) -> str:
         """Load the abstract from the configured path."""
@@ -95,6 +101,80 @@ class AdvancedPerspectiveOrchestrator:
             border_style="green",
         ))
         return content
+
+    # =========================================================================
+    # Section Memory Management
+    # =========================================================================
+    
+    def _reset_section_memory(self) -> None:
+        """Reset the section memory for a new paper."""
+        self.section_memory = {}
+    
+    def _generate_section_summary(self, section: Section) -> str:
+        """Generate a concise summary of a section for memory.
+        
+        Args:
+            section: The section to summarize.
+            
+        Returns:
+            A concise summary capturing key points.
+        """
+        from ai_writer.agents.base_agent import BaseAgent
+        
+        # Use a lightweight call to generate summary
+        client = self.writer_agent.client
+        model = self.writer_agent.model
+        
+        user_prompt = f"""Genera un resumen conciso de la siguiente sección de un paper académico.
+
+SECCIÓN: {section.title}
+
+CONTENIDO:
+{section.content}
+
+INSTRUCCIONES:
+- Resume en 3-5 oraciones los puntos clave y argumentos principales
+- Incluye la tesis o idea central de la sección
+- Menciona conceptos o términos importantes introducidos
+- Sé preciso y conciso (máximo 150 palabras)
+
+RESUMEN:"""
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "Eres un asistente experto en síntesis de textos académicos."},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_completion_tokens=300,
+        )
+        
+        return response.choices[0].message.content.strip()
+    
+    def _update_section_memory(self, section: Section) -> None:
+        """Update memory with a completed section.
+        
+        Args:
+            section: The completed section to add to memory.
+        """
+        console.print(f"  [dim]💭 Generando resumen para memoria...[/dim]")
+        summary = self._generate_section_summary(section)
+        self.section_memory[section.title] = summary
+    
+    def _get_memory_context(self) -> str:
+        """Get formatted memory context for agents.
+        
+        Returns:
+            Formatted string with section summaries.
+        """
+        if not self.section_memory:
+            return ""
+        
+        context = "\n\nMEMORIA DEL PAPER (resúmenes de secciones anteriores):\n"
+        for title, summary in self.section_memory.items():
+            context += f"\n### {title}\n{summary}\n"
+        
+        return context
 
     # =========================================================================
     # PHASE 1: Cluster Analysis
@@ -298,6 +378,9 @@ class AdvancedPerspectiveOrchestrator:
         # Reset exploration state for this new paper
         self.context_manager.reset_exploration_state()
         
+        # Reset section memory for fresh paper
+        self._reset_section_memory()
+        
         # Initialize output file
         self._initialize_output_file(outline.title)
         
@@ -365,10 +448,8 @@ class AdvancedPerspectiveOrchestrator:
         section_name = section_outline.section_name
         console.print(f"\n[bold cyan]📝 Escribiendo: {section_name}[/bold cyan]")
         
-        # Build previous sections text
-        previous_text = "\n\n".join(
-            f"## {s.title}\n{s.content}" for s in previous_sections
-        )
+        # Get memory context (summaries of previous sections)
+        memory_context = self._get_memory_context()
         
         paragraphs_content = []
         
@@ -378,7 +459,7 @@ class AdvancedPerspectiveOrchestrator:
             # Get targeted context using paragraph's key idea (NOT the abstract)
             context = self._get_context_for_paragraph(para_outline, section_name)
             
-            # Write paragraph
+            # Write paragraph with memory context
             para_text = self._write_paragraph(
                 paragraph_outline=para_outline,
                 section_name=section_name,
@@ -386,6 +467,7 @@ class AdvancedPerspectiveOrchestrator:
                 previous_paragraphs=paragraphs_content,
                 reference_context=context,
                 thesis=thesis,
+                memory_context=memory_context,
             )
             
             paragraphs_content.append(para_text)
@@ -395,15 +477,21 @@ class AdvancedPerspectiveOrchestrator:
         
         section = Section(title=section_name, content=section_content)
         
-        # Review iterations
+        # Review iterations - pass memory to reviewer
         for iteration in range(self.review_iterations):
             console.print(
                 f"  [yellow]🔄 Revisión {iteration + 1}/{self.review_iterations}[/yellow]"
             )
+            # Share orchestrator's memory with reviewer
+            self.reviewer_agent.section_summaries = self.section_memory.copy()
             section = self.reviewer_agent.review_section(
                 section=section,
-                previous_sections=previous_sections,
+                previous_sections=None,  # No longer needed, using memory
+                update_memory=False,  # Orchestrator manages memory
             )
+        
+        # Update orchestrator's memory with the completed section
+        self._update_section_memory(section)
         
         console.print(f"  [green]✓ {section_name} completado[/green]")
         return section
@@ -473,6 +561,7 @@ class AdvancedPerspectiveOrchestrator:
         previous_paragraphs: list[str],
         reference_context: str,
         thesis: str,
+        memory_context: str = "",
     ) -> str:
         """Write a single paragraph based on outline and context.
         
@@ -483,6 +572,7 @@ class AdvancedPerspectiveOrchestrator:
             previous_paragraphs: Already written paragraphs in this section.
             reference_context: Context from embeddings search.
             thesis: Paper's thesis statement.
+            memory_context: Summary of previous sections for coherence.
             
         Returns:
             Written paragraph text.
@@ -495,6 +585,7 @@ class AdvancedPerspectiveOrchestrator:
             previous_paragraphs=previous_paragraphs,
             reference_context=reference_context,
             thesis=thesis,
+            memory_context=memory_context,
         )
 
     def _initialize_output_file(self, title: str) -> Path:

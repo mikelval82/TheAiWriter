@@ -12,8 +12,8 @@ from config.settings import settings
 console = Console()
 
 
-# Modelo por defecto para el planificador (gpt-4o es más confiable con JSON)
-PLANNER_MODEL = "gpt-4o"
+# Modelo por defecto para el planificador
+PLANNER_MODEL = "gpt-5.2"
 
 # Standard perspective paper sections con número de párrafos recomendados
 # Formato: (nombre, propósito, num_parrafos_min, num_parrafos_max)

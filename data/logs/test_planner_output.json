@@ -1,0 +1,384 @@
+{
+  "model": "gpt-5.2",
+  "thesis_statement": "La convergencia XR–IA–neurociencia está habilitando “Cuerpos Secos” como agentes 4E en el Metaverso, pero el salto cualitativo dependerá de pasar de LLMs textuales sin Teoría de la Mente a Agentes Fundamentales Empáticos multimodales con memoria episódica y modelos de appraisal, junto con un marco ético que mitigue la reconfiguración cognitiva por inmersión prolongada.",
+  "total_sections": 8,
+  "total_paragraphs": 26,
+  "sections": [
+    {
+      "name": "Introducción",
+      "purpose": "Presentar el giro desde herramientas digitales pasivas hacia agentes 4E empáticos en XR/Metaverso y enmarcar la tesis y contribución del artículo.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "La “empatía computacional” ya se implementa como un ensamblaje de capacidades (reconocimiento emocional, respuesta empática, personalización y conductas relacionales), pero su adopción fragmentaria impide que los sistemas actuales sostengan interacciones realmente humanas en entornos inmersivos.",
+          "supporting_points": [
+            "La literatura operacionaliza la empatía en CAs mediante componentes múltiples, pero típicamente se implementan solo algunos (p. ej., buen texto empático sin percepción afectiva robusta).",
+            "La evaluación de estas capacidades es inconsistente, lo que dificulta comparar avances y afirmar que existe “empatía” como propiedad del sistema.",
+            "La tendencia de IA emocional busca integrar modelos ricos de emoción y señales contextuales en LLMs, señalando que el problema no es solo lingüístico sino de integración cognitiva."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic",
+            "Emotion + Emotional"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "La evolución de los agentes de lenguaje (razonamiento, planificación y memoria) crea el sustrato técnico para “Cuerpos Secos”, pero sin abstracciones compartidas y sin un bucle multimodal con el entorno, el comportamiento seguirá siendo verosímil solo por ‘andamiaje’ y no por cognición situada.",
+          "supporting_points": [
+            "Los agentes modernos incorporan razonamiento, planificación y gestión de memoria alrededor de LLMs, lo que permite autonomía más allá de la generación de texto.",
+            "El campo carece de terminología y abstracciones comunes, dificultando diseñar arquitecturas comparables y acumulativas para agentes encarnados/embebidos.",
+            "El andamiaje arquitectónico (memoria, reflexión, planificación, prompting estructurado) mejora naturalidad, pero no garantiza integración con percepción y acción en XR."
+          ],
+          "suggested_sources": [
+            "Agents + Agent"
+          ]
+        },
+        {
+          "number": 3,
+          "key_idea": "Proponemos que el próximo umbral no es ‘más capacidad lingüística’, sino la integración multimodal de señales no verbales (incluida fisiología) para sostener empatía en tiempo real, como condición de posibilidad para agentes 4E autónomos en el Metaverso.",
+          "supporting_points": [
+            "La revisión sistemática de detección de empatía basada en ML muestra evidencia transversal en texto, audio, audiovisual y fisiología, sugiriendo que la empatía medible es multimodal por naturaleza.",
+            "Prototipos multi-agente con MLLM+LLM que incorporan contexto no verbal (expresiones faciales) producen cambios medibles en lenguaje cognitivo/afectivo, apuntando a beneficios de integrar percepción no verbal.",
+            "Los sistemas emocionalmente inteligentes más recientes buscan fusionar señales ricas con LLMs para mejorar relevancia contextual y soporte terapéutico, alineado con el argumento de ‘empatía como integración’."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic",
+            "Emotion + Emotional",
+            "Agents + Agent"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Estado Actual del Arte",
+      "purpose": "Sintetizar avances y límites de agentes empáticos basados en LLMs, con foco en evaluación, multimodalidad y arquitecturas cognitivas.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "El principal cuello de botella científico no es entrenar respuestas “sonoras” empáticas, sino medir empatía de forma válida y comparable: hoy predominan métricas heterogéneas y autoinformes que sesgan la evidencia a favor de sistemas textuales.",
+          "supporting_points": [
+            "La evaluación de empatía en agentes es limitada y metodológicamente heterogénea; se apoya mayormente en autoinformes y rara vez incluye evaluación experta.",
+            "En psicología, la empatía se mide con cuestionarios y paradigmas de precisión empática; en afective computing se usan como ground truth, pero también aparecen etiquetados heurísticos que degradan validez.",
+            "La diversidad de instrumentos y definiciones produce resultados difícilmente comparables entre estudios y plataformas."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "Aunque el fine-tuning de LLMs permite reconocer estados emocionales y generar respuestas empáticas sin datos clínicos sensibles, el enfoque sigue siendo predominantemente textual, lo que limita la captación del contexto afectivo completo.",
+          "supporting_points": [
+            "Un LLM afinado puede reconocer emociones y producir respuestas empáticas de alta calidad sin depender de datos clínicos sensibles, mostrando viabilidad práctica.",
+            "La mayoría de sistemas empáticos basados en LLM son textocéntricos y descuidan habla y gestos, reduciendo sensibilidad a prosodia, expresiones faciales y postura.",
+            "La ausencia de canales no verbales restringe tanto la inferencia afectiva como la capacidad de respuesta multimodal coherente."
+          ],
+          "suggested_sources": [
+            "Emotion + Emotional"
+          ]
+        },
+        {
+          "number": 3,
+          "key_idea": "La autonomía de los agentes actuales es real pero incompleta: realizan razonamiento y aprendizaje no triviales, sin embargo carecen de una arquitectura integrada percepción–cognición–afecto–acción que sostenga empatía como propiedad del sistema y no como ‘capa’ conversacional.",
+          "supporting_points": [
+            "Los agentes contemporáneos realizan razonamiento/aprendizaje con LLMs, lo que motiva el uso de arquitecturas cognitivas para estructurar interacciones internas y externas.",
+            "Arquitecturas previas capturan aspectos parciales (razonamiento, bucles percepción–acción, ajuste emocional, character portrayal), pero no alcanzan integración conductual unificada.",
+            "La falta de integración dificulta pasar de “respuesta empática” a “agencia empática” consistente en escenarios dinámicos."
+          ],
+          "suggested_sources": [
+            "Agents + Agent"
+          ]
+        },
+        {
+          "number": 4,
+          "key_idea": "El progreso en datasets multimodales habilita modelar afecto más allá del texto, pero la carencia de señales no verbales ricas (especialmente 3D facial/corporal) limita el entrenamiento de agentes que deban habitar XR con credibilidad social.",
+          "supporting_points": [
+            "Existen múltiples datasets con señales multimodales (texto, audio, visual y a veces personalidad/prosodia) y esquemas de anotación diversos (categorías, escalas, dimensiones continuas).",
+            "Los datasets de diálogo multimodal suelen enfocarse en sentimiento y generación multimodal, pero son limitados en escala y carecen de lenguaje corporal y facial 3D detallado.",
+            "Sin datos no verbales ricos, los agentes no pueden aprender alineación fina entre contenido lingüístico y conducta visible requerida en XR."
+          ],
+          "suggested_sources": [
+            "Nonverbal + Multimodal"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Identificación del Problema o Brecha",
+      "purpose": "Delimitar por qué los enfoques actuales no alcanzan empatía ‘situada’ en XR/Metaverso y qué falta para pasar a agentes 4E con efectos cognitivos seguros.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "La empatía computacional falla al generalizar entre condiciones de interacción porque las respuestas humanas (conductuales y fisiológicas) cambian de forma sistemática entre conversaciones cara a cara y remotas; por tanto, los modelos entrenados y evaluados en contextos ‘planos’ no son directamente transferibles a XR.",
+          "supporting_points": [
+            "Comparativas empíricas muestran diferencias en respuestas faciales, EDA y HRV entre conversaciones emocionales presenciales y remotas.",
+            "La eficacia de enfoques de reconocimiento emocional varía según el setting, sugiriendo dependencia del canal y de la dinámica interactiva.",
+            "XR intensifica señales corporales y presencia, por lo que extrapolar desde chat textual o videollamada puede inducir errores de inferencia afectiva y de timing empático."
+          ],
+          "suggested_sources": [
+            "Face + Emotional",
+            "Emotion + Emotional"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "La inmersión en VR/Metaverso no solo media interacción: puede reconfigurar mecanismos predictivos top-down y generar respuestas híbridas virtual-real, creando un riesgo de ‘adaptación cognitiva’ a reglas del Metaverso sin salvaguardas empáticas y éticas integradas en el agente.",
+          "supporting_points": [
+            "Se plantea que la inmersión conducirá a respuestas corporales híbridas y a un reajuste gradual de mecanismos predictivos para ajustarse a reglas/afordancias del Metaverso.",
+            "El entrelazamiento cuerpo-entorno virtual reactiva marcos 4E y exige enfoque interdisciplinario para entender efectos sobre cognición y conducta.",
+            "Si los agentes no modelan adecuadamente el estado afectivo y la vulnerabilidad del usuario, la manipulación inadvertida (o optimización de engagement) puede amplificar reconfiguración cognitiva."
+          ],
+          "suggested_sources": [
+            "Metaverse + Vr"
+          ]
+        },
+        {
+          "number": 3,
+          "key_idea": "Falta una infraestructura de ‘observabilidad’ afectiva y contextual comparable a la de los digital twins urbanos: sin instrumentación multimodal (wearables + sensores del entorno) no es posible cerrar el bucle de evaluación y control para agentes empáticos en XR.",
+          "supporting_points": [
+            "Metodologías de gemelos digitales integran wearables, segmentación visual del entorno y sensores (p. ej., clima) para vincular morfología/contexto con percepción y fisiología.",
+            "Un proof-of-concept de urban digital twin muestra cómo fusionar fuentes emergentes para inferir confort y efectos del entorno, análogo a inferir estado afectivo en XR.",
+            "Trasladado a XR, se requiere instrumentación (fisiología, comportamiento no verbal, contexto ambiental virtual) para evaluar impacto del agente y ajustar políticas de interacción."
+          ],
+          "suggested_sources": [
+            "Ngfr + Urban",
+            "Ai + Data"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "La Nueva Perspectiva",
+      "purpose": "Proponer el marco de “Cuerpos Secos” y una hoja de ruta hacia Agentes Fundamentales Empáticos: multimodales, situados y con arquitectura cognitiva integrada.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "Definimos “Cuerpos Secos” como agentes 4E en XR que deben sostener empatía como capacidad situada y multimodal; por ello, la detección de empatía debe pasar de ser un submódulo a ser el sistema nervioso perceptivo del agente (texto+voz+rostro+cuerpo+fisiología).",
+          "supporting_points": [
+            "La evidencia revisada de detección de empatía en cuatro modalidades sugiere que la empatía computable emerge de señales multimodales y contextos diversos.",
+            "Trabajos que priorizan respuestas neurofisiológicas (sobre capacidades verbales) muestran que la empatía percibida depende de señales corporales, no solo de texto.",
+            "La literatura de agentes multimodales destaca el rol de canales no verbales (especialmente rostro) para reconocer afecto y expresar empatía con mejores resultados relacionales."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic",
+            "Emotion + Emotional"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "La transición a “Agentes Fundamentales Empáticos” exige arquitectura de agente (no solo modelo) que cierre el bucle percepción–razonamiento–memoria–acción: el LLM debe operar como núcleo en un loop con el entorno, no como interfaz conversacional.",
+          "supporting_points": [
+            "Los agentes cognitivos embeben LLMs en bucles con el entorno usando inputs multimodales, razonamiento intermedio, memoria y auto-modificación para guiar acciones.",
+            "La evolución histórica de agentes muestra el paso de generar instrucciones a realizar razonamiento antes de actuar, habilitando autonomía en mundos simulados/virtuales.",
+            "Esto fundamenta que un “Cuerpo Seco” requiera políticas de acción y memoria que preserven coherencia social y objetivos de cuidado (no solo de tarea)."
+          ],
+          "suggested_sources": [
+            "Agents + Agent"
+          ]
+        },
+        {
+          "number": 3,
+          "key_idea": "Para que la empatía sea creíble en XR, el agente debe aprender la alineación fina entre lenguaje y conducta visible; por ello, proponemos entrenar y evaluar con datos video-grounded y modelos que generen conjuntamente texto, expresiones faciales y lenguaje corporal.",
+          "supporting_points": [
+            "La construcción de datasets que priorizan segmentos donde el contenido lingüístico está acoplado a conducta visible habilita modelado de diálogo anclado en video.",
+            "El uso de pseudo-labels para suplir la falta de datos de movimiento conversacional permite generación conjunta de texto+rostro+cuerpo alineados al contexto.",
+            "Esto ofrece un camino directo para ‘encarnación digital’ sin depender únicamente de animación manual o reglas rígidas."
+          ],
+          "suggested_sources": [
+            "Nonverbal + Multimodal"
+          ]
+        },
+        {
+          "number": 4,
+          "key_idea": "La hoja de ruta técnica inmediata es: (i) reconocimiento afectivo rápido y preciso, (ii) fusión multimodal robusta, y (iii) salida no verbal generativa; sin el tercer punto, la empatía seguirá siendo asimétrica (percibe pero no ‘habita’ el cuerpo).",
+          "supporting_points": [
+            "La literatura señala como mejora futura la necesidad de reconocimiento emocional más preciso y veloz, condición para interacción en tiempo real.",
+            "Los agentes multimodales ya muestran que reconocer afecto por rostro incrementa empatía percibida y resultados relacionales.",
+            "El paso pendiente es convertir esa percepción en comportamiento expresivo multimodal del agente, cerrando el circuito de señalización social."
+          ],
+          "suggested_sources": [
+            "Emotion + Emotional"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Discusión",
+      "purpose": "Contrastar la perspectiva con enfoques existentes, profundizar en definiciones/evaluación, y argumentar por una integración multimodal y arquitectónica orientada a empatía situada.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "Sin una definición operacional clara, ‘empatía’ en IA se vuelve un objetivo móvil: distintas teorías producen distintos esquemas de anotación y, por tanto, modelos que optimizan señales incompatibles; esto es especialmente crítico en XR donde el error empático tiene consecuencias corporales.",
+          "supporting_points": [
+            "La psicología aporta medidas (cuestionarios, precisión empática) usadas como ground truth, pero algunos datasets usan etiquetas heurísticas no ancladas a constructos formales.",
+            "Diferentes visiones teóricas conducen a distintos targets de ML (p. ej., preocupación empática vs. intensidad vs. dinámica temporal).",
+            "En XR, la empatía debe mapearse a decisiones de interacción (timing, distancia social, tono, expresión), exigiendo definiciones que conecten medición con acción."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "La evidencia sugiere un camino pragmático: usar MLLMs para interpretar afecto visual y convertirlo en descripciones textuales como interfaz entre percepción y LLM; esto mejora sensibilidad empática sin requerir aún generación no verbal completa.",
+          "supporting_points": [
+            "Chatbots de salud mental basados en LLM mejoran al incorporar input multimodal con claves no verbales (FER) mientras mantienen output textual.",
+            "MLLMs pueden interpretar estados afectivos desde input visual de forma fiable; describir cues visuales en texto es una salida FER particularmente efectiva para condicionar respuestas.",
+            "Este patrón ‘percepción multimodal → representación textual → respuesta’ es un puente útil hacia agentes plenamente multimodales."
+          ],
+          "suggested_sources": [
+            "Emotion + Emotional"
+          ]
+        },
+        {
+          "number": 3,
+          "key_idea": "Sin embargo, la empatía en “Cuerpos Secos” requiere agencia: los módulos de razonamiento, memoria, planificación y tool-use deben coordinarse con objetivos de cuidado y regulación emocional, no solo con desempeño de tareas.",
+          "supporting_points": [
+            "Los agentes usan LLMs como unidades centrales para razonar, planificar y actuar en entornos diversos, acercándose a inteligencia más human-like.",
+            "Sistemas modernos se componen de múltiples módulos LLM (razonamiento, memoria, planificación, herramientas) aplicados en dominios complejos.",
+            "La perspectiva propone que estos módulos incluyan estados afectivos y políticas de interacción como variables de control, no como post-procesado de texto."
+          ],
+          "suggested_sources": [
+            "Agents + Agent",
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "number": 4,
+          "key_idea": "La generación conjunta de texto y conducta no verbal (p. ej., MARS) cambia el estándar: permite que el agente no solo ‘diga’ empatía sino que la ‘muestre’, habilitando evaluación conductual y no únicamente lingüística.",
+          "supporting_points": [
+            "MARS, entrenado con VENUS, genera expresiones no verbales naturales y alineadas al contexto junto con texto, con soporte en métricas, análisis cualitativo y estudios de usuario.",
+            "Modelar texto y señales no verbales como tokens latentes discretos permite aprendizaje unificado y generación coherente.",
+            "Esto habilita métricas nuevas (congruencia gesto–contenido, sincronía temporal, adecuación afectiva) críticas para XR."
+          ],
+          "suggested_sources": [
+            "Nonverbal + Multimodal"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Implicaciones Futuras",
+      "purpose": "Proponer líneas de investigación y efectos esperados para estandarización, diseño de agentes y expansión multimodal hacia XR/Metaverso.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "La agenda inmediata debe estandarizar la empatía como variable multimodal y temporal: sin alineación en granularidad, targets y modalidades, el campo seguirá produciendo ‘empatía’ inconmensurable y difícil de auditar en XR.",
+          "supporting_points": [
+            "Los datasets difieren en granularidad (utterance vs. sesión), targets (presencia, intensidad, dinámica) y modalidades, lo que produce operacionalizaciones inconsistentes.",
+            "En settings no clínicos se usan escalas numéricas/ordinales para calificar respuestas empáticas en diálogos e interacciones virtuales/robóticas, ofreciendo un punto de partida para estandarización transversal.",
+            "Propuesta implícita: protocolos que combinen ratings humanos, precisión empática y señales multimodales para capturar dinámica en tiempo real."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "El diseño de agentes debe coevolucionar con la arquitectura cognitiva: integrar memoria relacional y selección de vínculos (partner choice) puede convertir la empatía en propiedad longitudinal (alianza, confianza), no solo situacional.",
+          "supporting_points": [
+            "Las relaciones entre agentes pueden abstraerse mediante selección de compañeros basada en memoria de diálogo y justificación explícita, abriendo la puerta a ‘empatía basada en historia compartida’.",
+            "Se argumenta que arquitectura cognitiva y diseño del sistema deben integrarse en un loop de desarrollo mutuamente reforzante.",
+            "En XR, esta longitudinalidad es clave para evitar interacciones episódicas que optimicen engagement a corto plazo en detrimento del bienestar."
+          ],
+          "suggested_sources": [
+            "Agents + Agent",
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "number": 3,
+          "key_idea": "La expansión de modalidades no verbales (voz/prosodia y más) y el entrenamiento con modelos tipo MARS permitirán “Cuerpos Secos” socialmente competentes; el criterio de éxito debe incluir alianza terapéutica, confianza y calibración afectiva, no solo calidad textual.",
+          "supporting_points": [
+            "Agentes multimodales que explotan señales no verbales incrementan empatía percibida, engagement, confianza y alianza terapéutica, ofreciendo un template para chatbots empáticos con MLLMs.",
+            "Los MLLMs permiten integrar postura, prosodia y rostro con diálogo textual para respuestas context-aware.",
+            "Futuro trabajo propone ampliar modalidades (incluidas expresiones vocales) para robustez; MARS muestra viabilidad de generación conjunta texto+no verbal con tokens unificados."
+          ],
+          "suggested_sources": [
+            "Emotion + Emotional",
+            "Nonverbal + Multimodal"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Desafíos y Limitaciones",
+      "purpose": "Reconocer límites metodológicos y técnicos: comparabilidad, arquitectura, generalización entre contextos y sesgos por rasgos/persona.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "La comparabilidad científica está comprometida porque la empatía se formula como tareas distintas (clasificación, regresión, secuencias), reflejando teorías divergentes; incluso con revisiones exhaustivas, el campo corre el riesgo de acumular resultados no integrables.",
+          "supporting_points": [
+            "La empatía se modela con formulaciones diversas (discreta, continua, secuencial), lo que limita comparar modelos y afirmar progreso acumulativo.",
+            "Aunque existe una revisión sistemática amplia hasta mayo 2025, la heterogeneidad de tareas y contextos impide meta-conclusiones fuertes sobre ‘qué funciona’.",
+            "Esto afecta directamente la propuesta: sin consenso mínimo, “Agentes Fundamentales Empáticos” podrían optimizar proxies incompatibles."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "Las arquitecturas actuales priorizan metacognición interna (memoria/reflexión/planificación) y no el rediseño del sistema como organismo situado; además, los mecanismos sociales (proximidad/tendencias) pueden inducir patrones de interacción no deseados en XR.",
+          "supporting_points": [
+            "Las arquitecturas cognitivas moldean fuertemente el desempeño, pero suelen enfocarse en razonamiento interno más que en rediseñar el sistema para interacción situada.",
+            "La comunicación entre agentes puede dispararse probabilísticamente por proximidad y tendencias sociales, con conversaciones que se profundizan por memoria; esto puede amplificar exposición/enganche sin criterios de bienestar.",
+            "En XR, estos sesgos de política social pueden escalar a efectos de dependencia o manipulación afectiva si no se controlan."
+          ],
+          "suggested_sources": [
+            "Agents + Agent",
+            "Metaverse + Vr"
+          ]
+        },
+        {
+          "number": 3,
+          "key_idea": "La generalización entre entornos y usuarios es frágil: diferencias fisiológicas entre interacción presencial y remota, y sesgos por personalidad/rasgos, pueden distorsionar inferencias afectivas y llevar a ‘empatía equivocada’ aun con buenos modelos lingüísticos.",
+          "supporting_points": [
+            "Se observan diferencias en facial expressions, EDA y HRV entre settings, lo que sugiere que modelos entrenados en un canal pueden fallar en otro.",
+            "Evidencia indica que enfocar explícitamente el chatbot en temas de personalidad mejora inferencia de rasgos sin dañar la experiencia, pero también revela que la conversación guía el ‘perfilado’ del usuario.",
+            "En XR, donde hay más señales y más persistencia, la combinación de variabilidad fisiológica y perfilado por rasgos aumenta riesgos de errores sistemáticos y de sobreconfianza del sistema."
+          ],
+          "suggested_sources": [
+            "Face + Emotional",
+            "Personality + Traits",
+            "Emotion + Emotional"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Conclusiones",
+      "purpose": "Cerrar el argumento: por qué la empatía multimodal y la arquitectura de agentes son condiciones para “Cuerpos Secos” seguros y beneficiosos en XR.",
+      "paragraphs": [
+        {
+          "number": 1,
+          "key_idea": "La evidencia converge en que la empatía es multifacética (cognitiva, afectiva, compasiva) y que su implementación en agentes es heterogénea; por ello, “Cuerpos Secos” solo serán socialmente confiables si integran inteligencia emocional multimodal con arquitectura de agente (razonar–planificar–actuar) y criterios de evaluación coherentes.",
+          "supporting_points": [
+            "La empatía se define como constructo multifacético con componentes esenciales para engagement holístico y confianza.",
+            "Los rasgos empáticos en agentes (especialmente en salud mental) son altamente heterogéneos en definición e implementación, lo que justifica una hoja de ruta integradora.",
+            "Estrategias técnicas para inteligencia emocional incluyen prompting guiado por emoción, fusión multimodal, memoria episódica y adaptación dinámica; esto debe acoplarse a agentes que usan LLMs para razonar, planificar y actuar."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic",
+            "Emotion + Emotional",
+            "Agents + Agent"
+          ]
+        },
+        {
+          "number": 2,
+          "key_idea": "El programa de investigación debe unificar diseño y ciencia cognitiva: usar marcos estructurados para agentes y, a la vez, desarrollar estándares multimodales de empatía que permitan auditar impacto en XR, evitando que la simbiosis algoritmo–emoción erosione la cognición biológica.",
+          "supporting_points": [
+            "Se propone un programa estructurado para conectar agentes LLM con ideas históricas, definir abstracciones (p. ej., CoALA) y derivar guía de diseño y preguntas abiertas.",
+            "La necesidad de definiciones operacionales y mediciones consistentes de empatía se vuelve un requisito de seguridad y gobernanza en entornos inmersivos.",
+            "La conclusión refuerza el imperativo ético: diseñar para potenciar (no erosionar) la cognición humana mediante empatía computacional verificable."
+          ],
+          "suggested_sources": [
+            "Agents + Agent",
+            "Empathy + Empathic",
+            "Metaverse + Vr"
+          ]
+        }
+      ]
+    }
+  ]
+}

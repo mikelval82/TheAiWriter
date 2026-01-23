@@ -8,7 +8,7 @@ from config.settings import settings
 
 
 # Models that require max_completion_tokens instead of max_tokens
-GPT5_MODELS = ["gpt-5", "gpt-5.1", "gpt-5-mini", "gpt-5-2025-08-07", "gpt-5-mini-2025-08-07"]
+GPT5_MODELS = ["gpt-5", "gpt-5.1", "gpt-5.2", "gpt-5-mini", "gpt-5-2025-08-07", "gpt-5-mini-2025-08-07"]
 
 
 class BaseAgent(ABC):

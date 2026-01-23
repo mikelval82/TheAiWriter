@@ -1,7 +1,13 @@
 """Reviewer agent for reviewing and improving academic papers."""
 
+import json
+from typing import TYPE_CHECKING
+
 from ai_writer.agents.base_agent import BaseAgent
 from ai_writer.models.paper import Paper, Section
+
+if TYPE_CHECKING:
+    from ai_writer.utils.enhanced_context_manager import EnhancedContextManager
 
 
 class ReviewerAgent(BaseAgent):
@@ -11,16 +17,226 @@ class ReviewerAgent(BaseAgent):
         self,
         model: str | None = None,
         abstract_context: str | None = None,
+        context_manager: "EnhancedContextManager | None" = None,
     ) -> None:
         """Initialize the reviewer agent.
 
         Args:
             model: The model to use. Defaults to settings default.
             abstract_context: The abstract that provides context for the paper.
+            context_manager: Optional context manager for RAG-enhanced review.
         """
         super().__init__(model=model)
         self.abstract_context = abstract_context or ""
+        self.context_manager = context_manager
+        # Short-term memory: resúmenes de secciones revisadas
+        self.section_summaries: dict[str, str] = {}
+    
+    def set_context_manager(self, context_manager: "EnhancedContextManager") -> None:
+        """Set the context manager for RAG-enhanced review.
+        
+        Args:
+            context_manager: The enhanced context manager to use.
+        """
+        self.context_manager = context_manager
+    
+    def reset_memory(self) -> None:
+        """Reset the short-term memory (section summaries)."""
+        self.section_summaries = {}
+    
+    def _generate_section_summary(self, section: Section) -> str:
+        """Generate a concise summary of a section for context memory.
+        
+        Args:
+            section: The section to summarize.
+            
+        Returns:
+            A concise summary capturing key points and arguments.
+        """
+        user_prompt = f"""Genera un resumen conciso de la siguiente sección de un paper académico.
 
+SECCIÓN: {section.title}
+
+CONTENIDO:
+{section.content}
+
+INSTRUCCIONES:
+- Resume en 3-5 oraciones los puntos clave y argumentos principales
+- Incluye la tesis o idea central de la sección
+- Menciona conceptos o términos importantes introducidos
+- Sé preciso y conciso (máximo 150 palabras)
+- Este resumen se usará para dar contexto al revisar secciones posteriores
+
+RESUMEN:"""
+
+        summary = self._call_api(
+            system_prompt="Eres un asistente experto en síntesis de textos académicos. Generas resúmenes precisos y concisos.",
+            user_prompt=user_prompt,
+            max_tokens=300,
+            temperature=0.3,
+        )
+        
+        return summary.strip()
+    
+    def update_section_memory(self, section: Section) -> str:
+        """Update the short-term memory with a new or revised section.
+        
+        Args:
+            section: The section to add/update in memory.
+            
+        Returns:
+            The generated summary.
+        """
+        summary = self._generate_section_summary(section)
+        self.section_summaries[section.title] = summary
+        return summary
+    
+    def get_context_from_memory(self) -> str:
+        """Build context string from accumulated section summaries.
+        
+        Returns:
+            Formatted context string with all section summaries.
+        """
+        if not self.section_summaries:
+            return ""
+        
+        context = "\n\nMEMORIA DE SECCIONES ANTERIORES:\n"
+        context += "(Resúmenes de las secciones ya revisadas para mantener coherencia)\n"
+        
+        for title, summary in self.section_summaries.items():
+            context += f"\n### {title}\n{summary}\n"
+        
+        return context
+
+    # =========================================================================
+    # RAG-Enhanced Review Methods
+    # =========================================================================
+    
+    def _generate_strengthening_queries(self, section: Section) -> dict[str, str]:
+        """Generate 4 specific queries to strengthen the section's arguments.
+        
+        Generates one query of each type:
+        - support: Evidence that confirms claims in the section
+        - counter: Limitations or criticisms to address
+        - examples: Concrete implementations or case studies
+        - connections: Relationships with other concepts
+        
+        Args:
+            section: The section to analyze.
+            
+        Returns:
+            Dict with query types as keys and query strings as values.
+        """
+        user_prompt = f"""Analiza la siguiente sección académica e identifica 4 queries específicas para buscar 
+en la literatura y fortalecer los argumentos.
+
+SECCIÓN: {section.title}
+
+CONTENIDO:
+{section.content}
+
+Genera exactamente 4 queries, una de cada tipo:
+
+1. SOPORTE: Una query para buscar estudios o evidencia que confirmen el argumento principal
+2. CONTRARIA: Una query para buscar limitaciones, críticas o evidencia contraria que debería abordarse
+3. EJEMPLO: Una query para buscar implementaciones concretas, casos de estudio o ejemplos prácticos
+4. CONEXION: Una query para buscar relaciones con otros conceptos o campos que enriquezcan el argumento
+
+IMPORTANTE:
+- Las queries deben ser específicas y basadas en el contenido real de la sección
+- Deben ser útiles para búsqueda semántica en un corpus académico
+- No uses términos genéricos, sé concreto
+
+Responde SOLO en formato JSON:
+{{
+    "support": "query para buscar evidencia de soporte...",
+    "counter": "query para buscar limitaciones o críticas...",
+    "examples": "query para buscar implementaciones o ejemplos...",
+    "connections": "query para buscar relaciones con otros conceptos..."
+}}"""
+
+        response = self._call_api(
+            system_prompt="Eres un experto en investigación académica. Generas queries precisas para búsqueda en literatura científica.",
+            user_prompt=user_prompt,
+            max_tokens=500,
+            temperature=0.5,
+        )
+        
+        # Parse JSON response
+        try:
+            # Clean response if wrapped in markdown
+            response = response.strip()
+            if response.startswith("```"):
+                response = response.split("```")[1]
+                if response.startswith("json"):
+                    response = response[4:]
+            queries = json.loads(response)
+            return {
+                "support": queries.get("support", ""),
+                "counter": queries.get("counter", ""),
+                "examples": queries.get("examples", ""),
+                "connections": queries.get("connections", ""),
+            }
+        except json.JSONDecodeError:
+            # Fallback: return empty queries
+            return {"support": "", "counter": "", "examples": "", "connections": ""}
+    
+    def _search_for_strengthening_evidence(
+        self,
+        queries: dict[str, str],
+        top_k_per_query: int = 2,
+    ) -> str:
+        """Search the embedding space for evidence to strengthen arguments.
+        
+        Args:
+            queries: Dict with query types and query strings.
+            top_k_per_query: Number of results per query type.
+            
+        Returns:
+            Formatted context string with found evidence.
+        """
+        if not self.context_manager:
+            return ""
+        
+        evidence_sections = []
+        
+        query_type_labels = {
+            "support": "📗 EVIDENCIA DE SOPORTE",
+            "counter": "📙 LIMITACIONES/CRÍTICAS A CONSIDERAR",
+            "examples": "📘 EJEMPLOS E IMPLEMENTACIONES",
+            "connections": "📕 CONEXIONES CON OTROS CONCEPTOS",
+        }
+        
+        for query_type, query in queries.items():
+            if not query:
+                continue
+            
+            label = query_type_labels.get(query_type, query_type.upper())
+            
+            # Search in ideas index
+            results = self.context_manager.ideas_index.search(query, top_k=top_k_per_query)
+            
+            if results:
+                section_text = f"\n{label}:\n"
+                section_text += f"(Query: {query[:80]}...)\n" if len(query) > 80 else f"(Query: {query})\n"
+                
+                for item, score in results:
+                    idea = item.get("idea", "")
+                    paper = item.get("paper_title", "Unknown")[:50]
+                    section_text += f"- [{paper}] {idea}\n"
+                
+                evidence_sections.append(section_text)
+        
+        if not evidence_sections:
+            return ""
+        
+        context = "\n\n" + "=" * 50 + "\n"
+        context += "EVIDENCIA ADICIONAL DE LA LITERATURA\n"
+        context += "(Resultados de búsqueda para fortalecer argumentos)\n"
+        context += "=" * 50
+        context += "".join(evidence_sections)
+        
+        return context
     @property
     def system_prompt(self) -> str:
         """Return the system prompt for the reviewer agent."""
@@ -165,27 +381,42 @@ Provide a consistency report with specific issues and locations."""
         )
 
         return report
+    
     def review_section(
         self,
         section: Section,
         previous_sections: list[Section] | None = None,
+        update_memory: bool = True,
+        use_rag_enhancement: bool = True,
     ) -> Section:
-        """Review and improve a single section with context.
+        """Review and improve a single section with context from memory.
 
         Args:
             section: The section to review.
-            previous_sections: Already written sections for context.
+            previous_sections: Already written sections (used to sync memory if empty).
+            update_memory: Whether to update memory after review (default True).
+            use_rag_enhancement: Whether to search for additional evidence (default True).
 
         Returns:
             The improved section.
         """
-        # Build context from previous sections
-        previous_context = ""
-        if previous_sections:
-            previous_context = "\n\nCONTEXTO - SECCIONES ANTERIORES:\n"
+        # Sync memory with previous sections if memory is empty
+        # (This handles the case where we're starting fresh or sections were written without review)
+        if previous_sections and not self.section_summaries:
             for sec in previous_sections:
-                content = sec.content[:1000] + "..." if len(sec.content) > 1000 else sec.content
-                previous_context += f"\n### {sec.title}\n{content}\n"
+                if sec.title not in self.section_summaries:
+                    self.update_section_memory(sec)
+        
+        # Build context from memory (summaries) instead of truncated text
+        previous_context = self.get_context_from_memory()
+        
+        # RAG Enhancement: Search for additional evidence to strengthen arguments
+        rag_context = ""
+        if use_rag_enhancement and self.context_manager:
+            # Generate targeted queries based on section content
+            queries = self._generate_strengthening_queries(section)
+            # Search embedding space for evidence
+            rag_context = self._search_for_strengthening_evidence(queries)
 
         user_prompt = f"""Revisa y mejora la siguiente sección de un artículo de perspectivas académico.
 
@@ -193,7 +424,7 @@ SECCIÓN A REVISAR: {section.title}
 
 CONTENIDO ACTUAL:
 {section.content}
-{previous_context}
+{previous_context}{rag_context}
 
 CRITERIOS DE REVISIÓN:
 1. Claridad y precisión del lenguaje
@@ -205,7 +436,9 @@ CRITERIOS DE REVISIÓN:
 
 INSTRUCCIONES:
 - Mejora el contenido manteniendo las ideas centrales
-- Asegura coherencia con el contexto del paper
+- Asegura coherencia con el contexto del paper (resúmenes de secciones anteriores)
+- Si se proporciona EVIDENCIA ADICIONAL DE LA LITERATURA, considera incorporar 
+  insights relevantes para fortalecer los argumentos (cita las fuentes si las usas)
 - Escribe en español académico formal
 - NO incluyas comentarios sobre los cambios, solo el contenido mejorado
 
@@ -217,7 +450,13 @@ Escribe únicamente el contenido mejorado de la sección:"""
             max_tokens=4096,
         )
 
-        return Section(title=section.title, content=improved_content.strip())
+        improved_section = Section(title=section.title, content=improved_content.strip())
+        
+        # Update memory with the improved section
+        if update_memory:
+            self.update_section_memory(improved_section)
+        
+        return improved_section
 
     def review_full_paper(self, paper: Paper) -> Paper:
         """Perform a final coherence review of the complete paper.

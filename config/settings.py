@@ -22,9 +22,9 @@ class AISettings(BaseModel):
 
     openai_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     anthropic_api_key: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
-    default_model: str = Field(default_factory=lambda: os.getenv("DEFAULT_MODEL", "gpt-4o-mini"))
-    reasoning_model: str = Field(default_factory=lambda: os.getenv("REASONING_MODEL", "gpt-5-2025-08-07"))
-    fast_model: str = Field(default_factory=lambda: os.getenv("FAST_MODEL", "gpt-5-mini-2025-08-07"))
+    default_model: str = Field(default_factory=lambda: os.getenv("DEFAULT_MODEL", "gpt-5.2"))
+    reasoning_model: str = Field(default_factory=lambda: os.getenv("REASONING_MODEL", "gpt-5.2"))
+    fast_model: str = Field(default_factory=lambda: os.getenv("FAST_MODEL", "gpt-5.2"))
     max_tokens: int = Field(default_factory=lambda: int(os.getenv("MAX_TOKENS", "16384")))
     temperature: float = Field(default_factory=lambda: float(os.getenv("TEMPERATURE", "0.0")))
     reasoning_effort: str = Field(default_factory=lambda: os.getenv("REASONING_EFFORT", "medium"))

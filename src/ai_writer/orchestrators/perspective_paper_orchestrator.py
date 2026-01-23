@@ -42,7 +42,7 @@ class PerspectivePaperOrchestrator:
     def __init__(
         self,
         abstract_path: Path | str | None = None,
-        review_iterations: int = 2,
+        review_iterations: int = 1,
         top_k_references: int = 8,
         use_enhanced_context: bool = True,
     ) -> None:
@@ -79,7 +79,11 @@ class PerspectivePaperOrchestrator:
         
         # Initialize agents with shared context
         self.writer_agent = WriterAgent(abstract_context=self.abstract_context)
-        self.reviewer_agent = ReviewerAgent(abstract_context=self.abstract_context)
+        # Pass context_manager to reviewer for RAG-enhanced review
+        self.reviewer_agent = ReviewerAgent(
+            abstract_context=self.abstract_context,
+            context_manager=self.context_manager if hasattr(self, 'context_manager') else None,
+        )
         
         # Path for incremental output file
         self.output_file_path: Path | None = None
@@ -252,6 +256,9 @@ class PerspectivePaperOrchestrator:
 
         # Initialize output file (overwrites any existing file)
         self._initialize_output_file(title)
+        
+        # Reset reviewer's short-term memory for fresh context tracking
+        self.reviewer_agent.reset_memory()
 
         # Use default perspective paper sections if not specified
         section_names = sections or PERSPECTIVE_PAPER_SECTIONS
