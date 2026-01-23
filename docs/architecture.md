@@ -1,537 +1,548 @@
 # TheAIWriter - Arquitectura del Sistema
 
-## 📋 Resumen
+> Sistema de escritura académica asistida por IA especializado en **papers de perspectivas**.  
+> Versión: 1.0.0 | Última actualización: Enero 2026
 
-TheAIWriter es un sistema de escritura académica asistida por IA especializado en **papers de perspectivas**. Utiliza agentes especializados para generar, revisar iterativamente y exportar papers científicos manteniendo coherencia con un abstract base.
+## 📋 Índice
 
-### Características Principales
-- **Contexto Enriquecido**: Usa índices de ideas (3733) y claims (3839) extraídos de 41 papers de referencia
-- **Selección Inteligente**: Configuración por sección (ideas vs claims, nivel de confianza)
-- **Búsqueda Semántica**: Embeddings con OpenAI text-embedding-3-small (1536 dimensiones)
-- **Diversidad de Fuentes**: Límite de items por paper para citas variadas
-- **Procesamiento Batch**: Pipeline automatizado para extraer ideas, claims y referencias de PDFs
-- **Arquitectura Avanzada de 3 Fases**: Análisis de clusters, planificación con ideas clave, y escritura párrafo por párrafo
+1. [Visión General](#-visión-general)
+2. [Arquitectura de Alto Nivel](#-arquitectura-de-alto-nivel)
+3. [Pipeline de 3 Fases](#-pipeline-de-3-fases)
+4. [Sistema de Agentes](#-sistema-de-agentes)
+5. [Sistema RAG](#-sistema-rag)
+6. [Modelos de Datos](#-modelos-de-datos)
+7. [Estructura del Proyecto](#-estructura-del-proyecto)
+8. [CLI y Uso](#-cli-y-uso)
 
 ---
 
-## 🚀 NUEVO: Orquestador Avanzado de 3 Fases
+## 🎯 Visión General
+
+TheAIWriter genera papers académicos de perspectiva utilizando:
+
+- **Análisis de Clusters**: Extrae temas principales del espacio de embeddings
+- **Planificación Inteligente**: Genera outlines detallados párrafo por párrafo
+- **RAG-Enhanced Writing**: Cada párrafo busca evidencia específica
+- **Revisión Iterativa**: ReviewerAgent fortalece argumentos con evidencia adicional
+- **Memoria de Sección**: Mantiene coherencia entre secciones
+
+### Métricas del Sistema
+
+| Recurso | Cantidad |
+|---------|----------|
+| Ideas indexadas | 3,733 |
+| Claims indexados | 3,839 |
+| Referencias indexadas | 1,200+ |
+| Papers procesados | 41 |
+| Dimensiones embedding | 1,536 |
+
+---
+
+## 🏗️ Arquitectura de Alto Nivel
+
+```mermaid
+flowchart TB
+    subgraph Input["📥 Entrada"]
+        Abstract["📝 ABSTRACT.md"]
+        PDFs["📄 PDFs de Referencia"]
+    end
+
+    subgraph Processing["⚙️ Procesamiento Offline"]
+        Docling["Docling\nPDF → Markdown"]
+        Extractor["PDFExtractionAgent\nIdeas, Claims, Referencias"]
+        Embedder["OpenAI Embeddings\ntext-embedding-3-small"]
+        
+        PDFs --> Docling --> Extractor --> Embedder
+    end
+
+    subgraph Storage["💾 Almacenamiento"]
+        direction LR
+        Ideas[("💡 Ideas\nideas_index.npz")]
+        Claims[("📌 Claims\nclaims_index.npz")]
+        Refs[("📚 Referencias\nreferences_index.npz")]
+        
+        Embedder --> Ideas & Claims & Refs
+    end
+
+    subgraph Generation["🚀 Generación (3 Fases)"]
+        Phase1["🔬 Fase 1\nCluster Analysis"]
+        Phase2["📋 Fase 2\nPlanning"]
+        Phase3["✍️ Fase 3\nWriting"]
+        
+        Phase1 --> Phase2 --> Phase3
+    end
+
+    subgraph Output["📤 Salida"]
+        Paper["📄 Paper.md"]
+        Review["📋 Critical Review.md"]
+    end
+
+    Abstract --> Phase1
+    Ideas --> Phase1
+    Ideas & Claims & Refs --> Phase3
+    Phase3 --> Paper & Review
+
+    style Input fill:#e3f2fd
+    style Processing fill:#fff3e0
+    style Storage fill:#f3e5f5
+    style Generation fill:#e8f5e9
+    style Output fill:#fce4ec
+```
+
+---
+
+## 🔬 Pipeline de 3 Fases
+
+### Diagrama Detallado del Pipeline
 
 ```mermaid
 flowchart TD
-    subgraph phase1["🔬 FASE 1: Análisis de Clusters"]
-        A[📄 Abstract] --> B[ClusterAnalyzer]
-        E1[ideas_index.npz] --> B
-        B --> C[KMeans clustering<br/>n_clusters=12]
-        C --> D[Extraer temas principales]
-        D --> T[Lista de ClusterTopics<br/>con labels y keywords]
+    subgraph Phase1["🔬 FASE 1: Análisis de Clusters"]
+        A1["📝 Cargar Abstract"] --> A2["📊 Cargar Embeddings\n(ideas_index.npz)"]
+        A2 --> A3["🎯 KMeans Clustering\n(n_clusters=25)"]
+        A3 --> A4["📈 TF-IDF por Cluster"]
+        A4 --> A5["🏷️ Generar ClusterTopics\n• label\n• keywords\n• centroid\n• size"]
     end
-    
-    subgraph phase2["📋 FASE 2: Planificación"]
-        A --> P1[PlannerAgent]
-        T --> P1
-        P1 --> P2[Generar PaperOutline]
-        P2 --> P3[Secciones → Párrafos → Ideas Clave]
-        P3 --> P4[ReviewerAgent.review_outline]
-        P4 --> P5{Feedback?}
-        P5 -->|Sí| P6[Refinar outline]
-        P6 --> P3
-        P5 -->|No| OUT[Outline Final]
+
+    subgraph Phase2["📋 FASE 2: Planificación"]
+        B1["📑 Definir Secciones"] --> B2["🔗 Mapear Secciones → Topics"]
+        B2 --> B3["🔍 Buscar Ideas por Centroide\n~8 ideas/sección"]
+        B3 --> B4["📝 Construir Prompt\n• Abstract\n• Topics\n• Ideas reales"]
+        B4 --> B5["🤖 PlannerAgent\n→ PaperOutline"]
+        B5 --> B6["👀 ReviewerAgent\nreview_outline()"]
+        B6 --> B7{¿Cambios?}
+        B7 -->|Sí| B8["✏️ Refinar Outline"]
+        B8 --> B6
+        B7 -->|No| B9["✅ Outline Final"]
     end
-    
-    subgraph phase3["✍️ FASE 3: Escritura"]
-        OUT --> W1[Por cada sección]
-        W1 --> W2[Por cada párrafo]
-        W2 --> W3[paragraph.to_query<br/>= key_idea + supporting_points]
-        W3 --> W4[get_context_for_idea<br/>NO usa abstract]
-        W4 --> W5[Búsqueda semántica específica]
-        W5 --> W6[WriterAgent.write_paragraph]
-        W6 --> W7[Siguiente párrafo]
-        W7 --> W2
-        W2 --> W8[ReviewerAgent revisa sección]
-        W8 --> W9[Siguiente sección]
-        W9 --> W1
+
+    subgraph Phase3["✍️ FASE 3: Escritura"]
+        C1["📑 Por cada Sección"] --> C2["¶ Por cada Párrafo"]
+        C2 --> C3["🔍 paragraph.to_query()\n= key_idea + points"]
+        C3 --> C4["📚 get_context_for_idea()\nBúsqueda semántica"]
+        C4 --> C5["✍️ WriterAgent\nwrite_paragraph()"]
+        C5 --> C6["📝 Añadir a Sección"]
+        C6 --> C7{¿Más párrafos?}
+        C7 -->|Sí| C2
+        C7 -->|No| C8["💾 Generar Summary"]
+        C8 --> C9["📋 Actualizar Memory"]
+        C9 --> C10["👀 ReviewerAgent\nreview_section()"]
+        C10 --> C11{¿Más secciones?}
+        C11 -->|Sí| C1
+        C11 -->|No| C12["📄 Paper Completo"]
     end
-    
-    phase1 --> phase2
-    phase2 --> phase3
-    phase3 --> PAPER[📄 Paper Final]
+
+    A5 --> B1
+    B9 --> C1
+    C12 --> D1["📄 Guardar Paper.md"]
+    C12 --> D2["📋 Generar Critical Review"]
+
+    style Phase1 fill:#fff3e0
+    style Phase2 fill:#f3e5f5
+    style Phase3 fill:#e8f5e9
 ```
 
-### Componentes Clave del Orquestador Avanzado
+### Descripción de Fases
 
-| Componente | Ubicación | Propósito |
-|------------|-----------|-----------|
-| `ClusterAnalyzer` | `utils/cluster_analyzer.py` | Extrae temas principales del espacio de embeddings |
-| `PaperOutline` | `models/outline.py` | Modelo de datos para esquema (secciones → párrafos → ideas) |
-| `PlannerAgent` | `agents/planner_agent.py` | Genera esquema detallado basado en abstract + temas |
-| `AdvancedPerspectiveOrchestrator` | `orchestrators/advanced_orchestrator.py` | Coordina las 3 fases |
-| `get_context_for_idea()` | `utils/enhanced_context_manager.py` | Búsqueda por idea específica (no por abstract) |
-| `write_paragraph()` | `agents/writer_agent.py` | Escribe un párrafo siguiendo idea clave |
+#### Fase 1: Cluster Analysis
+1. Carga embeddings de ideas (3,733 vectores × 1,536 dims)
+2. Aplica KMeans con `n_clusters=25`
+3. Extrae keywords con TF-IDF por cluster
+4. Genera `ClusterTopic` con label, keywords, centroid y tamaño
 
-### Uso
+#### Fase 2: Planning
+1. Define 8 secciones estándar de paper de perspectivas
+2. Mapea cada sección a topics relevantes
+3. Busca ideas cercanas a centroids (`cosine_similarity`)
+4. PlannerAgent genera outline estructurado
+5. ReviewerAgent valida (cambios conservadores)
 
-```bash
-# Orquestador avanzado (3 fases)
-python src/ai_writer/scripts/run_advanced_paper.py --title "Mi Paper" --clusters 12
-
-# Orquestador original (sección por sección)
-python src/ai_writer/scripts/generate_perspective_paper.py --title "Mi Paper"
-```
+#### Fase 3: Writing
+1. Para cada párrafo del outline:
+   - Genera query semántico desde `key_idea + supporting_points`
+   - Busca contexto específico (NO usa abstract genérico)
+   - WriterAgent escribe párrafo fundamentado
+2. Genera summary de sección para memoria
+3. ReviewerAgent revisa sección completa
 
 ---
 
-## 🎯 Flujo Original: Paper de Perspectivas
+## 🤖 Sistema de Agentes
 
-```mermaid
-flowchart TD
-    subgraph input["📥 Entrada"]
-        A[📄 ABSTRACT.md<br/>Tesis del usuario]
-        P1[📚 PDFs procesados<br/>41 papers]
-    end
-    
-    subgraph processing["⚙️ Procesamiento Previo"]
-        P1 --> P2[BatchProcessor]
-        P2 --> P3[PDFExtractionAgent]
-        P3 --> P4[Extraer ideas, claims, refs]
-        P4 --> P5[JSONL + Embeddings]
-    end
-    
-    subgraph init["🚀 Inicialización"]
-        A --> B[Cargar Contexto Base]
-        B --> C[PerspectivePaperOrchestrator]
-        P5 --> D[EnhancedContextManager]
-        D --> E[Cargar índices embeddings]
-        E --> F1[ideas_index.npz<br/>3733 ideas]
-        E --> F2[claims_index.npz<br/>3839 claims]
-        C --> D
-    end
-    
-    subgraph agents["🤖 Agentes"]
-        C --> H[WriterAgent<br/>GPT-5.1 + contexto]
-        C --> I[ReviewerAgent<br/>GPT-5.1 + abstract]
-    end
-    
-    subgraph loop["🔄 Por cada sección (11 secciones)"]
-        D --> J[SectionConfig<br/>ideas_weight, min_confidence, top_k]
-        J --> K[Búsqueda semántica<br/>query = abstract + sección]
-        K --> L[Combinar ideas + claims<br/>según ideas_weight]
-        L --> M[Filtrar por confianza<br/>diversificar por paper]
-        M --> N[Formatear contexto<br/>compacto y token-efficient]
-        N --> O[WriterAgent escribe sección]
-        O --> P{Iteración < N?}
-        P -->|Sí| Q[ReviewerAgent revisa]
-        Q --> R[Feedback estructurado]
-        R --> O
-        P -->|No| S[✓ Sección completada]
-    end
-    
-    subgraph output["📤 Salida"]
-        S --> T[Paper completo]
-        T --> U[Revisión Crítica Final]
-        U --> V[📝 Paper.md<br/>data/output/final/]
-        U --> W[📋 Critical_Review.md]
-    end
-```
-
-### Ejecución
-
-```bash
-# Generar paper de perspectivas
-PYTHONPATH=/home/mikel/TheAIWriter python src/ai_writer/scripts/generate_perspective_paper.py
-
-# Procesamiento batch de PDFs (previo)
-python src/ai_writer/scripts/run_batch_processing.py
-```
-
----
-
-## 🔍 Sistema de Selección Inteligente de Contexto
-
-```mermaid
-flowchart LR
-    subgraph query["🔎 Construcción de Query"]
-        A[Sección actual:<br/>e.g. 'Introducción'] --> B[SectionConfig]
-        B --> C[ideas_weight: 0.7<br/>min_confidence: medium<br/>top_k: 12]
-        AB[Abstract completo] --> G
-    end
-    
-    subgraph indices["📊 Índices de Embeddings"]
-        D[Ideas Index<br/>3733 items] --> E[EmbeddingIndex]
-        F[Claims Index<br/>3839 items] --> E
-    end
-    
-    subgraph search["🎯 Búsqueda y Ranking"]
-        G[Query = Abstract +<br/>Sección + Keywords] --> E
-        E --> H[Similitud Coseno<br/>top_k resultados]
-        H --> I[Combinar ideas + claims<br/>según ideas_weight]
-        I --> J[Filtrar por confianza<br/>min_confidence]
-        J --> K[Diversificar fuentes<br/>max_per_paper]
-    end
-    
-    subgraph output["📝 Output"]
-        K --> L[Formatear contexto<br/>compacto]
-        L --> M[WriterAgent]
-    end
-```
-
-### Configuración por Sección
-
-| Sección | top_k | ideas_weight | min_confidence | max_per_paper |
-|---------|-------|--------------|----------------|---------------|
-| Introducción | 12 | 0.7 | medium | 4 |
-| Estado Actual del Arte | 18 | 0.8 | medium | 3 |
-| Identificación del Problema o Brecha | 12 | 0.5 | medium | 4 |
-| La Nueva Perspectiva | 15 | 0.6 | high | 5 |
-| Discusión | 14 | 0.3 | high | 4 |
-| Implicaciones Futuras | 12 | 0.6 | medium | 4 |
-| Desafíos y Limitaciones | 10 | 0.4 | medium | 4 |
-| Conclusiones | 10 | 0.5 | high | 5 |
-| Declaración de Conflicto de Intereses | 0 | - | - | 0 |
-| Agradecimientos | 0 | - | - | 0 |
-| Referencias Bibliográficas | 0 | - | - | 0 |
-
-**ideas_weight**: Balance entre ideas (conceptos) y claims (afirmaciones con evidencia)  
-**min_confidence**: Nivel mínimo de confianza para claims (high/medium/low)  
-**max_per_paper**: Máximo de items por paper para diversidad de fuentes
-
----
-
-## 📚 Estructura de un Paper de Perspectivas
-
-| Orden | Sección | Descripción |
-|-------|---------|-------------|
-| 0 | **Abstract** | Proporcionado por el usuario (no generado) |
-| 1 | Introducción | Contexto y objetivos |
-| 2 | Estado Actual del Arte | Revisión de literatura |
-| 3 | Identificación del Problema o Brecha | La brecha a abordar |
-| 4 | La Nueva Perspectiva | Propuesta central |
-| 5 | Discusión | Argumentación detallada |
-| 6 | Implicaciones Futuras | Hoja de ruta |
-| 7 | Desafíos y Limitaciones | Reconocimiento honesto |
-| 8 | Conclusiones | Síntesis final |
-| 9 | Declaración de Conflicto de Intereses | Declaración formal |
-| 10 | Agradecimientos | Reconocimientos |
-| 11 | Referencias Bibliográficas | Bibliografía |
-
----
-
-## 🏗️ Arquitectura de Agentes
+### Diagrama de Clases
 
 ```mermaid
 classDiagram
     class BaseAgent {
         <<abstract>>
         +client: OpenAI
-        +model: str
-        +_call_api(system_prompt, user_prompt)
-        +system_prompt: str*
+        +model: str = "gpt-5.2"
+        +_call_api(system_prompt, user_prompt) str
+        +_call_api_json(system_prompt, user_prompt) dict
+    }
+    
+    class PlannerAgent {
+        +generate_outline(title, abstract, topics) PaperOutline
+        +refine_outline(outline, feedback) PaperOutline
+        -_build_prompt(title, abstract, topics, ideas) str
     }
     
     class WriterAgent {
         +abstract_context: str
-        +write(topic, sections, references) Paper
-        +write_section(section_name, previous_sections, reference_context) Section
-        +expand_section(paper, section_title) Paper
-        -_get_section_instructions(section_name) str
+        +write_section(name, previous, context) Section
+        +write_paragraph(outline, context, memory) str
+        -_get_section_instructions(name) str
     }
     
     class ReviewerAgent {
         +abstract_context: str
-        +review(paper) Paper
-        +review_section(section, previous_sections) Section
+        +context_manager: EnhancedContextManager
+        +review_outline(outline) tuple[str, bool]
+        +review_section(section, memory) Section
         +review_full_paper(paper) Paper
         +generate_critical_review(paper) str
-        +get_feedback(paper) str
-        +check_consistency(paper) str
+        -_strengthen_with_rag(content) str
     }
-    
-    class PaperSummaryAgent {
-        +summarize(paper_text) str
-        +summarize_with_context(paper_text, context) str
-    }
-    
+
+    BaseAgent <|-- PlannerAgent
     BaseAgent <|-- WriterAgent
     BaseAgent <|-- ReviewerAgent
-    BaseAgent <|-- PaperSummaryAgent
 ```
 
----
-
-## 🔄 Proceso Iterativo de Escritura-Revisión
+### Flujo de Interacción
 
 ```mermaid
 sequenceDiagram
     participant O as Orchestrator
-    participant CM as EnhancedContextManager
+    participant P as PlannerAgent
     participant W as WriterAgent
     participant R as ReviewerAgent
-    participant F as FileSystem
-    participant API as OpenAI API
+    participant CM as ContextManager
+    participant M as SectionMemory
+
+    Note over O: Fase 1: Cluster Analysis
+    O->>O: phase1_analyze_topics()
     
-    Note over O: Carga ABSTRACT.md como contexto
-    O->>CM: Inicializa con índices ideas/claims
-    O->>W: Inicializa con abstract_context
-    O->>R: Inicializa con abstract_context
-    O->>F: Inicializa archivo de salida
+    Note over O: Fase 2: Planning
+    O->>P: generate_outline(title, abstract, topics)
+    P-->>O: PaperOutline
     
-    loop Para cada sección
-        O->>CM: get_context_for_section(nombre, prev_text)
-        CM->>CM: Busca en ideas + claims
-        CM->>CM: Filtra por confianza y diversifica
-        CM-->>O: Contexto formateado
-        
-        O->>W: write_section(nombre, prev, contexto)
-        W->>API: Genera con contexto enriquecido
-        API-->>W: Contenido inicial
-        
-        loop review_iterations (default: 2)
-            O->>R: review_section(sección, prev)
-            R->>API: Revisa y mejora
-            API-->>R: Contenido mejorado
+    loop outline_review_iterations
+        O->>R: review_outline(outline)
+        R-->>O: (feedback, requires_changes)
+        alt requires_changes
+            O->>P: refine_outline(outline, feedback)
+            P-->>O: refined_outline
         end
-        
-        O->>F: Guarda sección inmediatamente
     end
     
-    O->>CM: get_all_citations()
-    CM-->>O: Lista de papers citados
-    O->>F: Añade sección de referencias
+    Note over O: Fase 3: Writing
+    loop cada sección
+        loop cada párrafo
+            O->>CM: get_context_for_idea(paragraph.to_query())
+            CM-->>O: evidence[]
+            O->>W: write_paragraph(paragraph, evidence, memory)
+            W-->>O: content
+        end
+        O->>M: generate_summary(section)
+        M-->>O: summary
+        
+        loop review_iterations
+            O->>R: review_section(section, memory)
+            R->>CM: search_for_evidence(4 query types)
+            CM-->>R: supporting evidence
+            R-->>O: improved_section
+        end
+    end
     
-    Note over O: Paper completado
+    O->>R: generate_critical_review(paper)
+    R-->>O: critical_review.md
 ```
 
 ---
 
-## 📦 Modelo de Datos
+## 🔍 Sistema RAG
 
-### Paper y Secciones (Pydantic)
+### Arquitectura de Búsqueda
+
+```mermaid
+flowchart LR
+    subgraph Query["🔎 Generación de Query"]
+        Q1["Párrafo actual"] --> Q2["key_idea +\nsupporting_points"]
+        Q2 --> Q3["Query semántico"]
+    end
+    
+    subgraph Indices["📊 Índices"]
+        I1[("💡 Ideas\n3,733")]
+        I2[("📌 Claims\n3,839")]
+        I3[("📚 Refs\n1,200+")]
+    end
+    
+    subgraph Search["🎯 Búsqueda"]
+        S1["Embedding Query\ntext-embedding-3-small"]
+        S2["Cosine Similarity"]
+        S3["Ranking por Score"]
+        S4["Filtro Confianza"]
+        S5["Diversificación\nmax_per_paper"]
+    end
+    
+    subgraph Output["📝 Contexto"]
+        O1["Ideas relevantes"]
+        O2["Claims con evidencia"]
+        O3["Referencias citables"]
+    end
+    
+    Q3 --> S1
+    I1 & I2 & I3 --> S2
+    S1 --> S2 --> S3 --> S4 --> S5
+    S5 --> O1 & O2 & O3
+
+    style Query fill:#e3f2fd
+    style Indices fill:#f3e5f5
+    style Search fill:#fff3e0
+    style Output fill:#e8f5e9
+```
+
+### RAG en ReviewerAgent
+
+El ReviewerAgent usa 4 tipos de queries para fortalecer argumentos:
+
+```mermaid
+flowchart TD
+    Section["📄 Sección a revisar"] --> Analysis["🔍 Analizar contenido"]
+    
+    Analysis --> Q1["🛡️ Query 1: SUPPORT\nEvidencia que respalde"]
+    Analysis --> Q2["⚔️ Query 2: COUNTER\nContraargumentos"]
+    Analysis --> Q3["📊 Query 3: EXAMPLES\nEjemplos concretos"]
+    Analysis --> Q4["🔗 Query 4: CONNECTIONS\nConexiones interdisciplinarias"]
+    
+    Q1 --> RAG["RAG Search"]
+    Q2 --> RAG
+    Q3 --> RAG
+    Q4 --> RAG
+    
+    RAG --> Evidence["📚 Evidencia consolidada"]
+    Evidence --> Strengthen["✨ Fortalecer sección"]
+
+    style Q1 fill:#c8e6c9
+    style Q2 fill:#ffcdd2
+    style Q3 fill:#fff9c4
+    style Q4 fill:#b3e5fc
+```
+
+---
+
+## 📦 Modelos de Datos
+
+### Estructura del Outline
 
 ```mermaid
 erDiagram
-    Paper ||--o{ Section : contiene
-    Paper {
+    PaperOutline ||--o{ SectionOutline : contiene
+    SectionOutline ||--o{ ParagraphOutline : contiene
+    
+    PaperOutline {
         string title
-        list sections
-        list authors
-        list keywords
-        datetime created_at
-        datetime updated_at
+        string abstract
+        string thesis_statement
     }
-    Section {
-        string title
-        string content
+    
+    SectionOutline {
+        string section_name
+        string section_purpose
+    }
+    
+    ParagraphOutline {
+        string key_idea
+        list supporting_points
+        list suggested_sources
     }
 ```
 
-### Datos Procesados (JSONL)
+### Datos Extraídos
 
 ```mermaid
 erDiagram
+    ProcessedPaper ||--o{ Idea : contiene
+    ProcessedPaper ||--o{ Claim : contiene
+    ProcessedPaper ||--o{ Reference : cita
+    
     Idea {
         uuid id
         uuid paper_id
         string paper_title
-        list authors
-        int year
         string section
         string idea
         string context
-        string importance "high|medium|low"
+        string importance
         list keywords
-        list related_references
     }
     
     Claim {
         uuid id
         uuid paper_id
-        string paper_title
-        string section
         string claim
         string evidence
-        string evidence_type "experiment|data|citation|observation"
+        string evidence_type
+        string confidence
         list cited_references
-        string confidence "high|medium|low"
+    }
+    
+    Reference {
+        uuid id
+        string formatted
+        list authors
+        int year
+        string title
+        string venue
     }
 ```
 
-**Idea**: Conceptos clave extraídos de papers (139 items)
-- `importance`: Nivel de importancia (high/medium/low)
-- `keywords`: Términos clave para búsqueda
-- `context`: Cita textual del paper original
-
-**Claim**: Afirmaciones con evidencia (185 items)
-- `evidence_type`: Tipo de respaldo (experiment, data, citation, observation)
-- `confidence`: Nivel de confianza en la afirmación
-- `cited_references`: Referencias que soportan el claim
-
 ---
 
-## 🎯 Componentes Principales
-
-### Orquestación y Contexto
-
-| Componente | Ubicación | Responsabilidad |
-|------------|-----------|-----------------|
-| `PerspectivePaperOrchestrator` | orchestrators/ | Orquesta el flujo completo de paper de perspectivas |
-| `EnhancedContextManager` | utils/ | Contexto inteligente con ideas/claims por sección |
-| `EmbeddingIndex` | embeddings/ | Índice genérico con búsqueda semántica (NPZ + metadata) |
-| `ReferenceContextManager` | utils/ | Legacy: Selección de referencias (fallback) |
-| `ReferenceIndex` | utils/ | Legacy: Índice de referencias con embeddings |
-
-### Agentes de IA
-
-| Componente | Ubicación | Responsabilidad |
-|------------|-----------|-----------------|
-| `BaseAgent` | agents/ | Clase base abstracta para todos los agentes |
-| `WriterAgent` | agents/ | Genera contenido académico con contexto del abstract |
-| `ReviewerAgent` | agents/ | Revisa secciones y genera documento crítico |
-| `PaperSummaryAgent` | agents/ | Resume papers para contexto |
-| `PDFExtractionAgent` | processors/ | Extrae ideas, claims y referencias de papers |
-
-### Procesamiento de Papers
-
-| Componente | Ubicación | Responsabilidad |
-|------------|-----------|-----------------|
-| `BatchProcessor` | processors/ | Procesa múltiples PDFs en lote con paralelismo |
-| `PDFProcessor` | processors/ | Procesa un PDF individual: extrae → analiza → indexa |
-| `ReferenceParser` | utils/ | Parsea markdown estructurado en secciones |
-
-### Modelos de Datos (Pydantic)
-
-| Componente | Ubicación | Responsabilidad |
-|------------|-----------|-----------------|
-| `Paper`, `Section` | models/ | Modelo del paper generado |
-| `ProcessedPaper` | processors/models.py | Paper procesado con metadata, ideas, claims |
-| `Idea`, `Claim`, `Reference` | processors/models.py | Datos extraídos de papers |
-| `PaperMetadata`, `SectionData` | processors/models.py | Metadata y secciones de papers fuente |
-
-### Lectores y Escritores
-
-| Componente | Ubicación | Responsabilidad |
-|------------|-----------|-----------------|
-| `MarkdownReader` | readers/ | Lee archivos markdown |
-| `PDFReader` | readers/ | Lee archivos PDF |
-| `MarkdownWriter` | writers/ | Exporta paper a markdown |
-| `PDFWriter` | writers/ | Exporta paper a PDF |
-
-### Datos Procesados
-
-| Archivo | Contenido |
-|---------|-----------|
-| `data/processed/indices/all_ideas.jsonl` | 139 ideas extraídas de papers |
-| `data/processed/indices/all_claims.jsonl` | 185 claims con evidencia y confianza |
-| `data/processed/embeddings/ideas_index.npz` | Embeddings de ideas (text-embedding-3-small) |
-| `data/processed/embeddings/claims_index.npz` | Embeddings de claims |
-
----
-
-## 📁 Estructura de Directorios
+## 📁 Estructura del Proyecto
 
 ```
 TheAIWriter/
 ├── src/ai_writer/
-│   ├── __init__.py
-│   ├── main.py                      # Punto de entrada principal
-│   ├── agents/                      # Agentes de IA
-│   │   ├── base_agent.py            # Clase base abstracta
-│   │   ├── writer_agent.py          # Escritura con contexto
-│   │   ├── reviewer_agent.py        # Revisión iterativa
-│   │   └── paper_summary_agent.py   # Resumen de papers
-│   ├── orchestrators/               # Orquestadores de flujo
-│   │   └── perspective_paper_orchestrator.py
-│   ├── processors/                  # ⭐ Procesamiento de papers
-│   │   ├── batch_processor.py       # Procesamiento en lote
-│   │   ├── pdf_processor.py         # Procesador de PDFs
-│   │   ├── extraction_agent.py      # Agente extractor de ideas/claims
-│   │   └── models.py                # Modelos: Idea, Claim, ProcessedPaper
-│   ├── embeddings/                  # Sistema de embeddings
-│   │   └── embedding_index.py       # Índice genérico NPZ
-│   ├── models/                      # Modelos de datos
-│   │   ├── paper.py                 # Paper, Section
-│   │   └── reference.py             # ParsedReference
-│   ├── utils/                       # Utilidades
-│   │   ├── enhanced_context_manager.py  # ⭐ Contexto con ideas/claims
-│   │   ├── reference_context_manager.py # Legacy selector
-│   │   ├── reference_parser.py          # Parser de markdown
-│   │   ├── reference_index.py           # Legacy índice
-│   │   └── file_utils.py                # Utilidades de archivos
-│   ├── readers/                     # Lectores
+│   ├── main.py                    # CLI con Typer
+│   ├── __main__.py                # Entry point
+│   │
+│   ├── agents/                    # 🤖 Agentes de IA
+│   │   ├── base_agent.py          # Clase base abstracta
+│   │   ├── planner_agent.py       # Generación de outlines
+│   │   ├── writer_agent.py        # Escritura de contenido
+│   │   └── reviewer_agent.py      # Revisión RAG-enhanced
+│   │
+│   ├── orchestrators/             # 🎼 Orquestación
+│   │   └── advanced_orchestrator.py  # Pipeline 3 fases
+│   │
+│   ├── embeddings/                # 🧮 Sistema de embeddings
+│   │   ├── embedding_index.py     # Índice NPZ genérico
+│   │   └── rag_system.py          # Sistema RAG
+│   │
+│   ├── processors/                # ⚙️ Procesamiento
+│   │   ├── batch_processor.py     # Procesamiento en lote
+│   │   ├── pdf_processor.py       # Procesador individual
+│   │   ├── extraction_agent.py    # Extractor de ideas/claims
+│   │   └── models.py              # Modelos Pydantic
+│   │
+│   ├── utils/                     # 🔧 Utilidades
+│   │   ├── cluster_analyzer.py    # Análisis de clusters
+│   │   ├── enhanced_context_manager.py  # Contexto RAG
+│   │   └── pipeline_logger.py     # Logging del pipeline
+│   │
+│   ├── models/                    # 📋 Modelos de datos
+│   │   ├── paper.py               # Paper, Section
+│   │   └── outline.py             # PaperOutline
+│   │
+│   ├── readers/                   # 📖 Lectores
 │   │   ├── markdown_reader.py
 │   │   └── pdf_reader.py
-│   ├── writers/                     # Exportadores
+│   │
+│   ├── writers/                   # ✍️ Escritores
 │   │   ├── markdown_writer.py
 │   │   └── pdf_writer.py
-│   └── scripts/                     # Scripts ejecutables
-│       ├── generate_perspective_paper.py
-│       ├── run_batch_processing.py  # Procesa papers → ideas/claims
-│       ├── process_papers.py        # Procesamiento individual
-│       └── process_powerpoint.py    # Generación de presentaciones
-├── config/                          # Configuración
-│   ├── __init__.py
-│   └── settings.py                  # Settings con Pydantic
-├── data/
-│   ├── audio/                       # Archivos de audio (TTS)
-│   ├── processed/                   # ⭐ Datos procesados
-│   │   ├── processing_status.json   # Estado del procesamiento
-│   │   ├── papers/                  # Papers procesados por UUID
-│   │   ├── indices/
-│   │   │   ├── all_ideas.jsonl      # 139 ideas extraídas
-│   │   │   ├── all_claims.jsonl     # 185 claims con evidencia
-│   │   │   └── all_references.jsonl # Referencias extraídas
-│   │   └── embeddings/
-│   │       ├── ideas_index.npz      # Embeddings de ideas
-│   │       ├── ideas_metadata.json
-│   │       ├── claims_index.npz     # Embeddings de claims
-│   │       ├── claims_metadata.json
-│   │       ├── references_index.npz
-│   │       └── references_metadata.json
+│   │
+│   └── scripts/                   # 📜 Scripts
+│       └── run_advanced_paper.py
+│
+├── config/
+│   └── settings.py                # Configuración Pydantic
+│
+├── docs/
+│   └── architecture.md            # Este documento
+│
+├── data/                          # ⚠️ No tracked en git
 │   ├── references/
-│   │   ├── markdown/                # Referencias en markdown
-│   │   │   ├── ABSTRACT.md          # ⭐ Abstract base (requerido)
-│   │   │   └── *.md                 # Papers convertidos
-│   │   └── pdfs/                    # PDFs originales
+│   │   ├── markdown/ABSTRACT.md   # Abstract del paper
+│   │   └── pdfs/                  # PDFs de referencia
+│   ├── processed/
+│   │   ├── embeddings/            # Índices NPZ
+│   │   └── indices/               # JSONL files
+│   ├── logs/                      # Logs del pipeline
 │   └── output/
-│       ├── drafts/                  # Borradores
-│       ├── final/                   # Papers finales generados
-│       └── powerpoint/              # Presentaciones generadas
-├── tests/                           # Tests
-│   ├── conftest.py
-│   ├── test_agents/
-│   ├── test_readers/
-│   └── test_writers/
-├── docs/                            # Documentación
-│   └── architecture.md
-├── pyproject.toml                   # Configuración del proyecto
-├── README.md
-├── .env                             # Variables de entorno (API keys)
-└── .env.example                     # Ejemplo de configuración
+│       ├── drafts/                # Outlines
+│       └── final/                 # Papers generados
+│
+└── pyproject.toml
 ```
 
 ---
 
-## 🚀 Uso
+## 💻 CLI y Uso
+
+### Comandos Disponibles
 
 ```bash
-# Procesar papers de referencia (extraer ideas y claims)
-python -m ai_writer.scripts.run_batch_processing --report
+# Generar paper completo
+python -m ai_writer generate "Título del Paper"
 
-# Generar un paper de perspectivas
-python -m ai_writer.scripts.generate_perspective_paper
+# Con opciones
+python -m ai_writer generate "Título" \
+    --clusters 25 \
+    --reviews 1 \
+    --output ./output/
+
+# Solo generar outline
+python -m ai_writer outline "Título"
+
+# Revisar paper existente
+python -m ai_writer review ./paper.md
+
+# Procesar nuevos PDFs
+python -m ai_writer process --input ./pdfs/
+
+# Ver configuración
+python -m ai_writer version
 ```
 
-**Requisitos:**
-1. Archivo `data/references/markdown/ABSTRACT.md` con el abstract del paper
-2. Referencias estructuradas en `data/references/markdown/*.md`
-3. Datos procesados en `data/processed/` (generados por batch processing)
+### Configuración
 
-**Modo Enhanced (por defecto):**
-- Usa `EnhancedContextManager` con índices de ideas/claims
-- Configuración específica por sección
-- Carga embeddings desde NPZ (instantáneo)
-
-**Modo Legacy (fallback):**
 ```python
-orchestrator = PerspectivePaperOrchestrator(use_enhanced_context=False)
+# config/settings.py
+default_model = "gpt-5.2"      # Modelo principal
+reasoning_model = "gpt-5.2"    # Tareas complejas
+fast_model = "gpt-5.2"         # Operaciones rápidas
+embedding_model = "text-embedding-3-small"
+
+# Parámetros del pipeline
+n_clusters = 25                # Clusters para análisis
+review_iterations = 1          # Iteraciones de revisión por sección
+outline_review_iterations = 1  # Iteraciones de refinamiento del outline
 ```
-- Usa `ReferenceContextManager` con referencias completas
-- Se activa automáticamente si no existen los índices procesados
+
+---
+
+## 📝 Notas de Implementación
+
+### Memoria de Sección
+
+El sistema mantiene coherencia entre secciones usando un diccionario de summaries:
+
+```python
+section_memory = {
+    "Introducción": "Resumen de 3-5 oraciones...",
+    "Estado del Arte": "Resumen de 3-5 oraciones...",
+    # ...
+}
+```
+
+Cada agente recibe este contexto para mantener continuidad argumentativa.
+
+### Logging del Pipeline
+
+Todos los pasos se registran en `data/logs/run_{title}/`:
+
+- `phase1_topics.json`: Topics extraídos
+- `phase2_outline.json`: Outline generado
+- `outline_feedback_{n}.json`: Feedback del reviewer
+- `outline_refined_{n}.json`: Outline refinado
+- `run_log.json`: Metadata de ejecución
+
+### Refinamiento Conservador
+
+El ReviewerAgent aplica cambios conservadores al outline:
+- Solo fusiona párrafos si hay **redundancia evidente**
+- Valora la profundidad y exhaustividad
+- Preserva la estructura original cuando es posible

@@ -38,20 +38,10 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
+tests/
 
-# Output files (optional - uncomment if you want to track outputs)
-# data/output/
-data/output/final/
-data/output/drafts/
-
-# Processed data (generated, can be regenerated)
-data/processed/
-
-# Audio files
-data/audio/
-
-# Temporary files
-data/output/powerpoint/temp_slides/
+# Data folder (all data is local, not tracked)
+data/
 
 # Large files
 *.pptx
