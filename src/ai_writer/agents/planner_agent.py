@@ -453,7 +453,11 @@ Refina el esquema incorporando el feedback. Mantén la estructura JSON:
 Asegúrate de:
 1. Abordar específicamente cada punto del feedback
 2. Mantener coherencia entre secciones
-3. Mejorar las ideas clave para que sean más específicas y argumentables"""
+3. Mejorar las ideas clave para que sean más específicas y argumentables
+4. PRESERVAR LA ESTRUCTURA: Mantén aproximadamente el mismo número de secciones y párrafos
+5. Solo elimina o fusiona párrafos si hay redundancia MUY CLARA (dicen exactamente lo mismo)
+6. Es preferible mejorar el contenido de los párrafos existentes que reducir su cantidad
+7. La profundidad y exhaustividad del paper es valiosa - no la sacrifiques"""
 
         try:
             response = self.client.chat.completions.create(

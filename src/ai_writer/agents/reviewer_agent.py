@@ -616,7 +616,7 @@ CRITERIOS DE EVALUACIÓN:
 2. ¿Hay coherencia lógica entre secciones y párrafos?
 3. ¿Los puntos de apoyo son relevantes para cada idea clave?
 4. ¿El esquema cubre todos los aspectos necesarios del tema?
-5. ¿Hay redundancia entre secciones?
+5. ¿Hay redundancia EVIDENTE entre secciones? (solo si dos párrafos dicen esencialmente lo mismo)
 6. ¿Las transiciones entre secciones serán naturales?
 
 INSTRUCCIONES:
@@ -624,6 +624,9 @@ INSTRUCCIONES:
 - Si hay mejoras, proporciona feedback específico y accionable
 - Sé conciso y directo
 - Enfócate en las mejoras más importantes
+- IMPORTANTE: Valora la profundidad y exhaustividad del contenido
+- NO sugieras eliminar o fusionar párrafos a menos que haya redundancia clara y evidente
+- Prefiere sugerir mejoras de contenido sobre reducciones de estructura
 
 FEEDBACK:"""
 

@@ -339,8 +339,24 @@ RESUMEN:"""
             # Get feedback from reviewer
             feedback = self.reviewer_agent.review_outline(outline)
             
+            # Log the feedback
+            if self.logger and feedback:
+                self.logger.log_data(f"outline_feedback_{i+1}", {
+                    "iteration": i + 1,
+                    "feedback": feedback,
+                    "requires_changes": "sin cambios" not in feedback.lower()
+                })
+                console.print(f"  💾 Feedback guardado → outline_feedback_{i+1}.json")
+            
             if feedback and "sin cambios" not in feedback.lower():
                 outline = self.planner_agent.refine_outline(outline, feedback)
+                
+                # Log the refined outline
+                if self.logger:
+                    self.logger.log_data(f"outline_refined_{i+1}", outline.to_dict())
+                    console.print(f"  💾 Outline refinado → outline_refined_{i+1}.json")
+            else:
+                console.print(f"  ✓ Reviewer: Sin cambios necesarios")
         
         # Save outline to disk
         self._save_outline(outline, title)

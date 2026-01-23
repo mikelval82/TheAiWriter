@@ -1,255 +1,153 @@
 {
-  "n_clusters": 25,
+  "n_clusters": 12,
   "topics": [
     {
+      "cluster_id": 7,
+      "label": "Agents + Agent",
+      "keywords": [
+        "agents",
+        "agent",
+        "llm",
+        "based",
+        "cognitive"
+      ],
+      "size": 581,
+      "representative_ideas": [
+        "LLM-based agents benefit from architectural scaffolding (memory, reflection, planning, chain-of-thought prompting) that structures input and context to elicit more natural and believable behavior.",
+        "Prior agent architectures incorporate partial aspects of human-like cognition and affect—such as reasoning, learning, perception–brain–action loops, emotional adjustment, and LLM-based character portrayal—but do not yet achieve an integrated, behavior-influencing personality.",
+        "Modern language agents go beyond direct action selection to incorporate reasoning, planning, and memory management via LLMs, but the field lacks shared terminology and abstractions."
+      ]
+    },
+    {
       "cluster_id": 4,
+      "label": "Empathy + Empathetic",
+      "keywords": [
+        "empathy",
+        "empathetic",
+        "empathic",
+        "emotional",
+        "human"
+      ],
+      "size": 530,
+      "representative_ideas": [
+        "Existing empathy datasets differ widely in granularity (utterance-level vs. session-level), annotation targets (empathic concern, presence/absence, intensity, temporal dynamics), and modalities, leading to inconsistent operationalizations of empathy.",
+        "The paper offers the first comprehensive systematic review of machine learning-based empathy detection across four modalities (text, audiovisual, audio, physiological) and multiple interaction contexts up to May 2025.",
+        "The section stresses the importance of clear operational definitions of empathy for computational modeling, as different theoretical views lead to different annotation schemes and machine learning targets."
+      ]
+    },
+    {
+      "cluster_id": 5,
+      "label": "Emotional + Emotion",
+      "keywords": [
+        "emotional",
+        "emotion",
+        "based",
+        "empathetic",
+        "emotions"
+      ],
+      "size": 501,
+      "representative_ideas": [
+        "Recent emotionally intelligent AI systems focus on integrating rich emotion models and signals into LLMs and dialogue systems to enhance empathy, contextual relevance, and therapeutic support.",
+        "A multi-agent system prototype is developed in which an MLLM interprets facial expressions and supplies nonverbal context to an LLM-based chatbot, showing measurable changes in cognitive and affective language use and a non-significant upward trend in perceived empathy.",
+        "The system elicits distinct predominant emotions across themes, suggesting that its multi-emotion agent design can align output tone with situational context (e.g., fear for job loss, sadness for breakups, joy for family conflicts and academic anxiety)."
+      ]
+    },
+    {
+      "cluster_id": 2,
+      "label": "Health + Mental",
+      "keywords": [
+        "health",
+        "mental",
+        "mental health",
+        "empathic",
+        "conversational"
+      ],
+      "size": 409,
+      "representative_ideas": [
+        "This review aims to systematically map and evaluate empathic conversational agent platform designs for mental health, focusing on design characteristics, empathy-related mechanisms, and reported outcomes.",
+        "The review includes 19 studies of empathic conversational agents for mental health, with most reporting both system design and human evaluations.",
+        "The review systematically maps existing empathic conversational agent architectures for mental health, assessing both their technical emotion-detection performance and user acceptability."
+      ]
+    },
+    {
+      "cluster_id": 1,
+      "label": "Personality + Traits",
+      "keywords": [
+        "personality",
+        "traits",
+        "gpt",
+        "study",
+        "role"
+      ],
+      "size": 378,
+      "representative_ideas": [
+        "Focusing the chatbot explicitly on personality topics improves inference accuracy without substantially harming user experience compared to more casual ‘getting to know you’ conversations.",
+        "Explicitly focusing the chatbot on personality assessment does not degrade user experience; users rate these interactions as equally natural, pleasant, engaging, and humanlike as more naturalistic conditions.",
+        "Empirical analysis reveals three key findings: GPT-3.5 better portrays positive personalities, stronger predefined traits improve portrayal success, and more dialogue turns both enhance personality expression and increase risk of misdirection by partners."
+      ]
+    },
+    {
+      "cluster_id": 0,
       "label": "Face + Emotional",
       "keywords": [
         "face",
         "emotional",
         "data",
-        "remote",
-        "study"
+        "study",
+        "remote"
       ],
-      "size": 271,
+      "size": 330,
       "representative_ideas": [
-        "Human behavioral and physiological responses differ between face-to-face and remote emotional conversations, particularly in facial expressions, EDA, and HRV.",
         "The paper’s main contributions are an empirical comparison of physiological and facial responses and empathy across face-to-face and remote emotional conversations, identification of the most effective emotion recognition approaches for each setting, and release of a new multimodal dataset (EDA, PPG, facial video).",
+        "Human behavioral and physiological responses differ between face-to-face and remote emotional conversations, particularly in facial expressions, EDA, and HRV.",
         "Human behavioral and physiological responses differ between face-to-face and remote emotional conversations, especially in facial expressions, EDA, and HRV."
       ]
     },
     {
-      "cluster_id": 10,
-      "label": "Empathy + Empathic",
-      "keywords": [
-        "empathy",
-        "empathic",
-        "detection",
-        "empathy detection",
-        "emotional"
-      ],
-      "size": 240,
-      "representative_ideas": [
-        "The paper offers the first comprehensive systematic review of machine learning-based empathy detection across four modalities (text, audiovisual, audio, physiological) and multiple interaction contexts up to May 2025.",
-        "Empathy is modeled through diverse task formulations—such as discrete classification, regression, and sequence labeling—reflecting different theoretical views of empathy and limiting comparability across studies.",
-        "This work is the first comprehensive systematic review of ML-based empathy detection across four input modalities (text, audio, audiovisual/video, physiological signals) and diverse interaction contexts."
-      ]
-    },
-    {
-      "cluster_id": 24,
-      "label": "Agents + Agent",
-      "keywords": [
-        "agents",
-        "agent",
-        "social",
-        "personality",
-        "behavior"
-      ],
-      "size": 211,
-      "representative_ideas": [
-        "Evolving Agents consists of two tightly coupled subsystems, Behavior and Personality, which form a feedback loop where actions consider personality traits and experiences from actions in turn update personality.",
-        "Prior agent architectures incorporate partial aspects of human-like cognition and affect—such as reasoning, learning, perception–brain–action loops, emotional adjustment, and LLM-based character portrayal—but do not yet achieve an integrated, behavior-influencing personality.",
-        "Multimodal and game-based agent systems (e.g., in Minecraft) and social multi-agent frameworks demonstrate rich task execution and social behaviors but still operate with largely fixed or ad hoc personality settings."
-      ]
-    },
-    {
       "cluster_id": 6,
-      "label": "Personality + Gpt",
+      "label": "Multimodal + Nonverbal",
       "keywords": [
-        "personality",
-        "gpt",
-        "user",
-        "study",
-        "accuracy"
+        "multimodal",
+        "nonverbal",
+        "text",
+        "based",
+        "venus"
       ],
-      "size": 208,
+      "size": 328,
       "representative_ideas": [
-        "Personality inference is most accurate when the chatbot is explicitly prompted to assess personality (assessment condition), yielding moderate correlations between about r = .33 and r = .64.",
-        "In the assistant condition, where the chatbot does not ask personal questions and only reacts to user prompts, personality inference accuracy is lowest but still often above zero, indicating that everyday assistant-type interactions carry psychologically meaningful signals.",
-        "Focusing the chatbot explicitly on personality topics improves inference accuracy without substantially harming user experience compared to more casual ‘getting to know you’ conversations."
+        "Multiple datasets provide rich multimodal signals (text, audio, visual, and sometimes personality/prosody) and diverse annotation schemes (categorical emotions, sentiment scales, continuous affective dimensions), enabling varied emotion and sentiment modeling tasks.",
+        "The paper reports that MARS, trained on VENUS, can generate natural and contextually aligned nonverbal expressions alongside text, supported by quantitative metrics, qualitative analysis, and user studies.",
+        "The authors propose MARS, a multimodal language model that jointly models text and nonverbal cues represented as discrete latent tokens, enabling understanding and generation of nonverbal behavior in dialogue."
       ]
     },
     {
-      "cluster_id": 13,
-      "label": "Emotion + Multimodal",
+      "cluster_id": 10,
+      "label": "Ngfr + Data",
       "keywords": [
-        "emotion",
-        "multimodal",
-        "recognition",
-        "merc",
-        "models"
+        "ngfr",
+        "data",
+        "urban",
+        "thermal",
+        "smart"
       ],
       "size": 198,
       "representative_ideas": [
-        "Multiple datasets provide rich multimodal signals (text, audio, visual, and sometimes personality/prosody) and diverse annotation schemes (categorical emotions, sentiment scales, continuous affective dimensions), enabling varied emotion and sentiment modeling tasks.",
-        "The analysis establishes that multimodal integration of neural, physiological, and textual signals enables more accurate and nuanced detection of users’ emotional states than single‑modality approaches.",
-        "Existing surveys on multimodal emotion recognition largely focus on non-conversational settings or on feature fusion alone, failing to adequately address conversation-specific issues such as interlocutor modeling, context, cross-modal alignment, reasoning, and modality missingness."
+        "The study’s primary contribution is a methodology that integrates smart wearables, streetscape/visual (SVI) segmentation, and weather sensors into a UDT to examine how urban morphology affects thermal perception and physiological responses.",
+        "The paper presents a proof-of-concept urban digital twin that integrates emerging urban data sources (wearables and street-view imagery) to sense outdoor thermal comfort and built-environment influences, aiming to support planning and management for improved walkability.",
+        "The study integrates outdoor thermal comfort, walkability, and 3D urban form within an urban digital twin (UDT) using heterogeneous data sources such as wearables and street view imagery."
       ]
     },
     {
-      "cluster_id": 17,
-      "label": "Empathetic + Empathy",
-      "keywords": [
-        "empathetic",
-        "empathy",
-        "human",
-        "dialogue",
-        "responses"
-      ],
-      "size": 196,
-      "representative_ideas": [
-        "The study uses 2,000 prompts from EmpatheticDialogues, balanced across 32 positive and negative emotions, and prompts LLMs with an explicit empathy framework (cognitive, affective, compassionate) to enable fine-grained comparison with human responses.",
-        "The experimental setup uses ED and ESConv as benchmarks and a comprehensive suite of overlap, diversity, embedding, human, and LLM-based metrics to evaluate empathetic dialogue quality.",
-        "The EmpathyAgent benchmark is positioned as a practical tool for building powerful empathetic agents by enabling effective training and evaluation of embodied empathetic behaviors."
-      ]
-    },
-    {
-      "cluster_id": 19,
-      "label": "Empathic + Empathy",
-      "keywords": [
-        "empathic",
-        "empathy",
-        "health",
-        "mental health",
-        "mental"
-      ],
-      "size": 192,
-      "representative_ideas": [
-        "The review systematically maps existing empathic conversational agent architectures for mental health, assessing both their technical emotion-detection performance and user acceptability.",
-        "The review aims to assess conversational agent (CA) designs in mental health care that are specifically engineered to convey empathy and how that empathy is implemented technically.",
-        "This paper positions itself as the first review specifically focused on how empathic mental health conversational agents are designed and evaluated, addressing a gap in the literature."
-      ]
-    },
-    {
-      "cluster_id": 2,
-      "label": "Llm + Agents",
-      "keywords": [
-        "llm",
-        "agents",
-        "cognitive",
-        "language",
-        "systems"
-      ],
-      "size": 191,
-      "representative_ideas": [
-        "These agents perform nontrivial LLM-based reasoning and learning, motivating the use of cognitive architectures to structure their internal and external interactions.",
-        "Modern language agents go beyond direct action selection to incorporate reasoning, planning, and memory management via LLMs, but the field lacks shared terminology and abstractions.",
-        "Cognitive language agents embed LLMs in a feedback loop with the environment, using multimodal inputs, intermediate reasoning, memory, and self-modification to guide actions."
-      ]
-    },
-    {
-      "cluster_id": 11,
-      "label": "Emotional + Emotion",
-      "keywords": [
-        "emotional",
-        "emotion",
-        "memory",
-        "agents",
-        "agent"
-      ],
-      "size": 176,
-      "representative_ideas": [
-        "The proposed affective agent architecture relies on a memory system that stores both observations and internal emotional states, forming a chain of emotion that conditions future language-model outputs.",
-        "The study implements an appraisal-based Chain-of-Emotion architecture in a role-playing game agent and compares it to No-Memory and Memory baselines using a controlled breakup scenario.",
-        "An appraisal-based chain-of-emotion architecture, driven by a large language model, controls the agent’s in-game dialogue and affective responses."
-      ]
-    },
-    {
-      "cluster_id": 0,
-      "label": "Empathic + Based",
-      "keywords": [
-        "empathic",
-        "based",
-        "emotional",
-        "support",
-        "health"
-      ],
-      "size": 173,
-      "representative_ideas": [
-        "Multi-modal LLMs provide a foundation for empathic chatbots by enabling the integration of nonverbal information (e.g., facial expression, posture, prosody) with textual dialogue for more context-aware responses.",
-        "The study enhances empathic LLM-based mental health chatbots by augmenting multi-modal input with nonverbal cues (facial expressions) using MLLM-based facial emotion recognition (FER), while leaving nonverbal output unchanged.",
-        "A multi-agent system prototype is developed in which an MLLM interprets facial expressions and supplies nonverbal context to an LLM-based chatbot, showing measurable changes in cognitive and affective language use and a non-significant upward trend in perceived empathy."
-      ]
-    },
-    {
-      "cluster_id": 5,
-      "label": "Nonverbal + Venus",
-      "keywords": [
-        "nonverbal",
-        "venus",
-        "body",
-        "cues",
-        "dataset"
-      ],
-      "size": 160,
-      "representative_ideas": [
-        "The final VENUS annotations align textual utterances with time-synchronized 3D nonverbal expression parameters, enabling video-grounded dialogue modeling of nonverbal behavior.",
-        "The paper reports that MARS, trained on VENUS, can generate natural and contextually aligned nonverbal expressions alongside text, supported by quantitative metrics, qualitative analysis, and user studies.",
-        "The authors introduce VENUS, a large-scale multimodal conversational dataset that aligns text, facial expressions, and body language from dialogue-rich podcast videos to enable modeling of nonverbal cues."
-      ]
-    },
-    {
-      "cluster_id": 23,
-      "label": "Empathetic + Human",
-      "keywords": [
-        "empathetic",
-        "human",
-        "agent",
-        "emotional",
-        "physiological"
-      ],
-      "size": 154,
-      "representative_ideas": [
-        "A multimodal, real-time emotion recognition system driving an empathetic digital human increases reported empathy, enjoyment, and engagement compared to a neutral agent.",
-        "The findings indicate that real-time neurophysiological emotion recognition can enhance the perceived empathy of conversational agents and improve the quality of human–agent interactions.",
-        "A separate self-report questionnaire after each conversation captured participants’ emotional state (valence, arousal), perceived human-agent empathy (empathic, cognitive, affective), and evaluations of the agent’s real-time emotional expressions."
-      ]
-    },
-    {
-      "cluster_id": 16,
-      "label": "Studies + Chatbots",
-      "keywords": [
-        "studies",
-        "chatbots",
-        "cognitive",
-        "executive",
-        "ai"
-      ],
-      "size": 140,
-      "representative_ideas": [
-        "The review restricted studies to empirical research involving human participants where AI chatbots were used as an intervention, assessment, or support tool for executive functions.",
-        "Using a PRISMA 2020–guided systematic search (2021–present) across major databases, the authors narrowed 115 initially identified articles down to 10 eligible empirical studies on AI chatbots and executive functions.",
-        "The review followed PRISMA 2020 guidelines to systematically identify, screen, and synthesize studies on AI chatbots and executive functions."
-      ]
-    },
-    {
-      "cluster_id": 21,
-      "label": "Personality + Dialogue",
-      "keywords": [
-        "personality",
-        "dialogue",
-        "role",
-        "traits",
-        "psyplay"
-      ],
-      "size": 140,
-      "representative_ideas": [
-        "PsyPlay introduces a personality back-testing method that infers a role’s personality directly from dialogue using LLM evaluators, arguing this is more reflective than having agents fill out personality questionnaires.",
-        "The authors propose PsyPlay, a three-stage framework that generates multi-agent, multi-turn dialogues where LLM agents are explicitly infused with Big Five personality traits and must consistently portray them.",
-        "Through personality back-testing with GPT-3.5, PsyPlay achieves about 80% success in accurately portraying intended personality traits, and reveals that LLMs aligned with positive values more reliably play positive personalities than negative ones."
-      ]
-    },
-    {
-      "cluster_id": 20,
+      "cluster_id": 3,
       "label": "Commonsense + Dialogue",
       "keywords": [
         "commonsense",
         "dialogue",
         "sibyl",
         "knowledge",
-        "models"
+        "empathetic"
       ],
-      "size": 129,
+      "size": 135,
       "representative_ideas": [
         "The paper introduces Sibyl, a new paradigm for Sensible and Visionary Commonsense Knowledge that dynamically infers future-aware, response-specific commonsense to guide empathetic dialogue generation.",
         "Sibyl introduces a paradigm of ‘visionary commonsense’ by using a strong LLM (GPT‑4o) to generate four categories of commonsense inferences from dialogue history plus response, then validating these categories with human annotators.",
@@ -257,7 +155,7 @@
       ]
     },
     {
-      "cluster_id": 14,
+      "cluster_id": 8,
       "label": "Metaverse + Life",
       "keywords": [
         "metaverse",
@@ -266,7 +164,7 @@
         "like",
         "artificial"
       ],
-      "size": 127,
+      "size": 125,
       "representative_ideas": [
         "The Metaverse is conceptualized as a form of artificial life whose evolution intertwines the human body with virtual environments, demanding new points of theoretical connection for understanding its cognitive effects.",
         "Immersion in VR/Metaverse environments will drive the emergence of hybrid virtual-real bodily responses, gradually reshaping top-down predictive mechanisms to conform to Metaverse ‘rules’ and affordances.",
@@ -274,7 +172,7 @@
       ]
     },
     {
-      "cluster_id": 8,
+      "cluster_id": 9,
       "label": "Personality + Dialogue",
       "keywords": [
         "personality",
@@ -287,45 +185,11 @@
       "representative_ideas": [
         "Modeling dialogues as heterogeneous conversational graphs, which incorporate speakers, utterances, and their relations, leads to better personality recognition than sequence-based or homogeneous graph baselines.",
         "There is an identified need for models that jointly leverage data augmentation and heterogeneous graph networks to better capture complex conversational patterns for personality recognition.",
-        "The authors propose a heterogeneous conversational graph network that models multiple types of nodes and relations in dialogue (utterances, speakers, and conversations) to improve personality recognition."
+        "The authors propose heterogeneous conversational graph networks that separately capture contextual influences and inherent personality traits in dialogues."
       ]
     },
     {
-      "cluster_id": 12,
-      "label": "Mental + Emotion",
-      "keywords": [
-        "mental",
-        "emotion",
-        "health",
-        "mental health",
-        "risk"
-      ],
-      "size": 114,
-      "representative_ideas": [
-        "The paper introduces a novel LLM-based, explainable depression assessment system that integrates multiple conversational data streams to generate a real-time, multidimensional, and continuously updating depression risk profile, aiming to overcome the limitations of traditional tools.",
-        "The paper proposes an LLM-based system that analyzes real-time conversational cues and subtle emotional language patterns to assess mental state more accurately and dynamically.",
-        "AI, especially NLP and LLM-based systems, can detect depression through fine-grained linguistic markers that emerge in natural conversation, enabling more sensitive and earlier identification than static questionnaires."
-      ]
-    },
-    {
-      "cluster_id": 18,
-      "label": "Ngfr + Hub",
-      "keywords": [
-        "ngfr",
-        "hub",
-        "smart",
-        "city",
-        "ngfr hub"
-      ],
-      "size": 105,
-      "representative_ideas": [
-        "Beyond technical aspects, the NGFR hub is proposed as a technological-societal readiness benchmark for smart cities, indicating their capacity to deploy advanced resources to protect lives and property, especially under climate change-induced disaster risks.",
-        "The paper proposes an NGFR AI-enabled hub (a modified SmartHub) as a practice-centric, expandable architecture that embeds next-generation first responder technologies into smart city infrastructures.",
-        "The NGFR platform must interoperate with a wide range of smart city emergency resources and predictive technologies, linking traditional emergency response needs with advanced surveillance, IoT, positioning, mobile radio, and risk prediction systems."
-      ]
-    },
-    {
-      "cluster_id": 7,
+      "cluster_id": 11,
       "label": "Participants + Complexity",
       "keywords": [
         "participants",
@@ -334,96 +198,11 @@
         "coherence",
         "study"
       ],
-      "size": 96,
+      "size": 97,
       "representative_ideas": [
         "The study uses virtual reality to examine how the coherence and complexity of outdoor planting designs affect users’ perceptions of time and landscape aesthetics.",
         "The study introduces virtual reality as a controlled experimental tool to manipulate a specific design variable—vegetation layout along a campus path—to investigate its effects on perceived coherence, complexity, and sense of time.",
         "Perceived passage of time is systematically related to vegetation complexity and coherence: high complexity environments feel faster and are identified as places to linger, whereas low complexity feels slower, underwhelming, and encourages moving through more quickly, with formal, repetitive (high-coherence) layouts reinforcing a direct, pass-through path experience."
-      ]
-    },
-    {
-      "cluster_id": 3,
-      "label": "Urban + Thermal",
-      "keywords": [
-        "urban",
-        "thermal",
-        "data",
-        "comfort",
-        "thermal comfort"
-      ],
-      "size": 93,
-      "representative_ideas": [
-        "The study integrates outdoor thermal comfort, walkability, and 3D urban form within an urban digital twin (UDT) using heterogeneous data sources such as wearables and street view imagery.",
-        "The paper presents a proof-of-concept urban digital twin that integrates emerging urban data sources (wearables and street-view imagery) to sense outdoor thermal comfort and built-environment influences, aiming to support planning and management for improved walkability.",
-        "The current work is primarily a proof of concept for infrastructure and methodology integrating thermal walk data into an Urban Digital Twin (UDT), and current data are not yet representative, requiring more volume, diversity, and temporal coverage."
-      ]
-    },
-    {
-      "cluster_id": 1,
-      "label": "Genai + Agents",
-      "keywords": [
-        "genai",
-        "agents",
-        "genai agents",
-        "collaborative",
-        "participants"
-      ],
-      "size": 81,
-      "representative_ideas": [
-        "Preliminary findings suggest that participants see significant potential benefits from collaborative GenAI agents (e.g., challenging groupthink, reducing social friction, boosting confidence) but these are contingent on trust, cultural alignment, safeguards, and preservation of psychological safety and human agency.",
-        "Participants saw collaborative GenAI agents as augmenting, not replacing, team capabilities by adding diverse perspectives, surfacing ethics and equity concerns, and acting as a safety net against overlooked issues.",
-        "A Mixed Reality ‘provotype’ provided an embodied experience of GenAI agents as active collaborators, balancing exposure to collective and individual interaction modes before eliciting perceptions."
-      ]
-    },
-    {
-      "cluster_id": 9,
-      "label": "Narrative + Empathy",
-      "keywords": [
-        "narrative",
-        "empathy",
-        "style",
-        "narrative style",
-        "stories"
-      ],
-      "size": 80,
-      "representative_ideas": [
-        "Empirical analysis with the new dataset shows that specific narrative style elements—especially vividness of emotions, character development and action, and plot volume—are positively associated with narrative empathy.",
-        "The HEART taxonomy enables large-scale, style-aware empirical study of narrative empathy that extends beyond prior small, hand-crafted, literary-focused analyses.",
-        "Analysis using HEART shows that certain narrative styles—greater vividness of emotions, character development and action, and higher plot volume—are associated with greater narrative empathy."
-      ]
-    },
-    {
-      "cluster_id": 22,
-      "label": "Agent + Queries",
-      "keywords": [
-        "agent",
-        "queries",
-        "agents",
-        "complex",
-        "framework"
-      ],
-      "size": 74,
-      "representative_ideas": [
-        "AgentMaster is a novel modular multi‑agent conversational framework that uses A2A-MCP protocols for retrieval-augmented question answering over structured, unstructured, and multimodal data sources.",
-        "The framework handles tasks such as information retrieval, question answering, and image analysis through dynamic coordination and flexible communication among agents.",
-        "AgentMaster is introduced as a modular multi-agent MAS framework that integrates A2A and MCP to decompose user queries into specialized workflows coordinated across agents with centralized tool and context management."
-      ]
-    },
-    {
-      "cluster_id": 15,
-      "label": "Gaze + Data",
-      "keywords": [
-        "gaze",
-        "data",
-        "analytics",
-        "learning",
-        "design"
-      ],
-      "size": 63,
-      "representative_ideas": [
-        "The study identified a need to improve data visualization literacy and interface clarity so that teachers—who are often unfamiliar with gaze-based analytics—can translate complex visualizations into actionable, pedagogically meaningful feedback.",
-        "The paper proposes using data storytelling principles and conversational interfaces to improve the interpretability and pedagogical relevance of gaze-based analytics for ELA instruction.",
-        "Gaze data, though initially unfamiliar to educators, can be rendered actionable and interpretable via user-centered visual design, data storytelling principles, and scaffolded interaction."
       ]
     }
   ]

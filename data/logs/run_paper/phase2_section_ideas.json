@@ -1,760 +1,697 @@
 {
-  "total_ideas": 118,
+  "total_ideas": 114,
   "sections": {
     "Introducción": {
       "n_ideas": 12,
       "topics_used": [
-        "Face + Emotional",
-        "Empathy + Empathic",
         "Agents + Agent",
-        "Personality + Gpt",
-        "Emotion + Multimodal",
-        "Empathetic + Empathy"
+        "Empathy + Empathetic",
+        "Emotional + Emotion",
+        "Health + Mental",
+        "Personality + Traits",
+        "Face + Emotional"
       ],
       "ideas": [
         {
-          "text": "Human behavioral and physiological responses differ between face-to-face and remote emotional conversations, particularly in facial expressions, EDA, and HRV.",
+          "text": "LLM-based agents benefit from architectural scaffolding (memory, reflection, planning, chain-of-thought prompting) that structures input and context to elicit more natural and believable behavior.",
           "source": "Unknown",
-          "similarity": 0.6154317855834961
-        },
-        {
-          "text": "The paper’s main contributions are an empirical comparison of physiological and facial responses and empathy across face-to-face and remote emotional conversations, identification of the most effective emotion recognition approaches for each setting, and release of a new multimodal dataset (EDA, PPG",
-          "source": "Unknown",
-          "similarity": 0.612235426902771
-        },
-        {
-          "text": "The paper offers the first comprehensive systematic review of machine learning-based empathy detection across four modalities (text, audiovisual, audio, physiological) and multiple interaction contexts up to May 2025.",
-          "source": "Unknown",
-          "similarity": 0.6924819350242615
-        },
-        {
-          "text": "Empathy is modeled through diverse task formulations—such as discrete classification, regression, and sequence labeling—reflecting different theoretical views of empathy and limiting comparability across studies.",
-          "source": "Unknown",
-          "similarity": 0.6900666356086731
-        },
-        {
-          "text": "Evolving Agents consists of two tightly coupled subsystems, Behavior and Personality, which form a feedback loop where actions consider personality traits and experiences from actions in turn update personality.",
-          "source": "Unknown",
-          "similarity": 0.5365065932273865
+          "similarity": 0.5026817917823792
         },
         {
           "text": "Prior agent architectures incorporate partial aspects of human-like cognition and affect—such as reasoning, learning, perception–brain–action loops, emotional adjustment, and LLM-based character portrayal—but do not yet achieve an integrated, behavior-influencing personality.",
           "source": "Unknown",
-          "similarity": 0.5359551906585693
+          "similarity": 0.5025399923324585
         },
         {
-          "text": "Personality inference is most accurate when the chatbot is explicitly prompted to assess personality (assessment condition), yielding moderate correlations between about r = .33 and r = .64.",
+          "text": "Existing empathy datasets differ widely in granularity (utterance-level vs. session-level), annotation targets (empathic concern, presence/absence, intensity, temporal dynamics), and modalities, leading to inconsistent operationalizations of empathy.",
           "source": "Unknown",
-          "similarity": 0.6064087152481079
+          "similarity": 0.6243628263473511
         },
         {
-          "text": "In the assistant condition, where the chatbot does not ask personal questions and only reacts to user prompts, personality inference accuracy is lowest but still often above zero, indicating that everyday assistant-type interactions carry psychologically meaningful signals.",
+          "text": "The paper offers the first comprehensive systematic review of machine learning-based empathy detection across four modalities (text, audiovisual, audio, physiological) and multiple interaction contexts up to May 2025.",
           "source": "Unknown",
-          "similarity": 0.5967463254928589
+          "similarity": 0.6199312210083008
         },
         {
-          "text": "Multiple datasets provide rich multimodal signals (text, audio, visual, and sometimes personality/prosody) and diverse annotation schemes (categorical emotions, sentiment scales, continuous affective dimensions), enabling varied emotion and sentiment modeling tasks.",
+          "text": "Recent emotionally intelligent AI systems focus on integrating rich emotion models and signals into LLMs and dialogue systems to enhance empathy, contextual relevance, and therapeutic support.",
           "source": "Unknown",
-          "similarity": 0.583633542060852
+          "similarity": 0.5838034152984619
         },
         {
-          "text": "The analysis establishes that multimodal integration of neural, physiological, and textual signals enables more accurate and nuanced detection of users’ emotional states than single‑modality approaches.",
+          "text": "A multi-agent system prototype is developed in which an MLLM interprets facial expressions and supplies nonverbal context to an LLM-based chatbot, showing measurable changes in cognitive and affective language use and a non-significant upward trend in perceived empathy.",
           "source": "Unknown",
-          "similarity": 0.5663326978683472
+          "similarity": 0.5730983018875122
         },
         {
-          "text": "The study uses 2,000 prompts from EmpatheticDialogues, balanced across 32 positive and negative emotions, and prompts LLMs with an explicit empathy framework (cognitive, affective, compassionate) to enable fine-grained comparison with human responses.",
+          "text": "This review aims to systematically map and evaluate empathic conversational agent platform designs for mental health, focusing on design characteristics, empathy-related mechanisms, and reported outcomes.",
           "source": "Unknown",
-          "similarity": 0.6224984526634216
+          "similarity": 0.5955941677093506
         },
         {
-          "text": "The experimental setup uses ED and ESConv as benchmarks and a comprehensive suite of overlap, diversity, embedding, human, and LLM-based metrics to evaluate empathetic dialogue quality.",
+          "text": "The review includes 19 studies of empathic conversational agents for mental health, with most reporting both system design and human evaluations.",
           "source": "Unknown",
-          "similarity": 0.6139814257621765
+          "similarity": 0.593802273273468
+        },
+        {
+          "text": "Focusing the chatbot explicitly on personality topics improves inference accuracy without substantially harming user experience compared to more casual ‘getting to know you’ conversations.",
+          "source": "Unknown",
+          "similarity": 0.5605379343032837
+        },
+        {
+          "text": "Explicitly focusing the chatbot on personality assessment does not degrade user experience; users rate these interactions as equally natural, pleasant, engaging, and humanlike as more naturalistic conditions.",
+          "source": "Unknown",
+          "similarity": 0.5602031946182251
+        },
+        {
+          "text": "The paper’s main contributions are an empirical comparison of physiological and facial responses and empathy across face-to-face and remote emotional conversations, identification of the most effective emotion recognition approaches for each setting, and release of a new multimodal dataset (EDA, PPG",
+          "source": "Unknown",
+          "similarity": 0.606894850730896
+        },
+        {
+          "text": "Human behavioral and physiological responses differ between face-to-face and remote emotional conversations, particularly in facial expressions, EDA, and HRV.",
+          "source": "Unknown",
+          "similarity": 0.6031061410903931
         }
       ]
     },
     "Estado Actual del Arte": {
       "n_ideas": 16,
       "topics_used": [
-        "Face + Emotional",
-        "Empathy + Empathic",
         "Agents + Agent",
-        "Personality + Gpt",
-        "Emotion + Multimodal",
-        "Empathetic + Empathy",
-        "Empathic + Empathy",
-        "Llm + Agents",
+        "Empathy + Empathetic",
         "Emotional + Emotion",
-        "Empathic + Based",
-        "Nonverbal + Venus",
-        "Empathetic + Human",
-        "Studies + Chatbots",
-        "Personality + Dialogue",
+        "Health + Mental",
+        "Personality + Traits",
+        "Face + Emotional",
+        "Multimodal + Nonverbal",
+        "Ngfr + Data",
         "Commonsense + Dialogue",
         "Metaverse + Life",
         "Personality + Dialogue",
-        "Mental + Emotion",
-        "Ngfr + Hub",
-        "Participants + Complexity",
-        "Urban + Thermal",
-        "Genai + Agents",
-        "Narrative + Empathy",
-        "Agent + Queries",
-        "Gaze + Data"
+        "Participants + Complexity"
       ],
       "ideas": [
         {
-          "text": "Human behavioral and physiological responses differ between face-to-face and remote emotional conversations, especially in facial expressions, EDA, and HRV.",
+          "text": "Modern language agents go beyond direct action selection to incorporate reasoning, planning, and memory management via LLMs, but the field lacks shared terminology and abstractions.",
           "source": "Unknown",
-          "similarity": 0.6111451983451843
-        },
-        {
-          "text": "Physiological and facial responses differ systematically between face-to-face and remote conversations, with remote settings linked to more positive, higher-arousal emotional states.",
-          "source": "Unknown",
-          "similarity": 0.6062636375427246
-        },
-        {
-          "text": "This work is the first comprehensive systematic review of ML-based empathy detection across four input modalities (text, audio, audiovisual/video, physiological signals) and diverse interaction contexts.",
-          "source": "Unknown",
-          "similarity": 0.6860999464988708
-        },
-        {
-          "text": "This work is presented as the first comprehensive systematic review of ML-based empathy detection across four modalities and diverse interaction contexts, covering all eligible studies up to May 2025.",
-          "source": "Unknown",
-          "similarity": 0.6849173903465271
-        },
-        {
-          "text": "Multimodal and game-based agent systems (e.g., in Minecraft) and social multi-agent frameworks demonstrate rich task execution and social behaviors but still operate with largely fixed or ad hoc personality settings.",
-          "source": "Unknown",
-          "similarity": 0.5343982577323914
-        },
-        {
-          "text": "Evolving Agents comprise two main systems—Personality (Cognition, Emotion, Character Growth) and Behavior (Planning, Action)—whose interaction produces a feedback loop of behavior-personality co-evolution.",
-          "source": "Unknown",
-          "similarity": 0.5313815474510193
-        },
-        {
-          "text": "Focusing the chatbot explicitly on personality topics improves inference accuracy without substantially harming user experience compared to more casual ‘getting to know you’ conversations.",
-          "source": "Unknown",
-          "similarity": 0.5931844711303711
-        },
-        {
-          "text": "ChatGPT can infer users’ Big Five personality traits above chance from free-form interactions, as shown by positive, often significant correlations between self-reported and inferred scores.",
-          "source": "Unknown",
-          "similarity": 0.5928881764411926
-        },
-        {
-          "text": "Existing surveys on multimodal emotion recognition largely focus on non-conversational settings or on feature fusion alone, failing to adequately address conversation-specific issues such as interlocutor modeling, context, cross-modal alignment, reasoning, and modality missingness.",
-          "source": "Unknown",
-          "similarity": 0.5641543865203857
-        },
-        {
-          "text": "The references list situates the survey within a broad body of work on multimodal emotion recognition, sentiment analysis, dialogic emotion analysis, datasets, feature toolkits, and large language model-based methods.",
-          "source": "Unknown",
-          "similarity": 0.5630725622177124
-        },
-        {
-          "text": "The EmpathyAgent benchmark is positioned as a practical tool for building powerful empathetic agents by enabling effective training and evaluation of embodied empathetic behaviors.",
-          "source": "Unknown",
-          "similarity": 0.6086233854293823
-        },
-        {
-          "text": "Baseline large-capacity conversation models trained on spontaneous internet conversations are not rated as very empathetic, but their empathetic performance can be improved using the new dataset.",
-          "source": "Unknown",
-          "similarity": 0.6071691513061523
-        },
-        {
-          "text": "The review systematically maps existing empathic conversational agent architectures for mental health, assessing both their technical emotion-detection performance and user acceptability.",
-          "source": "Unknown",
-          "similarity": 0.7390786409378052
-        },
-        {
-          "text": "The review aims to assess conversational agent (CA) designs in mental health care that are specifically engineered to convey empathy and how that empathy is implemented technically.",
-          "source": "Unknown",
-          "similarity": 0.7329784035682678
+          "similarity": 0.5020062327384949
         },
         {
           "text": "These agents perform nontrivial LLM-based reasoning and learning, motivating the use of cognitive architectures to structure their internal and external interactions.",
           "source": "Unknown",
-          "similarity": 0.5998365879058838
+          "similarity": 0.5010623335838318
         },
         {
-          "text": "Modern language agents go beyond direct action selection to incorporate reasoning, planning, and memory management via LLMs, but the field lacks shared terminology and abstractions.",
+          "text": "The section stresses the importance of clear operational definitions of empathy for computational modeling, as different theoretical views lead to different annotation schemes and machine learning targets.",
           "source": "Unknown",
-          "similarity": 0.5967490673065186
+          "similarity": 0.6198419332504272
+        },
+        {
+          "text": "Empathy is modeled through diverse task formulations—such as discrete classification, regression, and sequence labeling—reflecting different theoretical views of empathy and limiting comparability across studies.",
+          "source": "Unknown",
+          "similarity": 0.6194623708724976
+        },
+        {
+          "text": "The system elicits distinct predominant emotions across themes, suggesting that its multi-emotion agent design can align output tone with situational context (e.g., fear for job loss, sadness for breakups, joy for family conflicts and academic anxiety).",
+          "source": "Unknown",
+          "similarity": 0.5680670738220215
+        },
+        {
+          "text": "Future improvements should focus on more accurate and fast emotion recognition (e.g., deep learning, better fusion, additional behavioral modalities) and a richer, more adaptive empathic interface (diverse avatars, prosody control, LLM-based dialogue, handling emotional transitions, and possible per",
+          "source": "Unknown",
+          "similarity": 0.5680371522903442
+        },
+        {
+          "text": "The review systematically maps existing empathic conversational agent architectures for mental health, assessing both their technical emotion-detection performance and user acceptability.",
+          "source": "Unknown",
+          "similarity": 0.5930527448654175
+        },
+        {
+          "text": "Despite rapid development of mental health conversational agents, there is limited systematic knowledge about how empathy is concretely designed, implemented, and evaluated in these systems.",
+          "source": "Unknown",
+          "similarity": 0.5927907228469849
+        },
+        {
+          "text": "Empirical analysis reveals three key findings: GPT-3.5 better portrays positive personalities, stronger predefined traits improve portrayal success, and more dialogue turns both enhance personality expression and increase risk of misdirection by partners.",
+          "source": "Unknown",
+          "similarity": 0.5589484572410583
+        },
+        {
+          "text": "Personality-infused role-playing, illustrated using Big Five traits in a job-hunting dialogue scenario, is argued to make conversational agents more realistic, engaging, and immersive for users.",
+          "source": "Unknown",
+          "similarity": 0.5572858452796936
+        },
+        {
+          "text": "Human behavioral and physiological responses differ between face-to-face and remote emotional conversations, especially in facial expressions, EDA, and HRV.",
+          "source": "Unknown",
+          "similarity": 0.5982843637466431
+        },
+        {
+          "text": "The main contributions include a comparative analysis of physiological and behavioral responses across settings, identification of features that vary by emotional and conversational condition, exploration of empathy differences, and release of a new multimodal dataset.",
+          "source": "Unknown",
+          "similarity": 0.5966397523880005
+        },
+        {
+          "text": "Multiple datasets provide rich multimodal signals (text, audio, visual, and sometimes personality/prosody) and diverse annotation schemes (categorical emotions, sentiment scales, continuous affective dimensions), enabling varied emotion and sentiment modeling tasks.",
+          "source": "Unknown",
+          "similarity": 0.5532164573669434
+        },
+        {
+          "text": "The paper reports that MARS, trained on VENUS, can generate natural and contextually aligned nonverbal expressions alongside text, supported by quantitative metrics, qualitative analysis, and user studies.",
+          "source": "Unknown",
+          "similarity": 0.5439398288726807
+        },
+        {
+          "text": "The study’s primary contribution is a methodology that integrates smart wearables, streetscape/visual (SVI) segmentation, and weather sensors into a UDT to examine how urban morphology affects thermal perception and physiological responses.",
+          "source": "Unknown",
+          "similarity": 0.5238114595413208
+        },
+        {
+          "text": "The paper presents a proof-of-concept urban digital twin that integrates emerging urban data sources (wearables and street-view imagery) to sense outdoor thermal comfort and built-environment influences, aiming to support planning and management for improved walkability.",
+          "source": "Unknown",
+          "similarity": 0.5097079873085022
         }
       ]
     },
     "Identificación del Problema o Brecha": {
-      "n_ideas": 16,
+      "n_ideas": 12,
       "topics_used": [
-        "Studies + Chatbots",
-        "Personality + Dialogue",
+        "Multimodal + Nonverbal",
+        "Ngfr + Data",
         "Commonsense + Dialogue",
         "Metaverse + Life",
         "Personality + Dialogue",
-        "Mental + Emotion",
-        "Ngfr + Hub",
-        "Participants + Complexity",
-        "Urban + Thermal",
-        "Genai + Agents",
-        "Narrative + Empathy",
-        "Agent + Queries",
-        "Gaze + Data"
+        "Participants + Complexity"
       ],
       "ideas": [
         {
-          "text": "The review restricted studies to empirical research involving human participants where AI chatbots were used as an intervention, assessment, or support tool for executive functions.",
+          "text": "The authors propose MARS, a multimodal language model that jointly models text and nonverbal cues represented as discrete latent tokens, enabling understanding and generation of nonverbal behavior in dialogue.",
           "source": "Unknown",
-          "similarity": 0.5765745639801025
+          "similarity": 0.5339705944061279
         },
         {
-          "text": "Using a PRISMA 2020–guided systematic search (2021–present) across major databases, the authors narrowed 115 initially identified articles down to 10 eligible empirical studies on AI chatbots and executive functions.",
+          "text": "Existing multimodal dialogue datasets and methods focus on conversational sentiment and multimodal dialogue generation but are limited in scale and lack detailed 3D facial and body language for modeling nonverbal cues.",
           "source": "Unknown",
-          "similarity": 0.5645145773887634
+          "similarity": 0.53348708152771
         },
         {
-          "text": "Earlier work on automatic personality recognition (e.g., Mehl et al.) used psycholinguistic attributes from daily-life conversations but only modeled the subject’s speech, ignoring interlocutors’ influence on personality expression.",
+          "text": "The study integrates outdoor thermal comfort, walkability, and 3D urban form within an urban digital twin (UDT) using heterogeneous data sources such as wearables and street view imagery.",
           "source": "Unknown",
-          "similarity": 0.5292987823486328
+          "similarity": 0.5063626766204834
         },
         {
-          "text": "The paper targets automatic recognition of Big-Five personality traits from dialogue, which is important for user-adaptive, effective human-robot interaction.",
+          "text": "The paper proposes integrating wearable sensing with a Digital Twin of the city to capture and model pedestrian comfort dynamics at high spatial and temporal resolution.",
           "source": "Unknown",
-          "similarity": 0.5174239873886108
+          "similarity": 0.5033600330352783
         },
         {
           "text": "The paper introduces Sibyl, a new paradigm for Sensible and Visionary Commonsense Knowledge that dynamically infers future-aware, response-specific commonsense to guide empathetic dialogue generation.",
           "source": "Unknown",
-          "similarity": 0.6871902346611023
+          "similarity": 0.6820166707038879
         },
         {
           "text": "Sibyl introduces a paradigm of ‘visionary commonsense’ by using a strong LLM (GPT‑4o) to generate four categories of commonsense inferences from dialogue history plus response, then validating these categories with human annotators.",
           "source": "Unknown",
-          "similarity": 0.6857423782348633
+          "similarity": 0.6813509464263916
         },
         {
           "text": "The Metaverse is conceptualized as a form of artificial life whose evolution intertwines the human body with virtual environments, demanding new points of theoretical connection for understanding its cognitive effects.",
           "source": "Unknown",
-          "similarity": 0.6510763168334961
+          "similarity": 0.6569591760635376
         },
         {
           "text": "Immersion in VR/Metaverse environments will drive the emergence of hybrid virtual-real bodily responses, gradually reshaping top-down predictive mechanisms to conform to Metaverse ‘rules’ and affordances.",
           "source": "Unknown",
-          "similarity": 0.6407449245452881
+          "similarity": 0.6477173566818237
         },
         {
-          "text": "Each configuration was evaluated in single-round experiments using four metrics across five personality traits to assess overall model capability.",
+          "text": "Modeling dialogues as heterogeneous conversational graphs, which incorporate speakers, utterances, and their relations, leads to better personality recognition than sequence-based or homogeneous graph baselines.",
           "source": "Unknown",
-          "similarity": 0.5075174570083618
+          "similarity": 0.678886890411377
         },
         {
-          "text": "Personality recognition in dialogue has recently attracted growing attention due to its utility in building user personas and understanding user needs in various applications.",
+          "text": "There is an identified need for models that jointly leverage data augmentation and heterogeneous graph networks to better capture complex conversational patterns for personality recognition.",
           "source": "Unknown",
-          "similarity": 0.5022857189178467
-        },
-        {
-          "text": "The paper introduces a novel LLM-based, explainable depression assessment system that integrates multiple conversational data streams to generate a real-time, multidimensional, and continuously updating depression risk profile, aiming to overcome the limitations of traditional tools.",
-          "source": "Unknown",
-          "similarity": 0.6177834272384644
-        },
-        {
-          "text": "The paper proposes an LLM-based system that analyzes real-time conversational cues and subtle emotional language patterns to assess mental state more accurately and dynamically.",
-          "source": "Unknown",
-          "similarity": 0.615392804145813
-        },
-        {
-          "text": "Beyond technical aspects, the NGFR hub is proposed as a technological-societal readiness benchmark for smart cities, indicating their capacity to deploy advanced resources to protect lives and property, especially under climate change-induced disaster risks.",
-          "source": "Unknown",
-          "similarity": 0.6407092213630676
-        },
-        {
-          "text": "The paper proposes an NGFR AI-enabled hub (a modified SmartHub) as a practice-centric, expandable architecture that embeds next-generation first responder technologies into smart city infrastructures.",
-          "source": "Unknown",
-          "similarity": 0.6343026161193848
+          "similarity": 0.6743378639221191
         },
         {
           "text": "The study uses virtual reality to examine how the coherence and complexity of outdoor planting designs affect users’ perceptions of time and landscape aesthetics.",
           "source": "Unknown",
-          "similarity": 0.6744272112846375
+          "similarity": 0.6732476949691772
         },
         {
           "text": "The study introduces virtual reality as a controlled experimental tool to manipulate a specific design variable—vegetation layout along a campus path—to investigate its effects on perceived coherence, complexity, and sense of time.",
           "source": "Unknown",
-          "similarity": 0.6717973351478577
+          "similarity": 0.6708495020866394
         }
       ]
     },
     "La Nueva Perspectiva": {
       "n_ideas": 16,
       "topics_used": [
-        "Face + Emotional",
-        "Empathy + Empathic",
         "Agents + Agent",
-        "Personality + Gpt",
-        "Emotion + Multimodal",
-        "Empathetic + Empathy",
-        "Empathic + Empathy",
-        "Llm + Agents"
+        "Empathy + Empathetic",
+        "Emotional + Emotion",
+        "Health + Mental",
+        "Personality + Traits",
+        "Face + Emotional",
+        "Multimodal + Nonverbal",
+        "Ngfr + Data"
       ],
       "ideas": [
         {
+          "text": "GenAI-based agents have emerging potential to act as autonomous, cognitively capable teammates that proactively contribute in group settings.",
+          "source": "Unknown",
+          "similarity": 0.4974779486656189
+        },
+        {
+          "text": "Agents’ interaction design includes names, visible role labels, lifelike idle and speaking animations, hand-raising, and gaze/turn-taking behaviors, with a Wizard-of-Oz system controlling when agents speak to simulate socially appropriate contributions.",
+          "source": "Unknown",
+          "similarity": 0.492388516664505
+        },
+        {
+          "text": "Empathy measurement in psychology relies largely on self-report questionnaires and empathic accuracy paradigms, while affective computing uses these instruments to obtain ground truth but sometimes applies heuristic labelling instead.",
+          "source": "Unknown",
+          "similarity": 0.6176429390907288
+        },
+        {
+          "text": "The paper outlines how empathy is measured in psychology (questionnaires and empathic accuracy) and how these measurements provide ground truth for ML, while also noting that some datasets instead use heuristic, source-based labels not tied to formal empathy definitions.",
+          "source": "Unknown",
+          "similarity": 0.6170916557312012
+        },
+        {
+          "text": "The fine-tuned LLM can accurately recognize users’ emotional states and generate high-quality empathetic responses without relying on sensitive clinical data.",
+          "source": "Unknown",
+          "similarity": 0.5679020881652832
+        },
+        {
+          "text": "Existing LLM-based empathetic systems are mostly text-centric and neglect speech and gestural modalities, limiting their ability to capture full emotional context and to respond multimodally.",
+          "source": "Unknown",
+          "similarity": 0.5667331218719482
+        },
+        {
+          "text": "Understanding the design and evaluation of empathic conversational agents has implications for future clinical integration, ethical deployment, and the development of guidelines or best practices in digital mental health.",
+          "source": "Unknown",
+          "similarity": 0.5908389687538147
+        },
+        {
+          "text": "Data extraction focused on study designs, methods for evaluating empathy, and types of conversational agent architectures to summarize all findings.",
+          "source": "Unknown",
+          "similarity": 0.5876428484916687
+        },
+        {
+          "text": "Personality inference is most accurate when the chatbot is explicitly prompted to assess personality (assessment condition), yielding moderate correlations between about r = .33 and r = .64.",
+          "source": "Unknown",
+          "similarity": 0.5553151369094849
+        },
+        {
+          "text": "Through personality back-testing with GPT-3.5, PsyPlay achieves about 80% success in accurately portraying intended personality traits, and reveals that LLMs aligned with positive values more reliably play positive personalities than negative ones.",
+          "source": "Unknown",
+          "similarity": 0.5523661375045776
+        },
+        {
+          "text": "The novel contribution of this work is creating a comparative multimodal dataset of physiological and behavioral responses during emotional conversations in both face-to-face and remote settings, to analyze empathy, response differences, and cross-setting emotion recognition.",
+          "source": "Unknown",
+          "similarity": 0.5959252119064331
+        },
+        {
           "text": "Conversation type and self-reported arousal and valence are treated as independent variables, while EDA, PPG features, facial action units, and reported empathy factors are dependent variables.",
           "source": "Unknown",
-          "similarity": 0.6051342487335205
+          "similarity": 0.5950621366500854
         },
         {
-          "text": "The study compares emotional video-mediated conversations with face-to-face interactions using behavioral and physiological measures to understand their impact on emotions, empathy, and bodily responses.",
+          "text": "The paper presents MARS, a multimodal language model that jointly understands and generates both text and nonverbal cues by training on unified discrete tokens for language, facial expressions, and body movements with a next-token prediction objective.",
           "source": "Unknown",
-          "similarity": 0.604059100151062
+          "similarity": 0.5306739807128906
         },
         {
-          "text": "The section stresses the importance of clear operational definitions of empathy for computational modeling, as different theoretical views lead to different annotation schemes and machine learning targets.",
+          "text": "Visualization highlights VENUS’s capacity to detect and align nonverbal affective signals—such as facial expressions and gestures—with conversational context.",
           "source": "Unknown",
-          "similarity": 0.6842683553695679
+          "similarity": 0.5290721654891968
         },
         {
-          "text": "The authors highlight substantial conceptual ambiguity in how empathy is defined and measured in psychology versus empathy computing, noting that computational work often collapses nuanced constructs (e.g., empathy vs sympathy, cognitive vs affective empathy) into coarse or binary labels.",
+          "text": "The research aims to inform more responsive and human-centered urban design and mobility policies by revealing how specific urban features and conditions impact pedestrian comfort in situ.",
           "source": "Unknown",
-          "similarity": 0.6830384731292725
+          "similarity": 0.5018948316574097
         },
         {
-          "text": "Multi-agent simulations are being used in goal-oriented and game-like contexts, including collaborative software production, autonomous exploration and learning in game worlds, and human-like NPCs for text-based strategy games.",
+          "text": "Future developments aim to use integrated data not only for visualization but also to classify paths by urban morphological features and identify commonly used routes and thermal hot spots.",
           "source": "Unknown",
-          "similarity": 0.5313360095024109
-        },
-        {
-          "text": "Agent communication is probabilistically triggered by proximity and social tendencies, with conversations designed to deepen over time through dialogue memory that promotes progressively more advanced topics.",
-          "source": "Unknown",
-          "similarity": 0.5309491157531738
-        },
-        {
-          "text": "When the chatbot is only instructed to ‘get to know’ the user (acquaintance condition), personality inference accuracy is lower than in the explicit assessment condition, with weaker but often still positive and significant correlations.",
-          "source": "Unknown",
-          "similarity": 0.5925788283348083
-        },
-        {
-          "text": "Personality inferences showed relatively small demographic biases: traits were generally underestimated across groups, with only a few significant subgroup differences in residuals and correlations.",
-          "source": "Unknown",
-          "similarity": 0.5885899066925049
-        },
-        {
-          "text": "The multimodal fusion approach enables modest but usable real-time emotion recognition accuracy, and the conversational protocol effectively induces target emotional states.",
-          "source": "Unknown",
-          "similarity": 0.5621957182884216
-        },
-        {
-          "text": "The paper’s main hypothesis is that multimodal models combining acoustic and visual information are more suitable for valence-based empathy recognition than unimodal models.",
-          "source": "Unknown",
-          "similarity": 0.5621088147163391
-        },
-        {
-          "text": "The study introduces an evaluation framework and dataset for assessing empathetic responding in LLMs versus humans, which can be reused to test newer LLM versions.",
-          "source": "Unknown",
-          "similarity": 0.6044856309890747
-        },
-        {
-          "text": "The performance gain of EmpathyAgent is particularly notable on tasks requiring accurate interpretation of users’ emotional states and appropriate follow-up actions.",
-          "source": "Unknown",
-          "similarity": 0.6036052703857422
-        },
-        {
-          "text": "This paper positions itself as the first review specifically focused on how empathic mental health conversational agents are designed and evaluated, addressing a gap in the literature.",
-          "source": "Unknown",
-          "similarity": 0.7230542898178101
-        },
-        {
-          "text": "The review examines types of conversational agent (CA) designs in mental health (MH) care that are specifically engineered to convey empathy.",
-          "source": "Unknown",
-          "similarity": 0.7224620580673218
-        },
-        {
-          "text": "Cognitive language agents embed LLMs in a feedback loop with the environment, using multimodal inputs, intermediate reasoning, memory, and self-modification to guide actions.",
-          "source": "Unknown",
-          "similarity": 0.5897431373596191
-        },
-        {
-          "text": "The authors distinguish between basic LLM use in NLP, simple language agents, and more advanced “cognitive language agents” that use LLMs not only for action selection but also for reasoning, planning, and long-term memory management.",
-          "source": "Unknown",
-          "similarity": 0.581157386302948
+          "similarity": 0.4986957013607025
         }
       ]
     },
     "Discusión": {
       "n_ideas": 16,
       "topics_used": [
-        "Face + Emotional",
-        "Empathy + Empathic",
         "Agents + Agent",
-        "Personality + Gpt",
-        "Emotion + Multimodal",
-        "Empathetic + Empathy",
-        "Empathic + Empathy",
-        "Llm + Agents",
+        "Empathy + Empathetic",
         "Emotional + Emotion",
-        "Empathic + Based",
-        "Nonverbal + Venus",
-        "Empathetic + Human",
-        "Studies + Chatbots",
-        "Personality + Dialogue",
+        "Health + Mental",
+        "Personality + Traits",
+        "Face + Emotional",
+        "Multimodal + Nonverbal",
+        "Ngfr + Data",
         "Commonsense + Dialogue",
         "Metaverse + Life",
         "Personality + Dialogue",
-        "Mental + Emotion",
-        "Ngfr + Hub",
-        "Participants + Complexity",
-        "Urban + Thermal",
-        "Genai + Agents",
-        "Narrative + Empathy",
-        "Agent + Queries",
-        "Gaze + Data"
+        "Participants + Complexity"
       ],
       "ideas": [
         {
-          "text": "The main contributions include a comparative analysis of physiological and behavioral responses across settings, identification of features that vary by emotional and conversational condition, exploration of empathy differences, and release of a new multimodal dataset.",
+          "text": "Cognitive language agents embed LLMs in a feedback loop with the environment, using multimodal inputs, intermediate reasoning, memory, and self-modification to guide actions.",
           "source": "Unknown",
-          "similarity": 0.6035912036895752
+          "similarity": 0.49145257472991943
         },
         {
-          "text": "The study adopts a quantitative approach to measure and compare physiological and behavioral indicators in face-to-face versus remote conversations.",
+          "text": "Agent communication is probabilistically triggered by proximity and social tendencies, with conversations designed to deepen over time through dialogue memory that promotes progressively more advanced topics.",
           "source": "Unknown",
-          "similarity": 0.5997745990753174
+          "similarity": 0.488182008266449
         },
         {
-          "text": "The paper offers a rigorous, PRISMA-aligned systematic review of empathy detection using machine learning, covering 82 studies and organizing them by task formulations and input modalities.",
+          "text": "This work is the first comprehensive systematic review of ML-based empathy detection across four input modalities (text, audio, audiovisual/video, physiological signals) and diverse interaction contexts.",
           "source": "Unknown",
-          "similarity": 0.681477427482605
+          "similarity": 0.6153489351272583
         },
         {
-          "text": "Empathy detection is conceptually distinct from emotion detection because it models relational dynamics between at least two individuals—the initial expresser and the responder whose empathic reaction is assessed.",
+          "text": "This work is presented as the first comprehensive systematic review of ML-based empathy detection across four modalities and diverse interaction contexts, covering all eligible studies up to May 2025.",
           "source": "Unknown",
-          "similarity": 0.6812372803688049
+          "similarity": 0.6102880239486694
         },
         {
-          "text": "Current simulation research largely emphasizes extrinsic behaviors of agents—both individual task performance and group-level social actions—often in real-world and game-like virtual environments.",
+          "text": "Multi-modal agents (social robots and virtual agents) leverage nonverbal channels—especially facial expression recognition—to recognize affective states and express empathy, leading to increased perceived empathy and improved relational outcomes.",
           "source": "Unknown",
-          "similarity": 0.5298453569412231
+          "similarity": 0.5640351176261902
         },
         {
-          "text": "This modular design is intended to support complex interactions and the emergence of human-like societal dynamics in large-scale multi-agent simulations.",
+          "text": "Different technical strategies are used to operationalize emotional intelligence in AI, including emotion-guided prompting, sentiment lexicons, multimodal fusion, episodic memory, and dynamic game-theoretic adaptation.",
           "source": "Unknown",
-          "similarity": 0.5293695330619812
+          "similarity": 0.5612583160400391
         },
         {
-          "text": "Different interaction modes (assessment, acquaintance, assistant) significantly affect inference accuracy and user experience; naturalistic, reciprocal conversation styles improve user experience without sacrificing personality-prediction accuracy.",
+          "text": "The paper aims to systematically review empathic conversational agent platforms for mental health, focusing on their design characteristics, underlying empathy models, implementation techniques, and evaluation outcomes.",
           "source": "Unknown",
-          "similarity": 0.5879417061805725
+          "similarity": 0.5866409540176392
         },
         {
-          "text": "User experience remains highly positive even when LLMs are prompted to actively seek personality-relevant information.",
+          "text": "Empathic conversational agents for mental health are typically evaluated on three fronts: technical performance (e.g., accuracy of emotion detection), user experience (e.g., perceived empathy, satisfaction), and clinical or mental health outcomes.",
           "source": "Unknown",
-          "similarity": 0.5869892239570618
+          "similarity": 0.5847172737121582
         },
         {
-          "text": "Despite recent progress and diverse modeling strategies, MERC still faces major challenges, particularly data scarcity, modality alignment, and cross-lingual and cross-cultural generalization.",
+          "text": "In the assistant condition, where the chatbot does not ask personal questions and only reacts to user prompts, personality inference accuracy is lowest but still often above zero, indicating that everyday assistant-type interactions carry psychologically meaningful signals.",
           "source": "Unknown",
-          "similarity": 0.5610469579696655
+          "similarity": 0.5521048903465271
         },
         {
-          "text": "Multimodal (audio + visual) models outperform unimodal models for valence-based empathy recognition, confirming that both acoustic and visual signals carry relevant information.",
+          "text": "Focusing directly on personality-relevant topics can increase personality inference accuracy without degrading user experience relative to a more casual acquaintance-style interaction.",
           "source": "Unknown",
-          "similarity": 0.5571989417076111
+          "similarity": 0.5504515171051025
         },
         {
-          "text": "The paper benchmarks existing LLMs and MLLMs on the EmpathyAgent framework to evaluate their empathetic capabilities in embodied settings.",
+          "text": "Findings highlight the potential to improve remote interactions by real-time multimodal emotion detection and transmission as an additional social cue.",
           "source": "Unknown",
-          "similarity": 0.6028136014938354
+          "similarity": 0.5937503576278687
         },
         {
-          "text": "The paper introduces a large-scale between-subjects user study comparing empathy in responses from humans and four state-of-the-art LLMs (GPT-4, LLaMA-2-70B-Chat, Gemini-1.0-Pro, Mixtral-8x7B-Instruct) using 1,000 Prolific participants.",
+          "text": "The study compares emotional video-mediated conversations with face-to-face interactions using behavioral and physiological measures to understand their impact on emotions, empathy, and bodily responses.",
           "source": "Unknown",
-          "similarity": 0.6018120646476746
+          "similarity": 0.5931086540222168
         },
         {
-          "text": "This review aims to systematically map and evaluate empathic conversational agent platform designs for mental health, focusing on design characteristics, empathy-related mechanisms, and reported outcomes.",
+          "text": "Future work will expand the range of nonverbal modalities in the dataset, including vocal expressions, to improve model robustness and richness of nonverbal cues.",
           "source": "Unknown",
-          "similarity": 0.7210042476654053
+          "similarity": 0.5242849588394165
         },
         {
-          "text": "User acceptability of empathic conversational agents is a core evaluation dimension in this review.",
+          "text": "Building on these advances, the authors use pseudo labels derived from VENUS to address the lack of large-scale conversational motion data and to jointly generate text, facial expressions, and body language aligned with conversational context.",
           "source": "Unknown",
-          "similarity": 0.7174770832061768
+          "similarity": 0.5235045552253723
         },
         {
-          "text": "The structural analogy between production systems and LLMs motivates using cognitive architectures to organize and extend LLM-based language agents.",
+          "text": "A methodological framework is introduced that fuses multimodal wearable data with urban context variables, enabling the detection and mapping of comfort hotspots and stressors along pedestrian trajectories.",
           "source": "Unknown",
-          "similarity": 0.5807915329933167
+          "similarity": 0.4976308345794678
         },
         {
-          "text": "The authors argue that cognitive architecture and system design for LLM agents should be deeply integrated to create a mutually reinforcing development loop.",
+          "text": "Beyond technical aspects, the NGFR hub is proposed as a technological-societal readiness benchmark for smart cities, indicating their capacity to deploy advanced resources to protect lives and property, especially under climate change-induced disaster risks.",
           "source": "Unknown",
-          "similarity": 0.5753873586654663
+          "similarity": 0.4956211447715759
         }
       ]
     },
     "Implicaciones Futuras": {
       "n_ideas": 16,
       "topics_used": [
-        "Face + Emotional",
-        "Empathy + Empathic",
         "Agents + Agent",
-        "Personality + Gpt",
-        "Emotion + Multimodal",
-        "Empathetic + Empathy",
-        "Empathic + Empathy",
-        "Llm + Agents",
+        "Empathy + Empathetic",
         "Emotional + Emotion",
-        "Empathic + Based"
+        "Health + Mental",
+        "Personality + Traits",
+        "Face + Emotional",
+        "Multimodal + Nonverbal",
+        "Ngfr + Data",
+        "Commonsense + Dialogue",
+        "Metaverse + Life"
       ],
       "ideas": [
         {
-          "text": "Physiological and facial responses differ systematically between face-to-face and remote emotional conversations, with remote interactions linked to more positive affect and higher HRV, and face-to-face to stronger phasic EDA responses.",
+          "text": "Modern AI agents are composed of multiple LLM-based modules (reasoning, memory, planning, tool use) and have been applied to domains like coding, web browsing, and gameplay.",
           "source": "Unknown",
-          "similarity": 0.5992631912231445
+          "similarity": 0.48676398396492004
         },
         {
-          "text": "Findings highlight the potential to improve remote interactions by real-time multimodal emotion detection and transmission as an additional social cue.",
+          "text": "Instead of fixed relationship parameters or categories, agent relationships are abstracted: large language models select preferred conversation partners based on dialogue memory, with agents required to justify their choices, leading to more open and diverse social interactions.",
           "source": "Unknown",
-          "similarity": 0.5991713404655457
+          "similarity": 0.48659780621528625
         },
         {
-          "text": "Empathy detection is conceptually distinct from emotion detection: while emotion detection targets a single individual’s emotional state, empathy detection analyses how one person’s emotional response relates to another’s expressed emotion within an interaction.",
+          "text": "Empathy in CAs is operationalized through multiple components—such as emotion recognition, empathic response generation, personalization, and relational behaviors—but implementations are often partial and inconsistently evaluated.",
           "source": "Unknown",
-          "similarity": 0.6808465123176575
+          "similarity": 0.60981285572052
         },
         {
-          "text": "The review reveals that ML-based empathy detection research is dominated by text-based methods, with far fewer studies using audiovisual, audio-only, or physiological signals.",
+          "text": "The authors differentiate empathy detection from emotion detection, emphasizing that empathy requires modeling relational dynamics between at least two individuals (the expresser and the responder) rather than a single emotional state.",
           "source": "Unknown",
-          "similarity": 0.6803091168403625
+          "similarity": 0.6098006963729858
         },
         {
-          "text": "Through the interplay of Memory and Insight, agents exhibit evolving, trait-consistent cognitive trajectories (e.g., Benjamin’s growing integration of technical and humanitarian concerns), demonstrating dynamic personality development in the simulation.",
+          "text": "Multi-modal LLMs can reliably interpret users’ affective states from visual input, and textual descriptions of visual cues are a particularly effective form of FER output.",
           "source": "Unknown",
-          "similarity": 0.529320478439331
+          "similarity": 0.5608714818954468
         },
         {
-          "text": "Evolving Agents employ a two-system architecture—Behavior System and Personality System—based on a stimulus-response concept, integrating modules for emotion, cognition, and character growth.",
+          "text": "The system employs an emotion-aware prompt engineering strategy to steer the LLM toward generating empathetic responses aligned with detected emotional states.",
           "source": "Unknown",
-          "similarity": 0.5283170938491821
+          "similarity": 0.5587747097015381
         },
         {
-          "text": "The paper includes standardized user-experience and demographic questionnaires to characterize participants and contextualize personality inference performance.",
+          "text": "The review also seeks to identify challenges and future research directions, including ethical and safety issues, robustness and accuracy of empathic inference, and the need for standardized evaluation metrics in mental health contexts.",
           "source": "Unknown",
-          "similarity": 0.5864847898483276
+          "similarity": 0.5841801166534424
         },
         {
-          "text": "LLM-based personality inference can contribute to novel insights in human behavior and psychology.",
+          "text": "The review concludes that AI-empowered empathic CAs are feasible, are often rated satisfactory by users, and could help address gaps in mental health service provision across various settings.",
           "source": "Unknown",
-          "similarity": 0.5857433676719666
+          "similarity": 0.5829721093177795
         },
         {
-          "text": "Multimodal large language models open new possibilities for MERC (e.g., zero-/few-shot generalization and deeper semantic understanding), but efficient fine-tuning and adaptation for nuanced, cross-cultural emotion understanding is an open research frontier.",
+          "text": "The method uses large language models as evaluators, with a dedicated prompt (Table 7) to back-test personality traits from dialogue, following recent work on LLM-based evaluation.",
           "source": "Unknown",
-          "similarity": 0.5564643144607544
+          "similarity": 0.5493613481521606
         },
         {
-          "text": "The authors identify limitations in prior FER evaluations with MLLMs (imbalanced and poorly labeled datasets) and propose using balanced, improved FER data plus temporal context and alternative encodings to more fairly assess and enhance MLLM emotion recognition (H1a, H1b, RQ1).",
+          "text": "PsyPlay introduces a personality back-testing method that infers a role’s personality directly from dialogue using LLM evaluators, arguing this is more reflective than having agents fill out personality questionnaires.",
           "source": "Unknown",
-          "similarity": 0.5560446977615356
+          "similarity": 0.5475618243217468
         },
         {
-          "text": "The benchmark’s evaluation framework maps specific empathy-related dimensions to different challenges: scenario understanding, planning empathetic actions, and executing actions/dialogue.",
+          "text": "Physiological and facial responses differ systematically between face-to-face and remote conversations, with remote settings linked to more positive, higher-arousal emotional states.",
           "source": "Unknown",
-          "similarity": 0.6011371612548828
+          "similarity": 0.5923198461532593
         },
         {
-          "text": "Benchmarking current models on EmpathyAgent shows that performing empathetic actions is still a significant challenge for existing systems.",
+          "text": "The paper’s main contribution is a comparative multimodal dataset of physiological and behavioral responses during emotional conversations in both face-to-face and remote settings, enabling analysis and modeling of differences between these modes.",
           "source": "Unknown",
-          "similarity": 0.6007996797561646
+          "similarity": 0.5897244215011597
         },
         {
-          "text": "Prior reviews have examined efficacy and technical/intervention characteristics of mental health CAs, highlighting empathy and personalization as key facilitators of efficacy but without deeply studying how empathy is incorporated.",
+          "text": "The final VENUS annotations align textual utterances with time-synchronized 3D nonverbal expression parameters, enabling video-grounded dialogue modeling of nonverbal behavior.",
           "source": "Unknown",
-          "similarity": 0.7165506482124329
+          "similarity": 0.523446798324585
         },
         {
-          "text": "The review describes evaluation approaches that assess empathic CAs in MH care from an implementation and user-acceptability perspective.",
+          "text": "The references list situates the survey within a broad body of work on multimodal emotion recognition, sentiment analysis, dialogic emotion analysis, datasets, feature toolkits, and large language model-based methods.",
           "source": "Unknown",
-          "similarity": 0.7165036201477051
+          "similarity": 0.5234085321426392
         },
         {
-          "text": "Language agents use LLMs as core computation units to reason, plan, and act in diverse environments, marking an emerging direction toward more human-like intelligence.",
+          "text": "A key novel extension is to improve NGFR performance by adopting self-aware computing as a methodological framework, also viewed as a basis for a digital twin of the system, particularly for crowd monitoring (CW) and emergency services.",
           "source": "Unknown",
-          "similarity": 0.5750242471694946
+          "similarity": 0.4949690103530884
         },
         {
-          "text": "Language agents are systems that use LLMs as a core computation unit to reason, plan, and act in the world.",
+          "text": "The NGFR hub’s CW mode operates as a perception–action cycle embedded in a smart city infrastructure, using cloud resources for learning and reasoning and providing real-time CW risk estimates to human decision makers.",
           "source": "Unknown",
-          "similarity": 0.5724800825119019
+          "similarity": 0.4939923882484436
         }
       ]
     },
     "Desafíos y Limitaciones": {
       "n_ideas": 16,
       "topics_used": [
-        "Face + Emotional",
         "Agents + Agent",
-        "Emotion + Multimodal",
-        "Empathic + Empathy",
         "Emotional + Emotion",
-        "Nonverbal + Venus",
-        "Studies + Chatbots",
+        "Personality + Traits",
+        "Multimodal + Nonverbal",
         "Commonsense + Dialogue",
         "Personality + Dialogue",
-        "Ngfr + Hub",
-        "Urban + Thermal",
-        "Narrative + Empathy",
-        "Gaze + Data",
-        "Empathy + Empathic",
-        "Empathetic + Empathy",
-        "Empathic + Based",
-        "Personality + Dialogue",
-        "Mental + Emotion",
-        "Genai + Agents"
+        "Empathy + Empathetic",
+        "Face + Emotional",
+        "Metaverse + Life"
       ],
       "ideas": [
         {
-          "text": "Type of conversation and self-reported arousal and valence are treated as independent variables, while EDA, PPG features, facial action units, and reported empathy measures serve as dependent variables.",
+          "text": "Cognitive architectures strongly shape agent performance, but most current architectures focus on internal reasoning (memory, reflection, planning, metacognition) rather than on redesigning the system itself, limiting the depth and breadth of metacognitive abilities.",
           "source": "Unknown",
-          "similarity": 0.5973990559577942
+          "similarity": 0.4862845540046692
         },
         {
-          "text": "The novel contribution of this work is creating a comparative multimodal dataset of physiological and behavioral responses during emotional conversations in both face-to-face and remote settings, to analyze empathy, response differences, and cross-setting emotion recognition.",
+          "text": "Language agents use LLMs as core computation units to reason, plan, and act in diverse environments, marking an emerging direction toward more human-like intelligence.",
           "source": "Unknown",
-          "similarity": 0.5961730480194092
+          "similarity": 0.485945463180542
         },
         {
-          "text": "Evolving Agents are grounded in psychological theories and are designed to simulate believable personality traits and personalized behavioral patterns that change over time in sandbox environments.",
+          "text": "The study enhances empathic LLM-based mental health chatbots by augmenting multi-modal input with nonverbal cues (facial expressions) using MLLM-based facial emotion recognition (FER), while leaving nonverbal output unchanged.",
           "source": "Unknown",
-          "similarity": 0.5263291001319885
+          "similarity": 0.5580140352249146
         },
         {
-          "text": "Agents with a social awareness module autonomously specialize into diverse and persistent social roles, forming heterogeneous role structures that resemble facets of human civilizations.",
+          "text": "Multi-modal agents that leverage nonverbal cues (especially facial expressions) can enhance perceived empathy, engagement, trust, and therapeutic alliance, providing a template for MLLM-based empathic chatbots.",
           "source": "Unknown",
-          "similarity": 0.5224379897117615
+          "similarity": 0.5578080415725708
         },
         {
-          "text": "Emotions are multimodal and can be recognized using combinations of physiological and behavioral signals, but it is unclear if face-to-face–trained models generalize to video-mediated conversations.",
+          "text": "The chatbot’s prompted role (assessment, acquaintance, assistant) strongly affects inference accuracy, whereas user interaction style (naturalistic vs unconstrained) has little impact.",
           "source": "Unknown",
-          "similarity": 0.5558662414550781
+          "similarity": 0.5470088720321655
         },
         {
-          "text": "Multimodal Emotion Recognition in Conversations (MERC) addresses the limitations of single-modality (especially text-only) emotion recognition for real-world dialogue systems.",
+          "text": "Different interaction modes (assessment, acquaintance, assistant) significantly affect inference accuracy and user experience; naturalistic, reciprocal conversation styles improve user experience without sacrificing personality-prediction accuracy.",
           "source": "Unknown",
-          "similarity": 0.553068995475769
+          "similarity": 0.5461515188217163
         },
         {
-          "text": "Human evaluation of empathic CAs is methodologically weak: few RCTs, inconsistent and poorly defined measures of empathy, limited assessment of mental health outcomes, and minimal involvement of clinicians and stakeholders.",
+          "text": "The dataset construction explicitly prioritizes segments where linguistic content is tightly coupled with visible behavior, supporting video-grounded dialogue modeling of nonverbal signals.",
           "source": "Unknown",
-          "similarity": 0.7152169942855835
+          "similarity": 0.5214007496833801
         },
         {
-          "text": "The review includes 19 studies of empathic conversational agents for mental health, with most reporting both system design and human evaluations.",
+          "text": "Multimodal approaches that incorporate facial expressions, speech tone, and other audio-visual cues provide richer emotional information than text alone and can improve detection of affective states and opportunities for empathetic responses.",
           "source": "Unknown",
-          "similarity": 0.7149385213851929
-        },
-        {
-          "text": "The proposed affective agent architecture relies on a memory system that stores both observations and internal emotional states, forming a chain of emotion that conditions future language-model outputs.",
-          "source": "Unknown",
-          "similarity": 0.6263167858123779
-        },
-        {
-          "text": "The study implements an appraisal-based Chain-of-Emotion architecture in a role-playing game agent and compares it to No-Memory and Memory baselines using a controlled breakup scenario.",
-          "source": "Unknown",
-          "similarity": 0.6233959197998047
-        },
-        {
-          "text": "The final VENUS annotations align textual utterances with time-synchronized 3D nonverbal expression parameters, enabling video-grounded dialogue modeling of nonverbal behavior.",
-          "source": "Unknown",
-          "similarity": 0.6018291115760803
-        },
-        {
-          "text": "The paper reports that MARS, trained on VENUS, can generate natural and contextually aligned nonverbal expressions alongside text, supported by quantitative metrics, qualitative analysis, and user studies.",
-          "source": "Unknown",
-          "similarity": 0.5993764400482178
-        },
-        {
-          "text": "The review followed PRISMA 2020 guidelines to systematically identify, screen, and synthesize studies on AI chatbots and executive functions.",
-          "source": "Unknown",
-          "similarity": 0.5558841228485107
-        },
-        {
-          "text": "The review targets studies where chatbots are used to support executive functions or related conditions such as stress, anxiety, depression, memory, attention, cognitive load, and behavioral changes.",
-          "source": "Unknown",
-          "similarity": 0.5468341112136841
+          "similarity": 0.5212429165840149
         },
         {
           "text": "For response generation, Sibyl augments the dialogue context with the four visionary commonsense inferences Kp as a bridge to the next response, and explores both finetuned and prompt-based generation strategies.",
           "source": "Unknown",
-          "similarity": 0.6837945580482483
+          "similarity": 0.6801235675811768
         },
         {
           "text": "The paper evaluates Sibyl by comparing it against several state-of-the-art empathetic dialogue and commonsense reasoning baselines.",
           "source": "Unknown",
-          "similarity": 0.6720483303070068
+          "similarity": 0.6713732481002808
+        },
+        {
+          "text": "The authors propose heterogeneous conversational graph networks that separately capture contextual influences and inherent personality traits in dialogues.",
+          "source": "Unknown",
+          "similarity": 0.6642248630523682
+        },
+        {
+          "text": "The authors propose a heterogeneous conversational graph network that models multiple types of nodes and relations in dialogue (utterances, speakers, and conversations) to improve personality recognition.",
+          "source": "Unknown",
+          "similarity": 0.6641072034835815
+        },
+        {
+          "text": "Global unidirectional empathy is also studied in human–agent and other non-clinical dyadic settings, using numeric or ordinal scales to rate empathic responses in dialogues, stories, and virtual/robotic interactions.",
+          "source": "Unknown",
+          "similarity": 0.60887211561203
+        },
+        {
+          "text": "The authors highlight substantial conceptual ambiguity in how empathy is defined and measured in psychology versus empathy computing, noting that computational work often collapses nuanced constructs (e.g., empathy vs sympathy, cognitive vs affective empathy) into coarse or binary labels.",
+          "source": "Unknown",
+          "similarity": 0.6083831787109375
+        },
+        {
+          "text": "The study adopts a quantitative approach to measure and compare physiological and behavioral indicators in face-to-face versus remote conversations.",
+          "source": "Unknown",
+          "similarity": 0.5891702771186829
+        },
+        {
+          "text": "Type of conversation and self-reported arousal and valence are treated as independent variables, while EDA, PPG features, facial action units, and reported empathy measures serve as dependent variables.",
+          "source": "Unknown",
+          "similarity": 0.5871814489364624
         }
       ]
     },
     "Conclusiones": {
       "n_ideas": 10,
       "topics_used": [
-        "Face + Emotional",
-        "Empathy + Empathic",
         "Agents + Agent",
-        "Personality + Gpt",
-        "Emotion + Multimodal"
+        "Empathy + Empathetic",
+        "Emotional + Emotion",
+        "Health + Mental",
+        "Personality + Traits"
       ],
       "ideas": [
         {
-          "text": "The study systematically compares emotional video-mediated conversations with face-to-face interactions using behavioral and physiological measures to clarify how remote communication impacts emotions and empathy.",
+          "text": "The LLM pipeline maintains a continuous global conversation memory and uses the evolving discussion context to generate agent opinions and immediate responses grounded in both history and current context.",
           "source": "Unknown",
-          "similarity": 0.5960922837257385
+          "similarity": 0.48560765385627747
         },
         {
-          "text": "The analysis framework explicitly targets differences between interaction modalities (face-to-face vs. remote) as a core dimension of emotional and physiological response variation.",
+          "text": "Language agents have evolved from simple high-level instruction generators to systems that perform intermediate reasoning before acting.",
           "source": "Unknown",
-          "similarity": 0.5948478579521179
+          "similarity": 0.48479998111724854
         },
         {
-          "text": "Empathy is a crucial, cross-disciplinary construct central to human communication and well-being, and is increasingly being operationalised using machine learning.",
+          "text": "The paper is structured to move from psychological definitions through task and dataset analysis to modality-specific ML models and real-world applications of empathy detection.",
           "source": "Unknown",
-          "similarity": 0.679502010345459
+          "similarity": 0.6082607507705688
         },
         {
-          "text": "Empathy detection is conceptually and computationally distinct from emotion detection because it concerns how one individual responds to another’s emotional state rather than identifying a single person’s emotion.",
+          "text": "Empathy detection is conceptually distinct from emotion detection because it models relational dynamics between at least two individuals—the initial expresser and the responder whose empathic reaction is assessed.",
           "source": "Unknown",
-          "similarity": 0.67908775806427
+          "similarity": 0.6080761551856995
         },
         {
-          "text": "The system enables believable personality evolution over time in a sandbox simulation, where agents develop new traits and behavior patterns through reflection and interaction with the environment and other agents.",
+          "text": "Current LLM-based empathic behavior is primarily achieved via generic pre-prompts and instructions to detect and express emotions in text, rather than deeper built-in empathic capabilities.",
           "source": "Unknown",
-          "similarity": 0.5218303203582764
+          "similarity": 0.5566366910934448
         },
         {
-          "text": "The authors define three criteria for agent specialization—autonomous role selection and switching, emergent specializations from interaction (not hard-coded), and role-consistent behaviors—and claim their system satisfies these in simulation.",
+          "text": "Across FER and temporal tasks, GPT-4-based MLLMs not only classify emotions but also generate meaningful textual descriptions, including recognition of occlusions and hand gestures.",
           "source": "Unknown",
-          "similarity": 0.520334005355835
+          "similarity": 0.5562352538108826
         },
         {
-          "text": "Inference accuracy varies systematically across interaction conditions: explicit personality assessment conversations outperform acquaintance-style and assistant-style conversations, and constrained chats often underperform unconstrained text.",
+          "text": "The review aims to assess conversational agent (CA) designs in mental health care that are specifically engineered to convey empathy and how that empathy is implemented technically.",
           "source": "Unknown",
-          "similarity": 0.5835102200508118
+          "similarity": 0.5825344324111938
         },
         {
-          "text": "The chatbot’s prompted behavior (assessment vs acquaintance vs assistant) has a strong impact on personality inference quality, whereas user instruction type (naturalistic conversation vs unconstrained use) has little effect on accuracy.",
+          "text": "Empathic conversational agents (CAs) for mental health show generally positive outcomes, but the existing evidence base is limited by small samples, short study durations, heterogeneous designs, and a focus on feasibility rather than robust clinical effectiveness.",
           "source": "Unknown",
-          "similarity": 0.5826510190963745
+          "similarity": 0.5822229385375977
         },
         {
-          "text": "Emotions are multimodal and can be recognized using combined physiological and behavioral signals; prior work in face-to-face conversation shows multimodal fusion improves emotion recognition, motivating tests of whether this generalizes to video-mediated settings.",
+          "text": "Even in an assistant role without asking personal questions, ChatGPT still extracts psychologically meaningful personality signals from everyday interactions, though with lower accuracy.",
           "source": "Unknown",
-          "similarity": 0.550606906414032
+          "similarity": 0.5457843542098999
         },
         {
-          "text": "Multimodal Emotion Recognition in Conversations (MERC) extends ERC by integrating multiple modalities—typically text, audio, and visual cues—to capture subtle emotional states more effectively.",
+          "text": "Personality inference accuracy depends strongly on conversational setup, with highest performance when the chatbot is explicitly prompted to elicit personality-relevant information.",
           "source": "Unknown",
-          "similarity": 0.5495259761810303
+          "similarity": 0.5434295535087585
         }
       ]
     }
