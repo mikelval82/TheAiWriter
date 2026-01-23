@@ -15,6 +15,41 @@ from ai_writer.processors.models import (
 from config.settings import settings
 
 
+def _safe_get(data: dict, key: str, default: Any = "") -> Any:
+    """Get value from dict, treating None as missing.
+    
+    Unlike dict.get(), this returns the default if the value is None.
+    This handles LLM responses that explicitly return null for fields.
+    """
+    value = data.get(key)
+    if value is None:
+        return default
+    return value
+
+
+def _safe_get_list(data: dict, key: str) -> list:
+    """Get list from dict, treating None as empty list."""
+    value = data.get(key)
+    if value is None or not isinstance(value, list):
+        return []
+    return value
+
+
+def _safe_get_int(data: dict, key: str) -> int | None:
+    """Get int from dict, handling various formats."""
+    value = data.get(key)
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
 class PDFExtractionAgent(BaseAgent):
     """Agent for extracting structured information from paper text."""
 
@@ -283,17 +318,20 @@ Return ONLY the JSON array, no other text."""
         
         ideas = []
         for data in ideas_data:
+            idea_text = _safe_get(data, "idea")
+            if not idea_text:  # Skip empty ideas
+                continue
             ideas.append(Idea(
                 paper_id=paper_id,
                 paper_title=paper_title,
                 authors=authors,
                 year=year,
                 section=section_name,
-                idea=data.get("idea", ""),
-                context=data.get("context", ""),
-                importance=data.get("importance", "medium"),
-                keywords=data.get("keywords", []),
-                related_references=data.get("related_references", []),
+                idea=idea_text,
+                context=_safe_get(data, "context"),
+                importance=_safe_get(data, "importance", "medium"),
+                keywords=_safe_get_list(data, "keywords"),
+                related_references=_safe_get_list(data, "related_references"),
             ))
         
         return ideas
@@ -350,15 +388,18 @@ Return ONLY the JSON array, no other text."""
         
         claims = []
         for data in claims_data:
+            claim_text = _safe_get(data, "claim")
+            if not claim_text:  # Skip empty claims
+                continue
             claims.append(Claim(
                 paper_id=paper_id,
                 paper_title=paper_title,
                 section=section_name,
-                claim=data.get("claim", ""),
-                evidence=data.get("evidence", ""),
-                evidence_type=data.get("evidence_type", "citation"),
-                cited_references=data.get("cited_references", []),
-                confidence=data.get("confidence", "medium"),
+                claim=claim_text,
+                evidence=_safe_get(data, "evidence"),
+                evidence_type=_safe_get(data, "evidence_type", "citation"),
+                cited_references=_safe_get_list(data, "cited_references"),
+                confidence=_safe_get(data, "confidence", "medium"),
             ))
         
         return claims
@@ -527,17 +568,19 @@ Return ONLY a valid JSON array, no explanation."""
         
         references = []
         for data in refs_data:
-            if not data.get("full_citation") and not data.get("title"):
+            full_citation = _safe_get(data, "full_citation")
+            title = _safe_get(data, "title")
+            if not full_citation and not title:
                 continue  # Skip empty entries
             references.append(Reference(
                 source_paper_id=paper_id,
-                citation_key=data.get("citation_key", ""),
-                full_citation=data.get("full_citation", ""),
-                authors=data.get("authors", []),
-                title=data.get("title", ""),
-                year=data.get("year"),
-                doi=data.get("doi"),
-                venue=data.get("venue"),
+                citation_key=_safe_get(data, "citation_key"),
+                full_citation=full_citation,
+                authors=_safe_get_list(data, "authors"),
+                title=title,
+                year=_safe_get_int(data, "year"),
+                doi=_safe_get(data, "doi") or None,  # Convert empty string to None
+                venue=_safe_get(data, "venue") or None,
             ))
         
         return references

@@ -5,44 +5,142 @@
 TheAIWriter es un sistema de escritura académica asistida por IA especializado en **papers de perspectivas**. Utiliza agentes especializados para generar, revisar iterativamente y exportar papers científicos manteniendo coherencia con un abstract base.
 
 ### Características Principales
-- **Contexto Enriquecido**: Usa índices de ideas (139) y claims (185) extraídos de papers de referencia
+- **Contexto Enriquecido**: Usa índices de ideas (3733) y claims (3839) extraídos de 41 papers de referencia
 - **Selección Inteligente**: Configuración por sección (ideas vs claims, nivel de confianza)
-- **Búsqueda Semántica**: Embeddings con OpenAI text-embedding-3-small
+- **Búsqueda Semántica**: Embeddings con OpenAI text-embedding-3-small (1536 dimensiones)
 - **Diversidad de Fuentes**: Límite de items por paper para citas variadas
+- **Procesamiento Batch**: Pipeline automatizado para extraer ideas, claims y referencias de PDFs
+- **Arquitectura Avanzada de 3 Fases**: Análisis de clusters, planificación con ideas clave, y escritura párrafo por párrafo
 
 ---
 
-## 🎯 Flujo Principal: Paper de Perspectivas
+## 🚀 NUEVO: Orquestador Avanzado de 3 Fases
 
 ```mermaid
 flowchart TD
-    A[📄 ABSTRACT.md] --> B[Cargar Contexto Base]
-    B --> C[PerspectivePaperOrchestrator]
-    
-    C --> D[EnhancedContextManager]
-    D --> E[Cargar índices procesados]
-    E --> F1[ideas_index.npz<br/>139 ideas]
-    E --> F2[claims_index.npz<br/>185 claims]
-    
-    C --> H[WriterAgent<br/>con contexto abstract]
-    C --> I[ReviewerAgent<br/>con contexto abstract]
-    
-    subgraph loop["🔄 Por cada sección"]
-        D --> J[SectionConfig<br/>ideas_weight, min_confidence]
-        J --> K[Búsqueda semántica<br/>en ideas + claims]
-        K --> L[Filtrar por confianza<br/>y diversificar fuentes]
-        L --> M[Formatear contexto<br/>token-efficient]
-        M --> N[WriterAgent escribe]
-        N --> O{Iteración < 2?}
-        O -->|Sí| P[ReviewerAgent revisa]
-        P --> N
-        O -->|No| Q[Sección completada]
+    subgraph phase1["🔬 FASE 1: Análisis de Clusters"]
+        A[📄 Abstract] --> B[ClusterAnalyzer]
+        E1[ideas_index.npz] --> B
+        B --> C[KMeans clustering<br/>n_clusters=12]
+        C --> D[Extraer temas principales]
+        D --> T[Lista de ClusterTopics<br/>con labels y keywords]
     end
     
-    Q --> R[Paper completo]
-    R --> S[Revisión Final]
-    S --> T[📝 Paper.md]
-    S --> U[📋 Critical_Review.md]
+    subgraph phase2["📋 FASE 2: Planificación"]
+        A --> P1[PlannerAgent]
+        T --> P1
+        P1 --> P2[Generar PaperOutline]
+        P2 --> P3[Secciones → Párrafos → Ideas Clave]
+        P3 --> P4[ReviewerAgent.review_outline]
+        P4 --> P5{Feedback?}
+        P5 -->|Sí| P6[Refinar outline]
+        P6 --> P3
+        P5 -->|No| OUT[Outline Final]
+    end
+    
+    subgraph phase3["✍️ FASE 3: Escritura"]
+        OUT --> W1[Por cada sección]
+        W1 --> W2[Por cada párrafo]
+        W2 --> W3[paragraph.to_query<br/>= key_idea + supporting_points]
+        W3 --> W4[get_context_for_idea<br/>NO usa abstract]
+        W4 --> W5[Búsqueda semántica específica]
+        W5 --> W6[WriterAgent.write_paragraph]
+        W6 --> W7[Siguiente párrafo]
+        W7 --> W2
+        W2 --> W8[ReviewerAgent revisa sección]
+        W8 --> W9[Siguiente sección]
+        W9 --> W1
+    end
+    
+    phase1 --> phase2
+    phase2 --> phase3
+    phase3 --> PAPER[📄 Paper Final]
+```
+
+### Componentes Clave del Orquestador Avanzado
+
+| Componente | Ubicación | Propósito |
+|------------|-----------|-----------|
+| `ClusterAnalyzer` | `utils/cluster_analyzer.py` | Extrae temas principales del espacio de embeddings |
+| `PaperOutline` | `models/outline.py` | Modelo de datos para esquema (secciones → párrafos → ideas) |
+| `PlannerAgent` | `agents/planner_agent.py` | Genera esquema detallado basado en abstract + temas |
+| `AdvancedPerspectiveOrchestrator` | `orchestrators/advanced_orchestrator.py` | Coordina las 3 fases |
+| `get_context_for_idea()` | `utils/enhanced_context_manager.py` | Búsqueda por idea específica (no por abstract) |
+| `write_paragraph()` | `agents/writer_agent.py` | Escribe un párrafo siguiendo idea clave |
+
+### Uso
+
+```bash
+# Orquestador avanzado (3 fases)
+python src/ai_writer/scripts/run_advanced_paper.py --title "Mi Paper" --clusters 12
+
+# Orquestador original (sección por sección)
+python src/ai_writer/scripts/generate_perspective_paper.py --title "Mi Paper"
+```
+
+---
+
+## 🎯 Flujo Original: Paper de Perspectivas
+
+```mermaid
+flowchart TD
+    subgraph input["📥 Entrada"]
+        A[📄 ABSTRACT.md<br/>Tesis del usuario]
+        P1[📚 PDFs procesados<br/>41 papers]
+    end
+    
+    subgraph processing["⚙️ Procesamiento Previo"]
+        P1 --> P2[BatchProcessor]
+        P2 --> P3[PDFExtractionAgent]
+        P3 --> P4[Extraer ideas, claims, refs]
+        P4 --> P5[JSONL + Embeddings]
+    end
+    
+    subgraph init["🚀 Inicialización"]
+        A --> B[Cargar Contexto Base]
+        B --> C[PerspectivePaperOrchestrator]
+        P5 --> D[EnhancedContextManager]
+        D --> E[Cargar índices embeddings]
+        E --> F1[ideas_index.npz<br/>3733 ideas]
+        E --> F2[claims_index.npz<br/>3839 claims]
+        C --> D
+    end
+    
+    subgraph agents["🤖 Agentes"]
+        C --> H[WriterAgent<br/>GPT-5.1 + contexto]
+        C --> I[ReviewerAgent<br/>GPT-5.1 + abstract]
+    end
+    
+    subgraph loop["🔄 Por cada sección (11 secciones)"]
+        D --> J[SectionConfig<br/>ideas_weight, min_confidence, top_k]
+        J --> K[Búsqueda semántica<br/>query = abstract + sección]
+        K --> L[Combinar ideas + claims<br/>según ideas_weight]
+        L --> M[Filtrar por confianza<br/>diversificar por paper]
+        M --> N[Formatear contexto<br/>compacto y token-efficient]
+        N --> O[WriterAgent escribe sección]
+        O --> P{Iteración < N?}
+        P -->|Sí| Q[ReviewerAgent revisa]
+        Q --> R[Feedback estructurado]
+        R --> O
+        P -->|No| S[✓ Sección completada]
+    end
+    
+    subgraph output["📤 Salida"]
+        S --> T[Paper completo]
+        T --> U[Revisión Crítica Final]
+        U --> V[📝 Paper.md<br/>data/output/final/]
+        U --> W[📋 Critical_Review.md]
+    end
+```
+
+### Ejecución
+
+```bash
+# Generar paper de perspectivas
+PYTHONPATH=/home/mikel/TheAIWriter python src/ai_writer/scripts/generate_perspective_paper.py
+
+# Procesamiento batch de PDFs (previo)
+python src/ai_writer/scripts/run_batch_processing.py
 ```
 
 ---
@@ -51,19 +149,29 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[Sección actual:<br/>e.g. 'Introducción'] --> B[SectionConfig]
-    B --> C[ideas_weight: 0.7<br/>min_confidence: medium<br/>top_k: 12]
+    subgraph query["🔎 Construcción de Query"]
+        A[Sección actual:<br/>e.g. 'Introducción'] --> B[SectionConfig]
+        B --> C[ideas_weight: 0.7<br/>min_confidence: medium<br/>top_k: 12]
+        AB[Abstract completo] --> G
+    end
     
-    D[Ideas Index<br/>139 items] --> E[EmbeddingIndex]
-    F[Claims Index<br/>185 items] --> E
+    subgraph indices["📊 Índices de Embeddings"]
+        D[Ideas Index<br/>3733 items] --> E[EmbeddingIndex]
+        F[Claims Index<br/>3839 items] --> E
+    end
     
-    G[Query = Abstract +<br/>Sección + Keywords] --> E
-    E --> H[Similitud Coseno]
-    H --> I[Combinar ideas + claims<br/>según ideas_weight]
-    I --> J[Filtrar por confianza]
-    J --> K[Limitar por paper<br/>max_per_paper]
-    K --> L[Formatear contexto]
-    L --> M[WriterAgent]
+    subgraph search["🎯 Búsqueda y Ranking"]
+        G[Query = Abstract +<br/>Sección + Keywords] --> E
+        E --> H[Similitud Coseno<br/>top_k resultados]
+        H --> I[Combinar ideas + claims<br/>según ideas_weight]
+        I --> J[Filtrar por confianza<br/>min_confidence]
+        J --> K[Diversificar fuentes<br/>max_per_paper]
+    end
+    
+    subgraph output["📝 Output"]
+        K --> L[Formatear contexto<br/>compacto]
+        L --> M[WriterAgent]
+    end
 ```
 
 ### Configuración por Sección

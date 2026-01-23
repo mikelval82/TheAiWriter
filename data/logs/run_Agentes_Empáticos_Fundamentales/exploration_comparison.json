@@ -1,0 +1,21 @@
+{
+  "old_method": {
+    "unique_ideas": 196,
+    "unique_claims": 196,
+    "idea_coverage_pct": 5.250468791856416,
+    "claim_coverage_pct": 5.1054962229747325,
+    "idea_reuse_ratio": 1.4285714285714286,
+    "ideas_retrieved_multiple": 56,
+    "exploration_score": 72.74469089805758
+  },
+  "new_method": {
+    "unique_ideas": 194,
+    "unique_claims": 68,
+    "idea_coverage_pct": 5.196892579694615,
+    "claim_coverage_pct": 1.7712946079708258,
+    "idea_reuse_ratio": 1.0,
+    "ideas_retrieved_multiple": 0,
+    "exploration_score": 85.98446289847308
+  },
+  "improvement": 13.239772000415499
+}

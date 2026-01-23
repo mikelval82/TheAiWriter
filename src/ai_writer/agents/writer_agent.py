@@ -288,3 +288,75 @@ Write only the expanded content."""
                 break
 
         return paper
+
+    def write_paragraph(
+        self,
+        key_idea: str,
+        supporting_points: list[str],
+        section_name: str,
+        section_purpose: str,
+        previous_paragraphs: list[str],
+        reference_context: str,
+        thesis: str,
+    ) -> str:
+        """Write a single paragraph based on a specific key idea.
+        
+        This method is designed for the advanced orchestrator's
+        paragraph-by-paragraph writing approach.
+        
+        Args:
+            key_idea: The main idea this paragraph should develop.
+            supporting_points: Additional points to cover.
+            section_name: Name of the section.
+            section_purpose: Purpose of the section.
+            previous_paragraphs: Already written paragraphs in this section.
+            reference_context: Context from embeddings search.
+            thesis: Paper's thesis statement.
+            
+        Returns:
+            Written paragraph text.
+        """
+        previous_text = "\n\n".join(previous_paragraphs) if previous_paragraphs else ""
+        
+        supporting_text = ""
+        if supporting_points:
+            supporting_text = "\n".join(f"- {p}" for p in supporting_points)
+        
+        user_prompt = f"""Escribe UN SOLO PÁRRAFO académico para la sección "{section_name}".
+
+# TESIS DEL PAPER
+{thesis}
+
+# PROPÓSITO DE LA SECCIÓN
+{section_purpose}
+
+# IDEA CLAVE A DESARROLLAR EN ESTE PÁRRAFO
+{key_idea}
+
+# PUNTOS DE APOYO A INCORPORAR
+{supporting_text}
+
+# PÁRRAFOS ANTERIORES EN ESTA SECCIÓN
+{previous_text if previous_text else "(Este es el primer párrafo de la sección)"}
+
+# CONTEXTO DE LA LITERATURA
+{reference_context if reference_context else "(Sin contexto adicional)"}
+
+# INSTRUCCIONES
+1. Escribe ÚNICAMENTE un párrafo coherente (4-8 oraciones)
+2. Desarrolla la IDEA CLAVE como argumento central del párrafo
+3. Incorpora los puntos de apoyo de forma natural
+4. Cita la literatura proporcionada cuando sea relevante
+5. Asegura transición fluida desde el párrafo anterior
+6. Mantén consistencia con la tesis del paper
+7. Escribe en español académico formal
+
+Escribe SOLO el párrafo, sin títulos ni comentarios adicionales."""
+
+        paragraph = self._call_api(
+            system_prompt=self.system_prompt,
+            user_prompt=user_prompt,
+            temperature=0.7,
+        )
+        
+        return paragraph.strip()

@@ -1,0 +1,117 @@
+{
+  "run_name": "run_Agentes_Empáticos_Fundamentales",
+  "basic_counts": {
+    "total_ideas_retrieved": 60,
+    "unique_ideas": 59,
+    "duplicate_ideas": 1,
+    "uniqueness_ratio": 0.9833333333333333
+  },
+  "cluster_coverage": {
+    "clusters_available": 10,
+    "clusters_used": 10,
+    "coverage_percent": 100.0
+  },
+  "distribution": {
+    "cluster_entropy": 0.97704959742492,
+    "cluster_gini": 0.17555555555555563,
+    "ideas_per_cluster": {
+      "Empathy + Empathic": 7,
+      "Emotion + Emotional": 6,
+      "Agents + Agent": 7,
+      "Nonverbal + Multimodal": 4,
+      "Personality + Traits": 4,
+      "Ai + Data": 3,
+      "Face + Emotional": 4,
+      "Metaverse + Vr": 3,
+      "Ngfr + Urban": 4,
+      "Commonsense + Dialogue": 3
+    }
+  },
+  "similarity": {
+    "avg_intra_section_similarity": 0.1334740089173463,
+    "avg_inter_section_similarity": 0.11507834000094286
+  },
+  "section_overlap_matrix": {
+    "Introducción": {
+      "Introducción": 1.0,
+      "Estado Actual del Arte": 0.0,
+      "Identificación del Problema o Brecha": 0.0,
+      "La Nueva Perspectiva": 0.0,
+      "Discusión": 0.0,
+      "Implicaciones Futuras": 0.0,
+      "Desafíos y Limitaciones": 0.0,
+      "Conclusiones": 0.0
+    },
+    "Estado Actual del Arte": {
+      "Introducción": 0.0,
+      "Estado Actual del Arte": 1.0,
+      "Identificación del Problema o Brecha": 0.0,
+      "La Nueva Perspectiva": 0.0,
+      "Discusión": 0.0,
+      "Implicaciones Futuras": 0.0,
+      "Desafíos y Limitaciones": 0.0,
+      "Conclusiones": 0.0
+    },
+    "Identificación del Problema o Brecha": {
+      "Introducción": 0.0,
+      "Estado Actual del Arte": 0.0,
+      "Identificación del Problema o Brecha": 1.0,
+      "La Nueva Perspectiva": 0.0,
+      "Discusión": 0.0,
+      "Implicaciones Futuras": 0.0,
+      "Desafíos y Limitaciones": 0.06666666666666667,
+      "Conclusiones": 0.0
+    },
+    "La Nueva Perspectiva": {
+      "Introducción": 0.0,
+      "Estado Actual del Arte": 0.0,
+      "Identificación del Problema o Brecha": 0.0,
+      "La Nueva Perspectiva": 1.0,
+      "Discusión": 0.0,
+      "Implicaciones Futuras": 0.0,
+      "Desafíos y Limitaciones": 0.0,
+      "Conclusiones": 0.0
+    },
+    "Discusión": {
+      "Introducción": 0.0,
+      "Estado Actual del Arte": 0.0,
+      "Identificación del Problema o Brecha": 0.0,
+      "La Nueva Perspectiva": 0.0,
+      "Discusión": 1.0,
+      "Implicaciones Futuras": 0.0,
+      "Desafíos y Limitaciones": 0.0,
+      "Conclusiones": 0.0
+    },
+    "Implicaciones Futuras": {
+      "Introducción": 0.0,
+      "Estado Actual del Arte": 0.0,
+      "Identificación del Problema o Brecha": 0.0,
+      "La Nueva Perspectiva": 0.0,
+      "Discusión": 0.0,
+      "Implicaciones Futuras": 1.0,
+      "Desafíos y Limitaciones": 0.0,
+      "Conclusiones": 0.0
+    },
+    "Desafíos y Limitaciones": {
+      "Introducción": 0.0,
+      "Estado Actual del Arte": 0.0,
+      "Identificación del Problema o Brecha": 0.06666666666666667,
+      "La Nueva Perspectiva": 0.0,
+      "Discusión": 0.0,
+      "Implicaciones Futuras": 0.0,
+      "Desafíos y Limitaciones": 1.0,
+      "Conclusiones": 0.0
+    },
+    "Conclusiones": {
+      "Introducción": 0.0,
+      "Estado Actual del Arte": 0.0,
+      "Identificación del Problema o Brecha": 0.0,
+      "La Nueva Perspectiva": 0.0,
+      "Discusión": 0.0,
+      "Implicaciones Futuras": 0.0,
+      "Desafíos y Limitaciones": 0.0,
+      "Conclusiones": 1.0
+    }
+  },
+  "exploration_score": 93.25565626890919
+}

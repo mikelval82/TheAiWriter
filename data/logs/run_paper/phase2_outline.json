@@ -1,0 +1,254 @@
+{
+  "title": "Agentes Empáticos Fundamentales",
+  "thesis_statement": "La integración de la empatía computacional en la IA y la XR está transformando las interacciones humano-digitales, sugiriendo un nuevo paradigma de agentes digitales que operan bajo los principios de la cognición 4E.",
+  "n_sections": 8,
+  "n_paragraphs": 18,
+  "sections": [
+    {
+      "name": "Introducción",
+      "purpose": "Presentar el tema, su relevancia y la tesis central del paper",
+      "paragraphs": [
+        {
+          "key_idea": "La convergencia de la neurociencia cognitiva, XR e IA redefine la experiencia humana hacia un ecosistema de 'Cuerpos Secos'.",
+          "supporting_points": [
+            "La diferencia en respuestas conductuales y fisiológicas entre conversaciones emocionales cara a cara y remotas.",
+            "La revisión sistemática de la detección de empatía basada en aprendizaje automático."
+          ],
+          "suggested_sources": [
+            "Face + Emotional",
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "key_idea": "Esta transformación destaca la importancia de la empatía computacional, que puede superar las limitaciones de los modelos actuales de IA.",
+          "supporting_points": [
+            "Limitaciones de los LLMs actuales en teoría de la mente.",
+            "La evolución de los agentes que integran aspectos parciales de la cognición humana."
+          ],
+          "suggested_sources": [
+            "Agents + Agent",
+            "Personality + Gpt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Estado Actual del Arte",
+      "purpose": "Revisar los avances recientes y el conocimiento establecido",
+      "paragraphs": [
+        {
+          "key_idea": "Los agentes multimodales y basados en juegos han avanzado en tareas sociales, aunque aún con configuraciones de personalidad fijas.",
+          "supporting_points": [
+            "Los sistemas de agentes en juegos demuestran comportamientos sociales ricos.",
+            "La integración multimodal mejora la detección emocional."
+          ],
+          "suggested_sources": [
+            "Agents + Agent",
+            "Emotion + Multimodal"
+          ]
+        },
+        {
+          "key_idea": "La detección de empatía basada en ML ha sido revisada sistemáticamente, revelando un dominio dominado por métodos textuales.",
+          "supporting_points": [
+            "Revisión de métodos de detección de empatía en múltiples modalidades.",
+            "Desafíos de la alineación multimodal y generalización cultural."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic",
+            "Emotion + Multimodal"
+          ]
+        },
+        {
+          "key_idea": "Los modelos de lenguaje y agentes cognitivos están avanzando hacia la inteligencia humana al integrar razonamiento, planificación y memoria.",
+          "supporting_points": [
+            "Los agentes de lenguaje cognitivo usan LLMs para acciones complejas.",
+            "Falta de terminología y abstracciones compartidas en el campo."
+          ],
+          "suggested_sources": [
+            "Llm + Agents",
+            "Agents + Agent"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Identificación del Problema o Brecha",
+      "purpose": "Identificar limitaciones, contradicciones o áreas no exploradas",
+      "paragraphs": [
+        {
+          "key_idea": "La falta de integración de la empatía computacional en LLMs limita su aplicación en interacciones humano-digitales.",
+          "supporting_points": [
+            "Los LLMs actuales carecen de una auténtica teoría de la mente.",
+            "Necesidad de modelos empáticos que superen las limitaciones textuales."
+          ],
+          "suggested_sources": [
+            "Studies + Chatbots",
+            "Empathy + Empathic"
+          ]
+        },
+        {
+          "key_idea": "La evolución del Metaverso requiere nuevos marcos teóricos para comprender la reconfiguración cognitiva humana.",
+          "supporting_points": [
+            "El Metaverso como forma de vida artificial influye en la cognición.",
+            "Emergencia de respuestas corporales híbridas virtuales-reales."
+          ],
+          "suggested_sources": [
+            "Metaverse + Life",
+            "Emotion + Multimodal"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "La Nueva Perspectiva",
+      "purpose": "Proponer la visión o enfoque novedoso del autor",
+      "paragraphs": [
+        {
+          "key_idea": "Propuesta de 'Agentes Fundamentales Empáticos' que integran modelos de empatía, memoria episódica y sesgo de evaluación.",
+          "supporting_points": [
+            "Los agentes evolucionan mediante una arquitectura cognitiva compleja.",
+            "Uso de memoria episódica para mejorar la empatía computacional."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic",
+            "Agents + Agent"
+          ]
+        },
+        {
+          "key_idea": "La integración de la empatía computacional puede redefinir las interacciones humano-digitales en el Metaverso.",
+          "supporting_points": [
+            "La empatía computacional facilita interacciones más genuinas.",
+            "Reconfiguración de la cognición humana mediante la inmersión prolongada."
+          ],
+          "suggested_sources": [
+            "Empathetic + Empathy",
+            "Metaverse + Life"
+          ]
+        },
+        {
+          "key_idea": "Delineación de un marco ético necesario para guiar la simbiosis entre algoritmos y emociones humanas.",
+          "supporting_points": [
+            "Riesgos éticos de la reconfiguración cognitiva.",
+            "Necesidad de un marco para garantizar la potenciación de la cognición biológica."
+          ],
+          "suggested_sources": [
+            "Empathy + Empathic",
+            "Emotion + Multimodal"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Discusión",
+      "purpose": "Analizar implicaciones, comparar con enfoques existentes",
+      "paragraphs": [
+        {
+          "key_idea": "La empatía computacional representa un avance significativo sobre los modelos de interacción actuales, permitiendo una detección emocional más precisa.",
+          "supporting_points": [
+            "Diferencias en respuestas emocionales en distintos contextos de interacción.",
+            "Integración multimodal para una detección emocional más precisa."
+          ],
+          "suggested_sources": [
+            "Face + Emotional",
+            "Emotion + Multimodal"
+          ]
+        },
+        {
+          "key_idea": "Las arquitecturas de agentes actuales deben evolucionar hacia sistemas más integrados que incorporen aspectos cognitivos y emocionales.",
+          "supporting_points": [
+            "Desafíos en la simulación de agentes con roles sociales complejos.",
+            "La importancia de arquitecturas cognitivas en el diseño de agentes."
+          ],
+          "suggested_sources": [
+            "Agents + Agent",
+            "Llm + Agents"
+          ]
+        },
+        {
+          "key_idea": "La aceptación del usuario y la efectividad de los agentes empáticos dependen de la integración efectiva de empatía y personalización.",
+          "supporting_points": [
+            "Evaluación de la aceptabilidad de agentes empáticos en salud mental.",
+            "La personalización como facilitador clave de la eficacia."
+          ],
+          "suggested_sources": [
+            "Empathic + Empathy",
+            "Personality + Gpt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Implicaciones Futuras",
+      "purpose": "Proyectar el impacto potencial y direcciones de investigación",
+      "paragraphs": [
+        {
+          "key_idea": "La implementación de empatía computacional en LLMs abre nuevas posibilidades para comprender el comportamiento humano.",
+          "supporting_points": [
+            "Inferencia de personalidad basada en LLMs para obtener nuevas perspectivas.",
+            "Posibilidades ofrecidas por modelos de lenguaje multimodal."
+          ],
+          "suggested_sources": [
+            "Personality + Gpt",
+            "Emotion + Multimodal"
+          ]
+        },
+        {
+          "key_idea": "Los modelos de empatía actuales enfrentan desafíos significativos, especialmente en la ejecución de acciones empáticas.",
+          "supporting_points": [
+            "Marco de evaluación de EmpathyAgent para evaluar capacidades empáticas.",
+            "Desafíos en la realización de acciones empáticas por parte de los sistemas existentes."
+          ],
+          "suggested_sources": [
+            "Empathetic + Empathy",
+            "Empathy + Empathic"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Desafíos y Limitaciones",
+      "purpose": "Reconocer obstáculos y limitaciones de la perspectiva",
+      "paragraphs": [
+        {
+          "key_idea": "La generalización de modelos emocionales entrenados para conversaciones cara a cara a entornos mediados por video sigue siendo incierta.",
+          "supporting_points": [
+            "Diferencias en respuestas emocionales entre interacciones cara a cara y remotas.",
+            "Limitaciones de los modelos basados en texto para el reconocimiento emocional en sistemas de diálogo."
+          ],
+          "suggested_sources": [
+            "Emotion + Multimodal",
+            "Face + Emotional"
+          ]
+        },
+        {
+          "key_idea": "La evaluación humana de agentes conversacionales empáticos es metodológicamente débil y carece de medidas consistentes de empatía.",
+          "supporting_points": [
+            "Pocas evaluaciones aleatorias controladas y medidas de empatía mal definidas.",
+            "Evaluación de agentes empáticos en salud mental con participación limitada de clínicos."
+          ],
+          "suggested_sources": [
+            "Empathic + Empathy",
+            "Studies + Chatbots"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Conclusiones",
+      "purpose": "Sintetizar los puntos clave y el mensaje final",
+      "paragraphs": [
+        {
+          "key_idea": "La empatía computacional y su integración en sistemas de IA y XR prometen transformar profundamente las interacciones humano-digitales.",
+          "supporting_points": [
+            "Comparación de interacciones emocionales cara a cara y mediadas por video.",
+            "Distinción conceptual entre detección de empatía y emoción."
+          ],
+          "suggested_sources": [
+            "Face + Emotional",
+            "Empathy + Empathic"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -6,11 +6,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-# Load environment variables
-load_dotenv()
-
-# Base paths
+# Base paths (define before load_dotenv to use in path)
 BASE_DIR = Path(__file__).parent.parent
+
+# Load environment variables from project root
+load_dotenv(BASE_DIR / ".env")
+
 DATA_DIR = BASE_DIR / "data"
 REFERENCES_DIR = DATA_DIR / "references"
 OUTPUT_DIR = DATA_DIR / "output"
@@ -21,7 +22,7 @@ class AISettings(BaseModel):
 
     openai_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     anthropic_api_key: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
-    default_model: str = Field(default_factory=lambda: os.getenv("DEFAULT_MODEL", "gpt-5.1"))
+    default_model: str = Field(default_factory=lambda: os.getenv("DEFAULT_MODEL", "gpt-4o-mini"))
     reasoning_model: str = Field(default_factory=lambda: os.getenv("REASONING_MODEL", "gpt-5-2025-08-07"))
     fast_model: str = Field(default_factory=lambda: os.getenv("FAST_MODEL", "gpt-5-mini-2025-08-07"))
     max_tokens: int = Field(default_factory=lambda: int(os.getenv("MAX_TOKENS", "16384")))
@@ -40,6 +41,9 @@ class PathSettings(BaseModel):
     output_dir: Path = OUTPUT_DIR
     drafts_dir: Path = OUTPUT_DIR / "drafts"
     final_dir: Path = OUTPUT_DIR / "final"
+    processed_dir: Path = DATA_DIR / "processed"
+    embeddings_dir: Path = DATA_DIR / "processed" / "embeddings"
+    indices_dir: Path = DATA_DIR / "processed" / "indices"
 
     def ensure_directories(self) -> None:
         """Create all required directories if they don't exist."""

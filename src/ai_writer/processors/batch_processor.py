@@ -101,7 +101,7 @@ class BatchProcessor:
                     refs_count = sum(1 for _ in open(refs_file)) if refs_file.exists() else 0
                     
                     status["processed"][filename] = {
-                        "paper_id": metadata.get("id", paper_folder.name),
+                        "paper_id": metadata.get("paper_id", paper_folder.name),
                         "title": metadata.get("title", "Unknown"),
                         "timestamp": metadata.get("processed_at", "unknown"),
                         "success": True,
@@ -221,7 +221,7 @@ class BatchProcessor:
                     if processed_paper:
                         # Update status
                         self.status["processed"][pdf_path.name] = {
-                            "paper_id": processed_paper.metadata.id,
+                            "paper_id": processed_paper.metadata.paper_id,
                             "title": processed_paper.metadata.title,
                             "timestamp": datetime.now().isoformat(),
                             "success": True,
@@ -275,7 +275,7 @@ class BatchProcessor:
             # Import here to avoid circular imports
             from ..embeddings.rag_system import RAGSystem
             
-            rag = RAGSystem(indices_folder=self.output_folder / "indices")
+            rag = RAGSystem(indices_dir=self.output_folder / "indices")
             rag.build_indices(force_rebuild=True)
             
             console.print("[green]✓ Embedding indices built successfully![/green]")

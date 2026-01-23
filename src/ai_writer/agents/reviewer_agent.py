@@ -355,3 +355,44 @@ Sé constructivo pero riguroso. Este documento servirá para mejorar futuras ver
         )
 
         return critical_review
+
+    def review_outline(self, outline) -> str:
+        """Review a paper outline and provide improvement feedback.
+        
+        Args:
+            outline: PaperOutline object to review.
+            
+        Returns:
+            Feedback string for improving the outline.
+        """
+        outline_text = outline.to_markdown()
+        
+        user_prompt = f"""Revisa el siguiente esquema de paper académico y proporciona feedback para mejorarlo.
+
+ESQUEMA A REVISAR:
+{outline_text}
+
+CRITERIOS DE EVALUACIÓN:
+1. ¿Las ideas clave son específicas y argumentables, o demasiado genéricas?
+2. ¿Hay coherencia lógica entre secciones y párrafos?
+3. ¿Los puntos de apoyo son relevantes para cada idea clave?
+4. ¿El esquema cubre todos los aspectos necesarios del tema?
+5. ¿Hay redundancia entre secciones?
+6. ¿Las transiciones entre secciones serán naturales?
+
+INSTRUCCIONES:
+- Si el esquema es bueno, responde "Sin cambios necesarios"
+- Si hay mejoras, proporciona feedback específico y accionable
+- Sé conciso y directo
+- Enfócate en las mejoras más importantes
+
+FEEDBACK:"""
+
+        feedback = self._call_api(
+            system_prompt=self.system_prompt,
+            user_prompt=user_prompt,
+            temperature=0.7,
+            max_tokens=1500,
+        )
+        
+        return feedback.strip()
