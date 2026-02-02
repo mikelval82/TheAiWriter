@@ -22,6 +22,7 @@ from ai_writer.writers.markdown_writer import MarkdownWriter
 from ai_writer.utils.cluster_analyzer import ClusterAnalyzer
 from ai_writer.utils.enhanced_context_manager import EnhancedContextManager
 from ai_writer.utils.pipeline_logger import PipelineLogger
+from ai_writer.utils.reference_processor import ReferenceProcessor
 from config.settings import settings
 
 console = Console()
@@ -434,14 +435,8 @@ RESUMEN:"""
             border_style="cyan",
         ))
         
-        # Add bibliography
-        citations = self.context_manager.get_all_citations()
-        if citations:
-            bib_content = "\n".join(f"- {cite}" for cite in citations)
-            paper.sections.append(Section(
-                title="Referencias Utilizadas",
-                content=bib_content,
-            ))
+        # Note: Bibliography is now generated in post-processing phase
+        # after all [@Author, Year] markers are resolved
         
         return paper
 
@@ -632,6 +627,75 @@ RESUMEN:"""
         
         console.print(f"  [dim]💾 Sección guardada[/dim]")
 
+    def _postprocess_references(self, paper: Paper) -> Paper:
+        """Post-process the paper to resolve citation markers and generate bibliography.
+        
+        This phase:
+        1. Parses all [@Author et al., Year] markers in the text
+        2. Looks up each citation in the references index
+        3. Replaces markers with proper inline citations
+        4. Generates the final References section
+        
+        Args:
+            paper: The paper with [@...] markers in section content.
+            
+        Returns:
+            Paper with resolved citations and References section.
+        """
+        console.print(Panel(
+            "[bold cyan]Fase 4: Post-procesamiento de Referencias[/bold cyan]\n"
+            "Resolviendo citas y generando bibliografía...",
+            border_style="cyan",
+        ))
+        
+        # Initialize reference processor
+        processor = ReferenceProcessor()
+        processor.load_references()
+        
+        # Combine all section content for processing
+        full_text = f"# {paper.title}\n\n"
+        for section in paper.sections:
+            full_text += f"## {section.title}\n\n{section.content}\n\n"
+        
+        # Process citations
+        processed_text = processor.process_paper(
+            full_text,
+            citation_style="inline",
+            generate_references_section=True,
+        )
+        
+        # Parse processed text back into sections
+        # Remove the title line and split by section headers
+        import re
+        
+        # Find all sections in processed text
+        section_pattern = re.compile(r'^## (.+?)$', re.MULTILINE)
+        matches = list(section_pattern.finditer(processed_text))
+        
+        new_sections = []
+        for i, match in enumerate(matches):
+            section_title = match.group(1).strip()
+            start = match.end()
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(processed_text)
+            section_content = processed_text[start:end].strip()
+            
+            # Skip if this is the new References section (we'll add it properly)
+            if section_title.lower() in ["referencias", "references"]:
+                # Add as a proper section
+                new_sections.append(Section(title=section_title, content=section_content))
+            else:
+                # Update existing section content
+                new_sections.append(Section(title=section_title, content=section_content))
+        
+        # Update paper sections
+        paper.sections = new_sections
+        
+        # Log statistics
+        used_refs = processor.get_used_references()
+        console.print(f"[green]✓ {len(used_refs)} referencias procesadas y añadidas a bibliografía[/green]")
+        
+        return paper
+
     # =========================================================================
     # Main Run Method
     # =========================================================================
@@ -674,6 +738,9 @@ RESUMEN:"""
         
         # PHASE 3: Writing
         paper = self.phase3_write_paper(outline)
+        
+        # PHASE 4: Post-process references
+        paper = self._postprocess_references(paper)
         
         # Paper path
         safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in title)

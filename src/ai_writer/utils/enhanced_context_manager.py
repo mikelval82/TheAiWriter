@@ -988,28 +988,41 @@ class EnhancedContextManager:
         """Format a single idea in compact form.
         
         Extracts only: idea text, paper title, importance, keywords (top 3)
+        Includes citation key for the writer to use with [@...].
         """
         idea = item.get("idea", "")
         paper = item.get("paper_title", "")[:50]  # Truncate long titles
         importance = item.get("importance", "")
         keywords = item.get("keywords", [])[:3]  # Top 3 keywords
         
+        # Build citation key from authors and year
+        authors = item.get("authors", [])
+        year = item.get("year", "")
+        citation_key = self._build_citation_key(authors, year)
+        
         # Single line format
         kw_str = f" [{', '.join(keywords)}]" if keywords else ""
         imp_marker = "⭐" if importance == "high" else "•"
+        cite_hint = f" → Citar: [@{citation_key}]" if citation_key else ""
         
-        return f"{imp_marker} [{paper}] {idea}{kw_str}"
+        return f"{imp_marker} [{paper}]{cite_hint}\n   {idea}{kw_str}"
 
     def _format_claim_compact(self, item: dict, score: float) -> str:
         """Format a single claim in compact form.
         
         Extracts: claim, evidence summary, confidence, paper
+        Includes citation key for the writer to use with [@...].
         """
         claim = item.get("claim", "")
         evidence = item.get("evidence", "")
         confidence = item.get("confidence", "")
         evidence_type = item.get("evidence_type", "")
         paper = item.get("paper_title", "")[:40]
+        
+        # Build citation key from authors and year
+        authors = item.get("authors", [])
+        year = item.get("year", "")
+        citation_key = self._build_citation_key(authors, year)
         
         # Truncate evidence to key part
         if len(evidence) > 150:
@@ -1018,13 +1031,59 @@ class EnhancedContextManager:
         # Confidence marker
         conf_marker = {"high": "✓", "medium": "○", "low": "?"}.get(confidence, "")
         type_marker = {"experiment": "🔬", "data": "📊", "citation": "📖", "observation": "👁️"}.get(evidence_type, "")
+        cite_hint = f" → Citar: [@{citation_key}]" if citation_key else ""
         
         lines = [
-            f"{conf_marker}{type_marker} [{paper}]",
+            f"{conf_marker}{type_marker} [{paper}]{cite_hint}",
             f"   Claim: {claim}",
             f"   Evidence: {evidence}",
         ]
         return "\n".join(lines)
+    
+    def _build_citation_key(self, authors: list | str, year: str | int) -> str:
+        """Build a citation key from authors and year.
+        
+        Args:
+            authors: List of author names or a string.
+            year: Publication year.
+            
+        Returns:
+            Citation key like "Brown et al., 2020" or "Smith & Jones, 2019".
+        """
+        if not authors or not year:
+            return ""
+        
+        # Handle string authors
+        if isinstance(authors, str):
+            authors = [authors]
+        
+        if not authors:
+            return ""
+        
+        # Get first author's last name
+        first_author = authors[0] if authors else ""
+        if "," in first_author:
+            last_name = first_author.split(",")[0].strip()
+        elif " " in first_author:
+            parts = first_author.split()
+            last_name = parts[-1].strip()
+        else:
+            last_name = first_author
+        
+        # Format based on number of authors
+        if len(authors) > 2:
+            return f"{last_name} et al., {year}"
+        elif len(authors) == 2:
+            second = authors[1]
+            if "," in second:
+                second_last = second.split(",")[0].strip()
+            elif " " in second:
+                second_last = second.split()[-1].strip()
+            else:
+                second_last = second
+            return f"{last_name} & {second_last}, {year}"
+        else:
+            return f"{last_name}, {year}"
 
     def get_used_papers(self) -> list[dict[str, Any]]:
         """Get list of all papers referenced in context.
