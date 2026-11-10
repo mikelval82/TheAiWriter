@@ -225,18 +225,19 @@ RESUMEN:"""
     def _create_section_topic_mapping(
         self,
         topics: list,
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[int]]:
         """Create a mapping of sections to relevant topics.
-        
+
         Args:
-            topics: List of ClusterTopic objects.
-            
+            topics: List of ClusterTopic objects (sorted by size, descending).
+
         Returns:
-            Dict mapping section names to list of topic labels.
+            Dict mapping section names to list of cluster_ids.
         """
         from ai_writer.agents.planner_agent import PERSPECTIVE_SECTIONS
-        
-        topic_labels = [t.label for t in topics]
+
+        # cluster_ids (not labels) identify topics unambiguously
+        topic_labels = [t.cluster_id for t in topics]
         n_topics = len(topic_labels)
         
         # Define which topics are most relevant for each section type
@@ -315,9 +316,14 @@ RESUMEN:"""
         for section_name, ideas in section_ideas.items():
             console.print(f"[dim]  {section_name}: {len(ideas)} ideas[/dim]")
         
-        # Log section ideas
+        # Log section ideas (with readable topic labels)
         if self.logger:
-            self.logger.log_section_ideas(section_ideas, section_topic_mapping)
+            id_to_label = {t.cluster_id: t.label for t in topics}
+            labelled_mapping = {
+                section: [id_to_label.get(cid, str(cid)) for cid in cluster_ids]
+                for section, cluster_ids in section_topic_mapping.items()
+            }
+            self.logger.log_section_ideas(section_ideas, labelled_mapping)
         
         # Generate initial outline with literature-grounded ideas
         outline = self.planner_agent.generate_outline(
