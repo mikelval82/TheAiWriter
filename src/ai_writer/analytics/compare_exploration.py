@@ -21,7 +21,6 @@ import numpy as np
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.progress import track
 from rich import box
 
 console = Console()
@@ -136,7 +135,6 @@ def simulate_new_method(outline: dict, top_k: int = 10) -> ExplorationMetrics:
         for para in paragraphs:
             key_idea = para.get("key_idea", "")
             supporting_points = para.get("supporting_points", [])
-            suggested_sources = para.get("suggested_sources", [])
             
             # Build query like the real system
             query_parts = [key_idea]

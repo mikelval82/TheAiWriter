@@ -22,10 +22,10 @@ flowchart TB
     end
 
     subgraph Processing["⚙️ Processing Pipeline"]
-        Docling["Docling\nPDF→Markdown"]
+        Reader["PyMuPDF\nPDF→Texto"]
         Extractor["Idea/Claim\nExtractor"]
         Embedder["OpenAI\nEmbeddings"]
-        PDFs --> Docling --> Extractor --> Embedder
+        PDFs --> Reader --> Extractor --> Embedder
     end
 
     subgraph Storage["💾 Vector Storage"]

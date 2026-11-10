@@ -8,9 +8,7 @@ from ai_writer.agents.base_agent import BaseAgent
 from ai_writer.processors.models import (
     Claim,
     Idea,
-    PaperMetadata,
     Reference,
-    SectionData,
 )
 from config.settings import settings
 

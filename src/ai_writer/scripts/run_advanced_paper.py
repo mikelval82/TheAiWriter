@@ -7,7 +7,6 @@ from pathlib import Path
 from rich.console import Console
 
 from ai_writer.orchestrators.advanced_orchestrator import AdvancedPerspectiveOrchestrator
-from config.settings import settings
 
 console = Console()
 

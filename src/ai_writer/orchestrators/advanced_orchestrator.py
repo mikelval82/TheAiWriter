@@ -6,11 +6,10 @@ Phase 3: Writing - Write paragraph-by-paragraph with idea-specific queries
 """
 
 from pathlib import Path
-from datetime import datetime
 
+from openai import OpenAIError
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ai_writer.agents.writer_agent import WriterAgent
 from ai_writer.agents.reviewer_agent import ReviewerAgent
@@ -82,6 +81,7 @@ class AdvancedPerspectiveOrchestrator:
         # State
         self.current_outline: PaperOutline | None = None
         self.topic_centroids: dict = {}
+        self.output_dir: Path | None = None
         self.output_file_path: Path | None = None
         self.logger: PipelineLogger | None = None
         
@@ -120,7 +120,6 @@ class AdvancedPerspectiveOrchestrator:
         Returns:
             A concise summary capturing key points.
         """
-        from ai_writer.agents.base_agent import BaseAgent
         
         # Use a lightweight call to generate summary
         client = self.writer_agent.client
@@ -158,7 +157,7 @@ RESUMEN:"""
         Args:
             section: The completed section to add to memory.
         """
-        console.print(f"  [dim]💭 Generando resumen para memoria...[/dim]")
+        console.print("  [dim]💭 Generando resumen para memoria...[/dim]")
         summary = self._generate_section_summary(section)
         self.section_memory[section.title] = summary
     
@@ -360,10 +359,10 @@ RESUMEN:"""
                 
                 # Log the refined outline
                 if self.logger:
-                    self.logger.log_data(f"outline_refined_{i+1}", outline.to_dict())
+                    self.logger.log_data(f"outline_refined_{i+1}", outline.model_dump(mode="json"))
                     console.print(f"  💾 Outline refinado → outline_refined_{i+1}.json")
             else:
-                console.print(f"  ✓ Reviewer: Sin cambios necesarios")
+                console.print("  ✓ Reviewer: Sin cambios necesarios")
         
         # Save outline to disk
         self._save_outline(outline, title)
@@ -607,12 +606,12 @@ RESUMEN:"""
 
     def _initialize_output_file(self, title: str) -> Path:
         """Initialize the output file."""
-        output_dir = settings.paths.final_dir
+        output_dir = self.output_dir or settings.paths.final_dir
         output_dir.mkdir(parents=True, exist_ok=True)
 
         safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in title)
         safe_title = safe_title.replace(" ", "_")[:50]
-        
+
         self.output_file_path = output_dir / f"{safe_title}.md"
         
         initial_content = f"# {title}\n\n## Abstract\n\n{self.abstract_context}\n\n"
@@ -631,7 +630,7 @@ RESUMEN:"""
         with open(self.output_file_path, "a", encoding="utf-8") as f:
             f.write(section_content)
         
-        console.print(f"  [dim]💾 Sección guardada[/dim]")
+        console.print("  [dim]💾 Sección guardada[/dim]")
 
     def _postprocess_references(self, paper: Paper) -> Paper:
         """Post-process the paper to resolve citation markers and generate bibliography.
@@ -735,35 +734,42 @@ RESUMEN:"""
         
         output_dir = Path(output_dir) if output_dir else settings.paths.final_dir
         output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir = output_dir
 
         # PHASE 1: Cluster Analysis
-        topics = self.phase1_analyze_topics()
-        
+        topics = self.phase1_analyze_topics(title)
+
         # PHASE 2: Planning
         outline = self.phase2_generate_outline(title, topics)
-        
+
         # PHASE 3: Writing
         paper = self.phase3_write_paper(outline)
-        
+
+        # Final coherence review. It runs before the references are resolved so
+        # the reviewer rewrites prose with [@...] markers, never the bibliography.
+        # Only API failures are tolerated: the paper is then kept unreviewed.
+        try:
+            paper = self.reviewer_agent.review_full_paper(paper)
+        except OpenAIError as e:
+            console.print(f"[yellow]⚠️ Error en revisión final: {e}[/yellow]")
+            console.print("[yellow]  Se conserva el paper sin revisión final[/yellow]")
+
         # PHASE 4: Post-process references
         paper = self._postprocess_references(paper)
-        
+
         # Paper path
         safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in title)
         safe_title = safe_title.replace(" ", "_")[:50]
         paper_path = self.output_file_path or (output_dir / f"{safe_title}.md")
 
-        # Final review
-        reviewed_paper = paper
+        self.markdown_writer.write(paper_path, paper)
+        console.print(f"[green]📄 Paper final guardado: {paper_path}[/green]")
+
         critical_review = ""
         try:
-            reviewed_paper, critical_review = self.reviewer_agent.review_full_paper(paper), ""
             critical_review = self.reviewer_agent.generate_critical_review(paper)
-            self.markdown_writer.write(reviewed_paper, paper_path)
-            console.print(f"[green]📄 Paper final guardado: {paper_path}[/green]")
-        except Exception as e:
-            console.print(f"[yellow]⚠️ Error en revisión final: {e}[/yellow]")
-            console.print(f"[yellow]  Paper guardado sin revisión final[/yellow]")
+        except OpenAIError as e:
+            console.print(f"[yellow]⚠️ Error generando la revisión crítica: {e}[/yellow]")
 
         # Save critical review
         review_path = output_dir / f"{safe_title}_critical_review.md"

@@ -13,13 +13,10 @@ Usage:
 import argparse
 import json
 from pathlib import Path
-from collections import Counter
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 from rich.console import Console
-from rich.progress import track, Progress
 
 console = Console()
 

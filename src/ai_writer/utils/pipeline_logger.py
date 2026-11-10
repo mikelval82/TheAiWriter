@@ -82,6 +82,15 @@ class PipelineLogger:
                 json.dump(data, f, indent=2, ensure_ascii=False, default=str)
             console.print(f"[dim]  💾 {step_name} → {step_file.name}[/dim]")
     
+    def log_data(self, name: str, data: dict[str, Any]) -> None:
+        """Log arbitrary data as a named step in its own file.
+
+        Args:
+            name: Name of the step and of the JSON file.
+            data: Data to save.
+        """
+        self.log_step(name, data)
+
     def _create_summary(self, data: dict) -> dict:
         """Create a summary of the data for the run log."""
         summary = {}

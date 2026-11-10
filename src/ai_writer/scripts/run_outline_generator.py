@@ -82,7 +82,7 @@ def main() -> None:
         
         # Finalize logger
         if orchestrator.logger:
-            log_dir = orchestrator.logger.finalize(success=True)
+            orchestrator.logger.finalize(success=True)
         
         # Summary
         output_dir = settings.paths.output_dir / "drafts"
@@ -93,7 +93,7 @@ def main() -> None:
         console.print(f"  📊 Temas extraídos: {len(topics)}")
         console.print(f"  📑 Secciones: {outline.total_sections}")
         console.print(f"  📝 Párrafos totales: {outline.total_paragraphs}")
-        console.print(f"\n  📄 Archivos generados:")
+        console.print("\n  📄 Archivos generados:")
         console.print(f"     - {output_dir / f'{safe_title}_outline.md'}")
         console.print(f"     - {output_dir / f'{safe_title}_outline.json'}")
         console.print("\n[dim]Para continuar con la escritura, ejecuta:[/dim]")

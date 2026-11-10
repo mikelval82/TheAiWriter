@@ -27,7 +27,7 @@ class TranslatorAgent(BaseAgent):
         
         # Load style guide
         self.style_guide_path = Path(style_guide_path) if style_guide_path else (
-            settings.paths.base_dir / "config" / "style_guides" / "mikel_val_calvo_uk_english.md"
+            settings.paths.base_dir / "config" / "style_guides" / "uk_english_writing_style.md"
         )
         self.style_guide = self._load_style_guide()
         

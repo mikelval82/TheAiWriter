@@ -14,7 +14,6 @@ from pathlib import Path
 
 from openai import OpenAI
 from pptx import Presentation
-from pptx.util import Inches
 from PIL import Image
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
@@ -231,7 +230,7 @@ class PowerPointProcessor:
             console.print("[yellow]⚠️ comtypes not installed. Install with: pip install comtypes[/yellow]")
             console.print("[yellow]   Falling back to text extraction mode...[/yellow]")
         except OSError as e:
-            console.print(f"[yellow]⚠️ Microsoft PowerPoint not installed or not accessible[/yellow]")
+            console.print("[yellow]⚠️ Microsoft PowerPoint not installed or not accessible[/yellow]")
             console.print(f"[dim]   Error: {e}[/dim]")
             console.print("[yellow]   Falling back to text extraction mode...[/yellow]")
         except Exception as e:
@@ -343,7 +342,7 @@ Proporciona:
         content_parts = []
         
         if texts:
-            content_parts.append(f"**Textos en la diapositiva:**\n" + "\n".join(f"- {t}" for t in texts))
+            content_parts.append("**Textos en la diapositiva:**\n" + "\n".join(f"- {t}" for t in texts))
         
         if notes:
             content_parts.append(f"**Notas del presentador:**\n{notes}")
@@ -568,7 +567,7 @@ Genera un documento coherente y bien estructurado basándote en este contenido."
             f.write(f"# {pptx_path.stem}\n\n")
             f.write(final_document)
         
-        console.print(f"\n[bold green]✅ Complete! Final document saved to:[/bold green]")
+        console.print("\n[bold green]✅ Complete! Final document saved to:[/bold green]")
         console.print(f"   [link]{final_path}[/link]\n")
 
         return slide_descriptions, final_document
@@ -617,7 +616,7 @@ def main():
 
     output_dir = Path(args.output_dir) if args.output_dir else None
     
-    console.print(f"\n[bold]📊 PowerPoint Processor[/bold]")
+    console.print("\n[bold]📊 PowerPoint Processor[/bold]")
     console.print(f"   Vision model: [cyan]{args.vision_model}[/cyan]")
     console.print(f"   Final model:  [cyan]{args.final_model or settings.ai.default_model}[/cyan]\n")
     

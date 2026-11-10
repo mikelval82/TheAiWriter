@@ -174,7 +174,6 @@ def analyze_retrieval_diversity(sim_results: dict) -> dict:
         idea_gini = 0
     
     # Inter-paragraph overlap (how many items appear in multiple paragraphs)
-    n_paragraphs = sim_results["n_paragraphs"]
     ideas_in_multiple = sum(1 for c in idea_counts.values() if c > 1)
     claims_in_multiple = sum(1 for c in claim_counts.values() if c > 1)
     

@@ -48,11 +48,11 @@ flowchart TB
     end
 
     subgraph Processing["⚙️ Procesamiento Offline"]
-        Docling["Docling\nPDF → Markdown"]
+        Reader["PyMuPDF\nPDF → Texto"]
         Extractor["PDFExtractionAgent\nIdeas, Claims, Referencias"]
         Embedder["OpenAI Embeddings\ntext-embedding-3-small"]
         
-        PDFs --> Docling --> Extractor --> Embedder
+        PDFs --> Reader --> Extractor --> Embedder
     end
 
     subgraph Storage["💾 Almacenamiento"]

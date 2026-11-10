@@ -1,5 +1,5 @@
 """Orchestrators for managing paper writing workflows."""
 
-from ai_writer.orchestrators.perspective_paper_orchestrator import PerspectivePaperOrchestrator
+from ai_writer.orchestrators.advanced_orchestrator import AdvancedPerspectiveOrchestrator
 
-__all__ = ["PerspectivePaperOrchestrator"]
+__all__ = ["AdvancedPerspectiveOrchestrator"]

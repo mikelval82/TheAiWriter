@@ -16,7 +16,6 @@ Usage:
 
 from pathlib import Path
 from typing import Optional
-import sys
 
 import typer
 from rich.console import Console
@@ -144,7 +143,7 @@ def process(
     """
     from ai_writer.processors.batch_processor import BatchProcessor
     
-    input_dir = input_dir or settings.paths.pdfs_dir
+    input_dir = input_dir or settings.paths.references_pdf_dir
     
     console.print(Panel(
         f"📂 Input: {input_dir}\n"
@@ -154,18 +153,18 @@ def process(
     ))
     
     processor = BatchProcessor(
-        input_dir=input_dir,
-        force_reprocess=force,
+        pdfs_folder=input_dir,
+        output_folder=settings.paths.processed_dir,
     )
     
-    stats = processor.process_all()
+    stats = processor.process_all(force_reprocess=force)
     
     console.print("\n")
     console.print(Panel(
-        f"✅ Processed: {stats.get('processed', 0)} papers\n"
-        f"💡 Ideas extracted: {stats.get('ideas', 0)}\n"
-        f"📌 Claims extracted: {stats.get('claims', 0)}\n"
-        f"📚 References extracted: {stats.get('references', 0)}",
+        f"✅ Processed: {stats.get('processed_successfully', 0)} papers\n"
+        f"💡 Ideas extracted: {stats.get('total_ideas', 0)}\n"
+        f"📌 Claims extracted: {stats.get('total_claims', 0)}\n"
+        f"📚 References extracted: {stats.get('total_references', 0)}",
         title="[bold green]✓ Processing Complete[/bold green]",
         border_style="green",
     ))
@@ -180,15 +179,15 @@ def stats() -> None:
     - Ideas, claims, and references indexed
     - Embedding dimensions and storage
     """
-    from ai_writer.embeddings.embedding_manager import EmbeddingManager
+    import json
+
+    import numpy as np
     
     console.print(Panel(
-        "Loading embedding statistics...",
+        f"📂 {settings.paths.embeddings_dir}",
         title="📊 Index Statistics",
         border_style="cyan",
     ))
-    
-    manager = EmbeddingManager()
     
     # Build stats table
     table = Table(title="Embedding Indices", show_header=True)
@@ -198,16 +197,27 @@ def stats() -> None:
     table.add_column("Papers", justify="right", style="yellow")
     
     for index_name in ["ideas", "claims", "references"]:
-        try:
-            info = manager.get_index_info(index_name)
-            table.add_row(
-                index_name.capitalize(),
-                str(info.get("count", "N/A")),
-                str(info.get("dimensions", 1536)),
-                str(info.get("unique_papers", "N/A")),
-            )
-        except Exception:
+        index_path = settings.paths.embeddings_dir / f"{index_name}_index.npz"
+        metadata_path = settings.paths.embeddings_dir / f"{index_name}_metadata.json"
+        
+        if not index_path.exists() or not metadata_path.exists():
             table.add_row(index_name.capitalize(), "Not found", "-", "-")
+            continue
+        
+        with np.load(index_path) as data:
+            count, dimensions = data["embeddings"].shape
+        with open(metadata_path, encoding="utf-8") as f:
+            items = json.load(f)["items"]
+        # References point at the paper that cites them
+        papers = {item.get("paper_id") or item.get("source_paper_id") for item in items}
+        papers.discard(None)
+        
+        table.add_row(
+            index_name.capitalize(),
+            str(count),
+            str(dimensions),
+            str(len(papers)),
+        )
     
     console.print(table)
 
@@ -237,7 +247,6 @@ def outline(
         ai-writer outline "Paper Title" --output outline.json
     """
     from ai_writer.orchestrators.advanced_orchestrator import AdvancedPerspectiveOrchestrator
-    from ai_writer.writers.markdown_writer import MarkdownWriter
     import json
     
     console.print(Panel(

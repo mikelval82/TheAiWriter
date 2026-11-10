@@ -6,7 +6,6 @@ from pathlib import Path
 import numpy as np
 from openai import OpenAI
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ai_writer.models.reference import ParsedReference
 from ai_writer.utils.reference_parser import ReferenceParser

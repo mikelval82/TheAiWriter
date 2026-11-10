@@ -66,7 +66,6 @@ class PDFWriter:
         page = doc.new_page(width=page_width, height=page_height)
 
         # Content area
-        content_width = page_width - 2 * self.margin
         y_position = self.margin
 
         # Insert title
@@ -176,7 +175,7 @@ class PDFWriter:
         font_name = "helv" if not bold else "hebo"
 
         # Insert text with word wrapping
-        text_length = page.insert_textbox(
+        page.insert_textbox(
             rect,
             text,
             fontsize=font_size,
