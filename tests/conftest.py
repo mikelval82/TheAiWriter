@@ -1,7 +1,7 @@
 """Shared test harness: a scripted fake LLM and a synthetic corpus.
 
-Nothing here touches the network. ``fake_llm`` replaces every ``OpenAI`` client
-the pipeline builds, and ``workspace`` points ``settings.paths`` at ``tmp_path``.
+Nothing here touches the network. ``fake_llm`` replaces the shared LLM client
+and embedder, and ``workspace`` points ``settings.paths`` at ``tmp_path``.
 """
 
 import json
@@ -11,16 +11,11 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from ai_writer.embeddings.embedder import set_embedder
+from ai_writer.llm import LLMClient, LLMRequest, LLMResponse, set_llm_client
 from config.settings import settings
 
 EMBEDDING_DIMS = 64
-
-# Modules that build their own OpenAI client.
-_OPENAI_IMPORTERS = [
-    "ai_writer.agents.base_agent",
-    "ai_writer.agents.planner_agent",
-    "ai_writer.embeddings.embedding_index",
-]
 
 PAPERS = [
     {
@@ -91,8 +86,18 @@ def fake_embedding(text: str) -> list[float]:
     return (vec / norm if norm else vec).tolist()
 
 
+class FakeEmbedder:
+    """Embedder backed by ``fake_embedding``."""
+
+    def __init__(self, model_name: str = "fake-embedder") -> None:
+        self.model_name = model_name
+
+    def embed(self, texts, kind="passage"):
+        return np.array([fake_embedding(t) for t in texts], dtype=np.float32)
+
+
 class FakeLLM:
-    """Stand-in for the OpenAI client, scripted by prompt substring.
+    """LLM backend scripted by prompt substring.
 
     Rules are checked in order against the system and user prompts joined; the
     first match answers. An unmatched prompt fails the test, so a new LLM call
@@ -102,8 +107,6 @@ class FakeLLM:
     def __init__(self) -> None:
         self.rules: list[tuple[str, object]] = []
         self.calls: list[dict] = []
-        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._chat_create))
-        self.embeddings = SimpleNamespace(create=self._embeddings_create)
 
     def on(self, needle: str, response: object) -> None:
         """Answer prompts containing ``needle``. Newer rules take precedence.
@@ -115,21 +118,14 @@ class FakeLLM:
     def prompts_containing(self, needle: str) -> list[str]:
         return [c["prompt"] for c in self.calls if needle in c["prompt"]]
 
-    def _chat_create(self, **kwargs):
-        prompt = "\n".join(m["content"] for m in kwargs["messages"])
-        self.calls.append({"prompt": prompt, "kwargs": kwargs})
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        prompt = f"{request.system}\n{request.user}"
+        self.calls.append({"prompt": prompt, "request": request})
         for needle, response in self.rules:
             if needle in prompt:
-                content = response(prompt) if callable(response) else response
-                message = SimpleNamespace(content=content)
-                return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+                text = response(prompt) if callable(response) else response
+                return LLMResponse(text=text)
         raise AssertionError(f"FakeLLM has no rule for prompt:\n{prompt[:400]}")
-
-    def _embeddings_create(self, model, input):
-        texts = [input] if isinstance(input, str) else input
-        return SimpleNamespace(
-            data=[SimpleNamespace(embedding=fake_embedding(t)) for t in texts]
-        )
 
 
 def _script_default_pipeline(llm: FakeLLM) -> None:
@@ -160,15 +156,24 @@ def _script_default_pipeline(llm: FakeLLM) -> None:
 
 @pytest.fixture
 def fake_llm(monkeypatch) -> FakeLLM:
-    """A FakeLLM installed in place of every OpenAI client."""
-    import importlib
+    """A FakeLLM and a FakeEmbedder installed as the shared client and embedder.
+
+    Building an OpenAI client fails the test: nothing may need an API key.
+    """
+    import openai
+
+    def no_openai(*args, **kwargs):
+        raise AssertionError("an OpenAI client was built")
+
+    monkeypatch.setattr(openai, "OpenAI", no_openai)
 
     llm = FakeLLM()
     _script_default_pipeline(llm)
-    for module_name in _OPENAI_IMPORTERS:
-        module = importlib.import_module(module_name)
-        monkeypatch.setattr(module, "OpenAI", lambda *args, **kwargs: llm)
-    return llm
+    set_llm_client(LLMClient(llm, max_retries=0))
+    set_embedder(FakeEmbedder())
+    yield llm
+    set_llm_client(None)
+    set_embedder(None)
 
 
 def _write_jsonl(path, rows) -> None:

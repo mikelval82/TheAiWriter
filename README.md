@@ -24,7 +24,7 @@ flowchart TB
     subgraph Processing["⚙️ Processing Pipeline"]
         Reader["PyMuPDF\nPDF→Texto"]
         Extractor["Idea/Claim\nExtractor"]
-        Embedder["OpenAI\nEmbeddings"]
+        Embedder["Local\nEmbeddings"]
         PDFs --> Reader --> Extractor --> Embedder
     end
 
@@ -91,9 +91,14 @@ source .venv/bin/activate  # Linux/Mac
 # Install dependencies
 pip install -e .
 
-# Configure API keys
+# Text generation uses the Claude Code CLI: install it and log in once
+claude   # then /login
+
+# Optional: override models or backends
 cp .env.example .env
-# Edit .env with your OPENAI_API_KEY
+
+# After changing the embedding model, rebuild the indices
+python -m ai_writer reindex
 ```
 
 ## 🚀 Usage
@@ -166,20 +171,24 @@ TheAIWriter/
 
 ## ⚙️ Configuration
 
-Create a `.env` file:
+No API key is needed by default. Text is generated through the Claude Code CLI
+(`claude -p`, using its own login) and embeddings are computed locally with
+`sentence-transformers`. Everything is set through environment variables or a
+`.env` file; the values below are the defaults:
 
 ```env
-OPENAI_API_KEY=your-api-key-here
+LLM_BACKEND=claude-code        # or "openai" (needs OPENAI_API_KEY)
+DEFAULT_MODEL=sonnet           # Writing and reviewing
+REASONING_MODEL=opus           # Outline planning
+FAST_MODEL=haiku               # Section summaries
+
+EMBEDDING_BACKEND=local        # or "openai" (needs OPENAI_API_KEY)
+EMBEDDING_MODEL=intfloat/multilingual-e5-small
 ```
 
-Models are configured in `config/settings.py`:
-
-```python
-default_model = "gpt-5.2"      # Main generation model
-reasoning_model = "gpt-5.2"    # Complex reasoning tasks
-fast_model = "gpt-5.2"         # Quick operations
-embedding_model = "text-embedding-3-small"
-```
+An index remembers the embedding model it was built with and refuses to load
+under a different one. Run `python -m ai_writer reindex` after changing it; the
+previous vectors are kept in `data/processed/embeddings/previous_<model>/`.
 
 ## 📊 Embedding Indices
 
@@ -240,4 +249,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-Built with ❤️ using OpenAI GPT models and semantic embeddings.
+Built with ❤️ using Claude and semantic embeddings.

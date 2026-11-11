@@ -4,16 +4,12 @@ import json
 from rich.console import Console
 from rich.panel import Panel
 
-from openai import OpenAI
-
+from ai_writer.llm import LLMClient, LLMError, get_llm_client
 from ai_writer.models.outline import PaperOutline, SectionOutline, ParagraphOutline
 from config.settings import settings
 
 console = Console()
 
-
-# Modelo por defecto para el planificador
-PLANNER_MODEL = "gpt-5.2"
 
 # Standard perspective paper sections con número de párrafos recomendados
 # Formato: (nombre, propósito, num_parrafos_min, num_parrafos_max)
@@ -27,6 +23,30 @@ PERSPECTIVE_SECTIONS = [
     ("Desafíos y Limitaciones", "Reconocer obstáculos y limitaciones de la perspectiva", 2, 3),
     ("Conclusiones", "Sintetizar los puntos clave y el mensaje final", 1, 2),
 ]
+
+# Output format shared by the planning and refinement prompts. The parser
+# reads exactly these keys, so both prompts must spell them out.
+OUTLINE_JSON_FORMAT = """## Formato de Salida (JSON)
+
+```json
+{
+  "thesis_statement": "Tesis central en una oración",
+  "sections": [
+    {
+      "section_name": "Nombre de la sección",
+      "section_purpose": "Propósito breve",
+      "paragraphs": [
+        {
+          "paragraph_number": 1,
+          "key_idea": "Idea específica y argumentativa (NO genérica)",
+          "supporting_points": ["Punto de apoyo 1", "Punto de apoyo 2"],
+          "suggested_sources": ["Topic1", "Topic2"]
+        }
+      ]
+    }
+  ]
+}
+```"""
 
 PLANNER_SYSTEM_PROMPT = """Eres un experto planificador de papers académicos. Tu tarea es generar 
 un esquema detallado (outline) para un paper de perspectivas, basándote en:
@@ -56,14 +76,16 @@ class PlannerAgent:
     def __init__(
         self,
         model: str | None = None,
+        llm: LLMClient | None = None,
     ) -> None:
         """Initialize the planner agent.
         
         Args:
-            model: OpenAI model to use. Defaults to gpt-5.1 for better reasoning.
+            model: Model to use. Defaults to the reasoning model.
+            llm: Client used for generation. Defaults to the shared client.
         """
-        self.client = OpenAI(api_key=settings.ai.openai_api_key)
-        self.model = model or PLANNER_MODEL
+        self.llm = llm or get_llm_client()
+        self.model = model or settings.ai.reasoning_model
     
     def _extract_json(self, content: str) -> str | None:
         """Extract JSON from a response that may contain other text.
@@ -184,27 +206,7 @@ class PlannerAgent:
 
 {sections_text}
 
-## Formato de Salida (JSON)
-
-```json
-{{
-  "thesis_statement": "Tesis central en una oración",
-  "sections": [
-    {{
-      "section_name": "Nombre de la sección",
-      "section_purpose": "Propósito breve",
-      "paragraphs": [
-        {{
-          "paragraph_number": 1,
-          "key_idea": "Idea específica y argumentativa (NO genérica)",
-          "supporting_points": ["Punto de apoyo 1", "Punto de apoyo 2"],
-          "suggested_sources": ["Topic1", "Topic2"]
-        }}
-      ]
-    }}
-  ]
-}}
-```
+{OUTLINE_JSON_FORMAT}
 
 ## Instrucciones
 1. Genera exactamente el número de párrafos indicado por sección
@@ -263,26 +265,21 @@ IMPORTANTE: Responde ÚNICAMENTE con JSON válido, sin texto adicional.
 """
             logger.log_prompt(full_prompt, "planner_prompt")
         
-        # Try up to 3 times: 2 with primary model, 1 with fallback
-        models_to_try = [self.model, self.model, "gpt-4o"]
+        # Try up to 3 times: an empty or malformed outline is worth another attempt
+        models_to_try = [self.model] * 3
         
         for attempt, model in enumerate(models_to_try):
             try:
                 console.print(f"[dim]  Llamando a {model} (intento {attempt + 1}/{len(models_to_try)})...[/dim]")
                 
-                response = self.client.chat.completions.create(
+                content = self.llm.complete(
+                    PLANNER_SYSTEM_PROMPT + "\n\nIMPORTANTE: Responde ÚNICAMENTE con JSON válido, sin texto adicional.",
+                    prompt,
                     model=model,
-                    messages=[
-                        {"role": "system", "content": PLANNER_SYSTEM_PROMPT + "\n\nIMPORTANTE: Responde ÚNICAMENTE con JSON válido, sin texto adicional."},
-                        {"role": "user", "content": prompt},
-                    ],
                     temperature=0.7,
-                    max_completion_tokens=8000,
-                    response_format={"type": "json_object"},
-                    timeout=180,
+                    max_tokens=8000,
+                    json_mode=True,
                 )
-                
-                content = response.choices[0].message.content
                 console.print(f"[dim]  Respuesta recibida: {len(content) if content else 0} chars[/dim]")
                 
                 # Log the raw response
@@ -317,9 +314,11 @@ IMPORTANTE: Responde ÚNICAMENTE con JSON válido, sin texto adicional.
             except json.JSONDecodeError as e:
                 console.print(f"[yellow]⚠ Error JSON (intento {attempt + 1}/{len(models_to_try)}): {e}[/yellow]")
                 continue
-            except Exception as e:
+            except LLMError as e:
                 console.print(f"[red]Error generando esquema: {e}[/red]")
-                continue  # Try next model instead of breaking
+                if not e.retryable:
+                    raise
+                continue
         
         # Return a basic outline as fallback
         console.print("[yellow]Usando esquema básico como fallback[/yellow]")
@@ -444,11 +443,10 @@ IMPORTANTE: Responde ÚNICAMENTE con JSON válido, sin texto adicional.
 
 # Instrucciones
 
-Refina el esquema incorporando el feedback. Mantén la estructura JSON:
-{{
-  "thesis_statement": "...",
-  "sections": [...]
-}}
+Refina el esquema incorporando el feedback. Responde con el esquema COMPLETO
+usando exactamente estas claves (section_name, section_purpose, paragraphs...):
+
+{OUTLINE_JSON_FORMAT}
 
 Asegúrate de:
 1. Abordar específicamente cada punto del feedback
@@ -460,25 +458,20 @@ Asegúrate de:
 7. La profundidad y exhaustividad del paper es valiosa - no la sacrifiques"""
 
         try:
-            response = self.client.chat.completions.create(
+            content = self.llm.complete(
+                PLANNER_SYSTEM_PROMPT + "\n\nIMPORTANTE: Responde ÚNICAMENTE con JSON válido y COMPLETO.",
+                refine_prompt,
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": PLANNER_SYSTEM_PROMPT + "\n\nIMPORTANTE: Responde ÚNICAMENTE con JSON válido y COMPLETO."},
-                    {"role": "user", "content": refine_prompt},
-                ],
                 temperature=0.7,
-                max_completion_tokens=8000,  # Increased from 4000
-                response_format={"type": "json_object"},
-                timeout=180,
+                max_tokens=8000,  # Increased from 4000
+                json_mode=True,
             )
-            
-            content = response.choices[0].message.content
             
             if not content or content.strip() == "":
                 console.print("[yellow]Respuesta vacía en refinamiento. Manteniendo esquema original.[/yellow]")
                 return outline
                 
-            data = json.loads(content)
+            data = json.loads(self._extract_json(content) or content)
             
             # Validate refined data has actual content
             if not self._validate_outline_data(data):
@@ -491,7 +484,9 @@ Asegúrate de:
             console.print("[green]✓ Esquema refinado[/green]")
             return refined
             
-        except Exception as e:
+        except (LLMError, json.JSONDecodeError) as e:
+            if isinstance(e, LLMError) and not e.retryable:
+                raise
             console.print(f"[yellow]Error refinando: {e}. Manteniendo esquema original.[/yellow]")
             return outline
     

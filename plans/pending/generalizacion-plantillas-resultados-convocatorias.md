@@ -110,12 +110,24 @@ Verificada cuando: `generate` termina y el fichero final contiene las citas resu
 
 Verificada cuando: el blueprint `perspective` produce, con el LLM falso, el mismo outline y la misma secuencia de llamadas que el código actual, y no queda ninguna comparación por nombre de sección en el código.
 
-#### Paso 1.1: Capa única de LLM (Tamaño: M)
-- Criterios: un `LLMClient` con reintentos, salida estructurada validada con Pydantic y registro de tokens y coste por ejecución; todos los agentes, incluido `PlannerAgent`, lo usan; modelo configurable por rol.
-- Verificación: `python -m pytest tests/test_llm_client.py`
-- Ficheros: `llm/client.py` (nuevo), `agents/*.py`, `config/settings.py`
-- Costura de test: `LLMClient` con transporte falso
+#### Paso 1.1: Capa única de LLM con backend de Claude Code (Tamaño: L, se divide en 1.1a y 1.1b)
+- 1.1a (M): `LLMClient` con interfaz `complete(system, user, schema=None, role=...)`, reintentos, salida estructurada validada con Pydantic y registro de coste por ejecución. Backend `ClaudeCodeBackend`, que lanza `claude -p --output-format json --system-prompt … --tools "" --strict-mcp-config --no-session-persistence` (y `--json-schema` cuando se pide salida estructurada) y lee el campo `result`. Backend `OpenAIBackend` con el comportamiento actual. Se elige con `LLM_BACKEND` (`claude-code` por defecto) y el modelo por rol con `--model`.
+- 1.1b (M): todos los agentes, `PlannerAgent` y la llamada directa del orquestador pasan a usar `LLMClient`; desaparece `GPT5_MODELS`; el `FakeLLM` de los tests pasa a ser un backend más.
+- Criterios: `generate` completa una ejecución sin `OPENAI_API_KEY` si los índices ya existen (ver la decisión abierta sobre embeddings); un fallo del CLI (no instalado, sin sesión iniciada, límite de uso) produce un error claro y no un paper a medias; las llamadas independientes se pueden lanzar en paralelo con un límite configurable.
+- Verificación: `python -m pytest tests/test_llm_client.py` (el CLI se sustituye por un ejecutable falso) y una ejecución real manual de `generate` con el corpus actual
+- Ficheros: `llm/client.py`, `llm/backends/claude_code.py`, `llm/backends/openai.py` (nuevos), `agents/*.py`, `processors/extraction_agent.py`, `orchestrators/advanced_orchestrator.py`, `config/settings.py`, `.env.example`
+- Costura de test: `LLMClient` con backend falso; `ClaudeCodeBackend` con `subprocess` sustituido
 - Bloqueado por: 0.2
+- Riesgos conocidos: cada llamada arranca un proceso (unos segundos de sobrecoste; un paper son cientos de llamadas); el consumo cuenta contra los límites de la suscripción de Claude Code; el ejecutable de Windows exigirá tener el CLI instalado y con sesión iniciada. El 2026-11-10 se comprobó que el CLI (2.1.322) acepta esas opciones, pero la llamada de prueba devolvió "Not logged in" dentro del entorno aislado de la sesión de trabajo, así que **falta una prueba real de extremo a extremo**.
+
+#### Paso 1.1c: Embeddings locales (Tamaño: M)
+- Criterios: `EmbeddingIndex` y `ReferenceIndex` obtienen los vectores de un `Embedder` configurable (`EMBEDDING_BACKEND=local` por defecto, modelo en `EMBEDDING_MODEL`); el índice guarda con qué modelo se generó y se niega a mezclar vectores de modelos distintos; `ai-writer reindex` regenera los índices del corpus sin volver a extraer los PDFs; desaparecen las dimensiones 1536 escritas a mano.
+- Comprobación de calidad antes de dar el cambio por bueno: para una muestra de ideas del corpus usadas como consulta, comparar los 10 vecinos más próximos en el índice antiguo (OpenAI, ya en disco) y en el nuevo. No necesita API key. Si el solapamiento es bajo, se revisa a mano una muestra antes de seguir.
+- Verificación: `python -m pytest tests/test_embedder.py` (con un modelo falso) y `ai-writer reindex` real sobre el corpus actual
+- Ficheros: `embeddings/embedder.py` (nuevo), `embeddings/embedding_index.py`, `utils/reference_index.py`, `utils/enhanced_context_manager.py`, `config/settings.py`, `main.py`, `pyproject.toml`
+- Costura de test: `Embedder` falso inyectado en `EmbeddingIndex`
+- Bloqueado por: 0.2
+- Riesgos conocidos: las puntuaciones de similitud cambian de escala, así que los umbrales y pesos de `EnhancedContextManager` hay que recalibrarlos; PyTorch engorda mucho el ejecutable de Windows.
 
 #### Paso 1.2: Proyecto como unidad de trabajo (Tamaño: M)
 - Criterios: `ai-writer init <dir>` crea la estructura; todas las rutas salen de `project.yaml`; `ai-writer migrate` convierte el `data/` actual en un proyecto sin reprocesar PDFs.
@@ -206,7 +218,7 @@ Verificada cuando: con una carpeta de análisis de ejemplo, el sistema escribe u
 - Bloqueado por: 1.2
 
 #### Paso 4.2: Hallazgos a partir de resultados (Tamaño: M)
-- Criterios: los estadísticos de cada tabla se calculan con pandas, no con el LLM; cada figura recibe una descripción con un modelo de visión; cada hallazgo guarda el fichero, la celda o columna de origen y el valor exacto; los hallazgos se indexan como fuente de evidencia.
+- Criterios: los estadísticos de cada tabla se calculan con pandas, no con el LLM; cada figura recibe una descripción con un modelo de visión (con el backend de Claude Code, dándole acceso de solo lectura a la carpeta de figuras); cada hallazgo guarda el fichero, la celda o columna de origen y el valor exacto; los hallazgos se indexan como fuente de evidencia.
 - Verificación: `python -m pytest tests/test_findings.py`
 - Ficheros: `analysis/findings.py` (nuevo), `evidence/findings_source.py` (nuevo)
 - Bloqueado por: 4.1, 1.3
@@ -321,9 +333,10 @@ F4 y F5 son técnicamente independientes entre sí. Por decisión del usuario, F
 | Primera plantilla LaTeX (2026-11-10) | Plantilla de arXiv | Respuesta del usuario; es el caso de prueba de los pasos 3.1 a 3.3 |
 | Forma de los análisis (2026-11-10) | Python | Respuesta del usuario; R queda fuera del alcance inicial de la Fase 4 |
 | Prioridad F4 / F5 (2026-11-10) | Paper con resultados (F4) antes que convocatorias (F5) | Respuesta del usuario |
+| Embeddings (2026-11-10) | Modelo local multilingüe con `sentence-transformers`; el modelo es configurable (pequeño por defecto, `BAAI/bge-m3` en la máquina del usuario) | Respuesta del usuario: elimina la API key de OpenAI. Multilingüe porque hoy las consultas van en español y el corpus en inglés |
 | Markdown a LaTeX (2026-11-10) | pandoc mediante `pypandoc-binary` | Aceptada la recomendación: resuelve escapado, tablas, matemáticas y DOCX |
 | Bibliografía (2026-11-10) | Manda el `.bib` de Zotero cuando exista; lo extraído de los PDFs es el respaldo | Aceptada la recomendación |
-| Proveedor de LLM (2026-11-10) | Capa única para OpenAI y Anthropic, OpenAI por defecto | Aceptada la recomendación |
+| Proveedor de LLM (2026-11-10, revisada el mismo día) | Capa única con el **CLI de Claude Code** (`claude -p`) como backend por defecto; OpenAI queda como backend alternativo | Petición del usuario: no depender de la API key de OpenAI para generar texto. Sustituye a "OpenAI por defecto" |
 | Idioma (2026-11-10) | Escribir en el idioma de destino (inglés por defecto en papers); traductor aparte | Aceptada la recomendación |
 | Puntos de control (2026-11-10) | Parada para confirmar outline, contribuciones y `CallSpec`; `--yes` los salta | Aceptada la recomendación |
 | Ejecutable de Windows (2026-11-10) | Genera el proyecto `.tex`; compila solo si hay LaTeX instalado | Aceptada la recomendación |
@@ -332,7 +345,7 @@ F4 y F5 son técnicamente independientes entre sí. Por decisión del usuario, F
 
 Cada una lleva mi recomendación. "Sí" acepta la recomendación.
 
-Las decisiones 1 a 6 quedaron aceptadas el 2026-11-10 y están en el registro de decisiones. Quedan dos, que no bloquean hasta fases posteriores:
+Las decisiones 1 a 6 y la de embeddings quedaron resueltas el 2026-11-10 y están en el registro de decisiones. Quedan dos, que no bloquean hasta fases posteriores:
 
 7. **Primera convocatoria real**: ¿cuál? Define el caso de prueba de la Fase 5 y si hace falta DOCX. Propongo la próxima que vayas a solicitar. No bloquea nada hasta la Fase 5.
 8. **Formato de los resultados** (derivada de "Python"): ¿scripts `.py`, notebooks o ambos? ¿Resultados en CSV y figuras en PNG/PDF dentro de una carpeta? Propongo admitir ambos y esos formatos. No bloquea nada hasta la Fase 4.
@@ -364,7 +377,7 @@ Resueltas el 2026-11-10 (ver registro de decisiones): privacidad, primera planti
 | Fase | Estado |
 |---|---|
 | 0. Estabilizar | hecha el 2026-11-10, sin commitear; ver notas de ejecución |
-| 1. Núcleo generalizado | pendiente |
+| 1. Núcleo generalizado | paso 1.1 (a, b, c) hecho el 2026-11-11, sin commitear; pasos 1.2 a 1.5 pendientes |
 | 2. Citas con BibTeX | pendiente |
 | 3. Plantillas LaTeX | pendiente |
 | 4. Resultados y código | pendiente |
@@ -386,3 +399,53 @@ Desviaciones respecto al plan:
 - El corpus sintético se genera en `tests/conftest.py`, no en ficheros bajo `tests/fixtures/`.
 - CI ejecuta solo las reglas `F` de ruff (errores reales). Las de estilo dan unos 1.500 avisos, casi todos espacios en blanco; arreglarlos es un cambio masivo que conviene hacer en un commit aparte.
 - No se ha tocado el número de versión: `pyproject.toml` y `main.py` dicen 1.0.0 y `docs/architecture.md` dice 1.1.0.
+
+### Paso 1.1 (2026-11-11)
+
+Hecho: `ai_writer.llm` (`LLMClient`, backends `claude-code` y `openai`), `ai_writer.embeddings.embedder` (backends `local` y `openai`), todos los agentes y el orquestador migrados, comando `ai-writer reindex`, y el índice guarda y comprueba el modelo de embeddings.
+
+Verificación: `ruff check . --select F` sin errores y `python -m pytest` en verde. Los tests sustituyen el CLI por un `subprocess.run` falso y el modelo de embeddings por uno falso, y fallan si algo construye un cliente de OpenAI.
+
+**Pendiente de verificar por el usuario**: una ejecución real de `generate`. El CLI de Claude Code no tiene sesión iniciada dentro del entorno de trabajo del agente ("Not logged in"), así que el backend `claude-code` solo está probado contra un CLI simulado. Lo comprobado contra el CLI real (2.1.322) es que acepta todas las opciones que se le pasan.
+
+Desviaciones respecto al plan:
+
+- No se usa `--json-schema`. No se pudo comprobar en qué campo devuelve el CLI la salida estructurada, así que el modo JSON añade una instrucción al prompt de sistema y `LLMClient.complete_json` extrae y valida el JSON (con Pydantic si se le pasa un modelo).
+- No se ha implementado el lanzamiento de llamadas en paralelo. El pipeline actual es secuencial (cada párrafo depende de los anteriores) y no había dónde usarlo; se añadirá en el paso que lo necesite (extracción de PDFs, Fase 4).
+- Modelos por defecto con `claude-code`: `sonnet` para escribir y revisar, `opus` para planificar el outline, `haiku` para los resúmenes de sección. Antes todo usaba `gpt-5.2`. El planificador ya no recurre a `gpt-4o` como alternativa.
+- Un error permanente del LLM (CLI sin instalar o sin sesión) detiene el planificador en lugar de producir un outline básico de relleno.
+- `max_tokens` y `temperature` no tienen equivalente en el CLI y se ignoran con ese backend.
+- Se eliminaron `utils/reference_index.py`, `utils/reference_context_manager.py` y `utils/reference_parser.py`: solo los usaba el orquestador antiguo, borrado en la Fase 0.
+- `scripts/process_powerpoint.py` sigue llamando a OpenAI directamente (usa visión). Queda fuera de este paso.
+- El `Embedder` distingue consulta y pasaje, porque los modelos E5 necesitan prefijos distintos para cada uno.
+
+#### Reindexado y comprobación de calidad (2026-11-11)
+
+El corpus real está reindexado con `intfloat/multilingual-e5-small` (384 dimensiones): 3.733 ideas, 3.839 claims y 2.713 referencias. Los vectores de OpenAI están en `data/processed/embeddings/previous_text-embedding-3-small/`.
+
+Comparación con el índice de OpenAI, usando 400 ideas del corpus como consulta:
+
+| Medida | Valor |
+|---|---|
+| Solapamiento medio de los 10 vecinos más próximos | 65 % |
+| Consultas con al menos 5 de 10 vecinos en común | 90 % |
+| El mejor vecino del índice antiguo aparece entre los 10 del nuevo | 97 % |
+| Tiempo para embeber las 3.733 ideas (12 núcleos, sin GPU) | 119 s |
+
+Comprobado además sobre el índice nuevo: una consulta en español recupera ideas pertinentes del corpus en inglés, `get_context_for_idea` devuelve contexto y `ClusterAnalyzer` genera los 25 clusters.
+
+Pendiente:
+
+- **Recalibrar `min_score=0.3`** en `EnhancedContextManager` (búsqueda de ideas y de claims). Con E5 las similitudes están comprimidas en torno a 0,75–0,9, así que ese umbral ya no descarta nada. El orden de los resultados no cambia; lo que se pierde es el filtro cuando el corpus no tiene nada pertinente.
+
+Comparación con `BAAI/bge-m3` (1.024 dimensiones), misma muestra: solapamiento medio 68 %, consultas con al menos 5 de 10 vecinos en común 92 %, mejor vecino antiguo entre los 10 nuevos 98 %. Tardó 1.282 s en embeber las 3.733 ideas, aunque compartió CPU con el reindexado, así que el tiempo real en solitario es menor. La mejora sobre el modelo pequeño es de 1 a 3 puntos, a cambio de un coste varias veces mayor: se mantiene `multilingual-e5-small` como valor por defecto.
+
+#### Prueba real con Claude Code (2026-11-11)
+
+Tras iniciar sesión en el CLI, el backend `claude-code` funciona de verdad: llamadas de texto y JSON validado (unos 4 s por llamada corta con `haiku`), y fases 1 y 2 completas (clusters y outline de 8 secciones y 28 párrafos con `opus`, unos 4,5 minutos, 31.600 tokens de salida). El `abstract` se tomó del paper generado anteriormente, porque `data/references/` (PDFs y `ABSTRACT.md`) no existe en el disco; ya faltaba antes de empezar este trabajo.
+
+Fallo encontrado y corregido: el prompt de refinamiento del outline no indicaba las claves del JSON, y el modelo devolvía `title` y `description` en lugar de `section_name` y `section_purpose`, así que el refinamiento se descartaba siempre. Ahora ambos prompts comparten `OUTLINE_JSON_FORMAT`. Verificado contra el CLI real: el refinamiento se aplica (8 secciones, 35 párrafos).
+
+Observación para el paso 1.3: el refinamiento renombró una sección a "Implicaciones Futuras: Hoja de Ruta". Como `SECTION_CONFIGS` se busca por nombre exacto, esa sección cae en la configuración de "Introducción" sin avisar. Es el problema que resuelve el blueprint.
+
+Sin probar todavía: `generate` completo (fase 3, escritura y revisión).

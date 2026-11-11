@@ -50,7 +50,7 @@ flowchart TB
     subgraph Processing["⚙️ Procesamiento Offline"]
         Reader["PyMuPDF\nPDF → Texto"]
         Extractor["PDFExtractionAgent\nIdeas, Claims, Referencias"]
-        Embedder["OpenAI Embeddings\ntext-embedding-3-small"]
+        Embedder["Embeddings locales\nsentence-transformers"]
         
         PDFs --> Reader --> Extractor --> Embedder
     end
@@ -175,8 +175,8 @@ flowchart TD
 classDiagram
     class BaseAgent {
         <<abstract>>
-        +client: OpenAI
-        +model: str = "gpt-5.2"
+        +llm: LLMClient
+        +model: str
         +_call_api(system_prompt, user_prompt) str
         +_call_api_json(system_prompt, user_prompt) dict
     }
@@ -279,7 +279,7 @@ flowchart LR
     end
     
     subgraph Search["🎯 Búsqueda"]
-        S1["Embedding Query\ntext-embedding-3-small"]
+        S1["Embedding Query\nmodelo local"]
         S2["Cosine Similarity"]
         S3["Ranking por Score"]
         S4["Filtro Confianza"]
@@ -499,12 +499,19 @@ python -m ai_writer version
 
 ### Configuración
 
+Por defecto no hace falta ninguna API key. El texto se genera con el CLI de
+Claude Code (`claude -p`, con su propia sesión) y los embeddings se calculan en
+local. Todas las llamadas pasan por `ai_writer.llm.LLMClient` y
+`ai_writer.embeddings.embedder`, que eligen el backend según la configuración:
+
 ```python
-# config/settings.py
-default_model = "gpt-5.2"      # Modelo principal
-reasoning_model = "gpt-5.2"    # Tareas complejas
-fast_model = "gpt-5.2"         # Operaciones rápidas
-embedding_model = "text-embedding-3-small"
+# config/settings.py (variables de entorno o .env)
+llm_backend = "claude-code"    # o "openai" (requiere OPENAI_API_KEY)
+default_model = "sonnet"       # Escritura y revisión
+reasoning_model = "opus"       # Planificación del outline
+fast_model = "haiku"           # Resúmenes de sección
+embedding_backend = "local"    # o "openai" (requiere OPENAI_API_KEY)
+embedding_model = "intfloat/multilingual-e5-small"
 
 # Parámetros del pipeline
 n_clusters = 25                # Clusters para análisis

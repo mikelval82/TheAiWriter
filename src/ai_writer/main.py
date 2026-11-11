@@ -223,6 +223,54 @@ def stats() -> None:
 
 
 @app.command()
+def reindex() -> None:
+    """Rebuild the embedding indices with the configured embedding model.
+    
+    Needed after changing EMBEDDING_BACKEND or EMBEDDING_MODEL: vectors from
+    different models cannot be mixed. The PDFs are not processed again, and the
+    previous index files are kept in a subfolder named after their model.
+    
+    Example:
+        ai-writer reindex
+    """
+    import json
+    import shutil
+
+    from ai_writer.embeddings.embedder import LEGACY_EMBEDDING_MODEL, get_embedder
+    from ai_writer.embeddings.rag_system import RAGSystem
+    
+    embeddings_dir = settings.paths.embeddings_dir
+    model_name = get_embedder().model_name
+    
+    console.print(Panel(
+        f"📂 {embeddings_dir}\n"
+        f"🧠 Model: {model_name}",
+        title="Rebuilding Embedding Indices",
+        border_style="cyan",
+    ))
+    
+    # Keep the previous vectors: with another backend they may not be reproducible
+    for metadata_path in sorted(embeddings_dir.glob("*_metadata.json")):
+        index_path = metadata_path.with_name(metadata_path.name.replace("_metadata.json", "_index.npz"))
+        with open(metadata_path, encoding="utf-8") as f:
+            previous_model = json.load(f).get("embedding_model", LEGACY_EMBEDDING_MODEL)
+        if previous_model == model_name:
+            continue
+        backup_dir = embeddings_dir / f"previous_{previous_model.replace('/', '_')}"
+        backup_dir.mkdir(exist_ok=True)
+        for path in (metadata_path, index_path):
+            if path.exists():
+                shutil.move(str(path), str(backup_dir / path.name))
+        console.print(f"[dim]  {metadata_path.name} ({previous_model}) → {backup_dir.name}/[/dim]")
+    
+    rag = RAGSystem(
+        indices_dir=settings.paths.indices_dir,
+        embeddings_dir=embeddings_dir,
+    )
+    rag.build_indices(force_rebuild=True)
+
+
+@app.command()
 def outline(
     title: str = typer.Argument(
         ...,
@@ -364,9 +412,12 @@ def version() -> None:
     table.add_column("Value", style="green")
     
     table.add_row("Version", "1.0.0")
+    table.add_row("LLM Backend", settings.ai.llm_backend)
     table.add_row("Default Model", settings.ai.default_model)
     table.add_row("Reasoning Model", settings.ai.reasoning_model)
     table.add_row("Fast Model", settings.ai.fast_model)
+    table.add_row("Embedding Backend", settings.ai.embedding_backend)
+    table.add_row("Embedding Model", settings.ai.embedding_model)
     table.add_row("References Dir", str(settings.paths.references_markdown_dir))
     table.add_row("Output Dir", str(settings.paths.final_dir))
     table.add_row("Data Dir", str(settings.paths.data_dir))

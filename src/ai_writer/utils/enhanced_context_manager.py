@@ -820,7 +820,7 @@ class EnhancedContextManager:
         if all(len(e) <= 16 for e in embeddings):
             return self._select_by_score_and_paper_diversity(candidates, target_k, max_per_paper)
         
-        # Get the target embedding dimension (should be 1536)
+        # Real embeddings share one dimension; pseudo-embeddings are shorter
         target_dim = max(len(e) for e in embeddings)
         
         # Filter out pseudo-embeddings and keep only real ones

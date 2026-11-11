@@ -47,3 +47,18 @@ def test_translator_default_style_guide_exists(fake_llm):
 
     assert translator.style_guide_path.exists()
     assert translator.style_guide
+
+
+def test_outline_refinement_prompt_names_the_parsed_keys(fake_llm):
+    from ai_writer.agents.planner_agent import PlannerAgent
+    from ai_writer.models.outline import PaperOutline
+    from tests.conftest import DEFAULT_OUTLINE
+
+    outline = PaperOutline(title="T", abstract="A", **DEFAULT_OUTLINE)
+
+    refined = PlannerAgent().refine_outline(outline, "Haz la tesis más específica.")
+
+    prompt = fake_llm.prompts_containing("Feedback para Mejorar")[0]
+    for key in ("section_name", "section_purpose", "key_idea", "supporting_points"):
+        assert f'"{key}"' in prompt
+    assert [s.section_name for s in refined.sections] == ["Introducción", "Conclusiones"]

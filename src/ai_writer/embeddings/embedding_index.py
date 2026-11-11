@@ -5,16 +5,19 @@ from pathlib import Path
 from typing import Any, TypeVar, Generic
 
 import numpy as np
-from openai import OpenAI
 from pydantic import BaseModel
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
+from ai_writer.embeddings.embedder import LEGACY_EMBEDDING_MODEL, Embedder, get_embedder
 from config.settings import settings
 
 console = Console()
 
 T = TypeVar("T", bound=BaseModel)
+
+
+class EmbeddingModelMismatch(RuntimeError):
+    """A cached index was built with a different embedding model."""
 
 
 class EmbeddingIndex(Generic[T]):
@@ -23,15 +26,13 @@ class EmbeddingIndex(Generic[T]):
     Can be used with any Pydantic model that has text content to embed.
     """
 
-    EMBEDDING_MODEL = "text-embedding-3-small"
-    EMBEDDING_DIMENSIONS = 1536
-
     def __init__(
         self,
         name: str,
         cache_dir: Path | None = None,
         text_field: str = "idea",
         context_fields: list[str] | None = None,
+        embedder: Embedder | None = None,
     ) -> None:
         """Initialize the embedding index.
 
@@ -40,6 +41,7 @@ class EmbeddingIndex(Generic[T]):
             cache_dir: Directory for cache files. Defaults to data/processed/embeddings.
             text_field: Primary field to embed from each item.
             context_fields: Additional fields to include in embedding text.
+            embedder: Source of the vectors. Defaults to the shared embedder.
         """
         self.name = name
         self.cache_dir = cache_dir or (settings.paths.data_dir / "processed" / "embeddings")
@@ -51,7 +53,7 @@ class EmbeddingIndex(Generic[T]):
         self.text_field = text_field
         self.context_fields = context_fields or []
         
-        self.client = OpenAI(api_key=settings.ai.openai_api_key)
+        self.embedder = embedder or get_embedder()
         
         self.items: list[dict[str, Any]] = []
         self._embeddings_matrix: np.ndarray | None = None
@@ -121,32 +123,7 @@ class EmbeddingIndex(Generic[T]):
         
         console.print(f"  [dim]Generating {len(texts_to_embed)} embeddings...[/dim]")
 
-        embeddings = []
-        batch_size = 100
-        
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("{task.completed}/{task.total}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task(f"[cyan]Embedding {self.name}...", total=len(texts_to_embed))
-            
-            for i in range(0, len(texts_to_embed), batch_size):
-                batch = texts_to_embed[i:i + batch_size]
-                
-                response = self.client.embeddings.create(
-                    model=self.EMBEDDING_MODEL,
-                    input=batch,
-                )
-                
-                for embedding_data in response.data:
-                    embeddings.append(embedding_data.embedding)
-                
-                progress.update(task, advance=len(batch))
-        
-        self._embeddings_matrix = np.array(embeddings, dtype=np.float32)
+        self._embeddings_matrix = self.embedder.embed(texts_to_embed, kind="passage")
         self._build_id_index()
 
     def _build_id_index(self) -> None:
@@ -161,26 +138,38 @@ class EmbeddingIndex(Generic[T]):
 
         Returns:
             True if cache was loaded successfully.
+
+        Raises:
+            EmbeddingModelMismatch: If the cache was built with another model.
         """
         if not self.cache_path.exists() or not self.metadata_path.exists():
             return False
 
         try:
             # Load embeddings
-            data = np.load(self.cache_path)
-            self._embeddings_matrix = data["embeddings"]
+            with np.load(self.cache_path) as data:
+                embeddings = data["embeddings"]
             
             # Load metadata
             with open(self.metadata_path, "r", encoding="utf-8") as f:
                 metadata = json.load(f)
-            
-            self.items = metadata["items"]
-            self._build_id_index()
-            
-            return True
         except Exception as e:
             console.print(f"[yellow]  Failed to load {self.name} cache: {e}[/yellow]")
             return False
+
+        # Vectors from different models are not comparable: never mix them
+        cached_model = metadata.get("embedding_model", LEGACY_EMBEDDING_MODEL)
+        if cached_model != self.embedder.model_name:
+            raise EmbeddingModelMismatch(
+                f"The {self.name} index was built with {cached_model!r} but the configured "
+                f"embedding model is {self.embedder.model_name!r}. Run `ai-writer reindex` "
+                "to rebuild it, or set EMBEDDING_BACKEND / EMBEDDING_MODEL to match."
+            )
+
+        self._embeddings_matrix = embeddings
+        self.items = metadata["items"]
+        self._build_id_index()
+        return True
 
     def _save_to_cache(self) -> None:
         """Save index to cache files."""
@@ -188,7 +177,7 @@ class EmbeddingIndex(Generic[T]):
         np.savez_compressed(self.cache_path, embeddings=self._embeddings_matrix)
         
         # Save metadata as JSON
-        metadata = {"items": self.items}
+        metadata = {"embedding_model": self.embedder.model_name, "items": self.items}
         with open(self.metadata_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False)
 
@@ -201,11 +190,7 @@ class EmbeddingIndex(Generic[T]):
         Returns:
             The embedding vector.
         """
-        response = self.client.embeddings.create(
-            model=self.EMBEDDING_MODEL,
-            input=text,
-        )
-        return np.array(response.data[0].embedding, dtype=np.float32)
+        return self.embedder.embed([text], kind="query")[0]
 
     def search(
         self,

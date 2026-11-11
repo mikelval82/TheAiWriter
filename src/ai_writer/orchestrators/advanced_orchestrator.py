@@ -7,13 +7,13 @@ Phase 3: Writing - Write paragraph-by-paragraph with idea-specific queries
 
 from pathlib import Path
 
-from openai import OpenAIError
 from rich.console import Console
 from rich.panel import Panel
 
 from ai_writer.agents.writer_agent import WriterAgent
 from ai_writer.agents.reviewer_agent import ReviewerAgent
 from ai_writer.agents.planner_agent import PlannerAgent
+from ai_writer.llm import LLMError, get_llm_client
 from ai_writer.models.paper import Paper, Section
 from ai_writer.models.outline import PaperOutline, SectionOutline, ParagraphOutline
 from ai_writer.readers.markdown_reader import MarkdownReader
@@ -121,10 +121,6 @@ class AdvancedPerspectiveOrchestrator:
             A concise summary capturing key points.
         """
         
-        # Use a lightweight call to generate summary
-        client = self.writer_agent.client
-        model = self.writer_agent.model
-        
         user_prompt = f"""Genera un resumen conciso de la siguiente sección de un paper académico.
 
 SECCIÓN: {section.title}
@@ -140,16 +136,15 @@ INSTRUCCIONES:
 
 RESUMEN:"""
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "Eres un asistente experto en síntesis de textos académicos."},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_completion_tokens=300,
+        # Summaries are short and frequent: the fast model is enough
+        response = get_llm_client().complete(
+            "Eres un asistente experto en síntesis de textos académicos.",
+            user_prompt,
+            model=settings.ai.fast_model,
+            max_tokens=300,
         )
         
-        return response.choices[0].message.content.strip()
+        return response.strip()
     
     def _update_section_memory(self, section: Section) -> None:
         """Update memory with a completed section.
@@ -750,7 +745,7 @@ RESUMEN:"""
         # Only API failures are tolerated: the paper is then kept unreviewed.
         try:
             paper = self.reviewer_agent.review_full_paper(paper)
-        except OpenAIError as e:
+        except LLMError as e:
             console.print(f"[yellow]⚠️ Error en revisión final: {e}[/yellow]")
             console.print("[yellow]  Se conserva el paper sin revisión final[/yellow]")
 
@@ -768,7 +763,7 @@ RESUMEN:"""
         critical_review = ""
         try:
             critical_review = self.reviewer_agent.generate_critical_review(paper)
-        except OpenAIError as e:
+        except LLMError as e:
             console.print(f"[yellow]⚠️ Error generando la revisión crítica: {e}[/yellow]")
 
         # Save critical review
