@@ -1,0 +1,26 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "theaiwriter",
+  "description": "Escritura científica apoyada en tu propia biblioteca de artículos",
+  "owner": {
+    "name": "mikelval82"
+  },
+  "plugins": [
+    {
+      "name": "theaiwriter",
+      "description": "Escribe papers de perspectiva y memorias de convocatoria con citas verificadas contra tu biblioteca",
+      "source": "./plugins/theaiwriter"
+    },
+    {
+      "name": "ai-research-writing",
+      "description": "Skill de jin-s13 para escribir papers con resultados y verificar cifras y citas (MIT)",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/jin-s13/ai-research-writing-skill.git",
+        "sha": "e8b5de964737350757b5b17d8a658a22943c9595"
+      },
+      "strict": false,
+      "skills": ["./"]
+    }
+  ]
+}

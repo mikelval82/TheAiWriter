@@ -184,7 +184,7 @@ Una vez:
    ```
 4. Ejecutar `/theaiwriter:configurar`. La primera vez descarga dependencias y el modelo de embeddings; son unos minutos.
 
-Requisitos: cuenta de Claude, unos 2 GB libres (menos si se adopta fastembed, decisión 2) y conexión a internet.
+Requisitos: cuenta de Claude, `uv`, menos de 1 GB libre y conexión a internet.
 
 ## 5. Qué pasa con el código actual
 
@@ -212,10 +212,12 @@ Verificada cuando: un plugin mínimo, instalado desde el repositorio, funciona e
 - Un comando y un servidor MCP con una herramienta trivial, arrancado con `uv`.
 - Comprobar cada punto de la sección 7 y anotar el resultado.
 - Medir la primera instalación con sentence-transformers y con fastembed.
+- Estado: hecho en Linux (sección 7). Falta probar la app de escritorio (supuesto 1) y Windows o macOS.
 
 ### Fase B: Biblioteca y carpeta de documento (Tamaño: M)
 Verificada cuando: el corpus actual (43 papers) se migra a una biblioteca sin reprocesar PDFs, y un documento nuevo usa una colección de ella.
 - Rutas de usuario por sistema operativo, colecciones, `proyecto.yaml`.
+- Cambiar `LocalEmbedder` a fastembed y quitar `sentence-transformers` y PyTorch de las dependencias.
 - Comando `/theaiwriter:biblioteca`.
 
 ### Fase C: Motor de evidencia por MCP y citas verificadas (Tamaño: L, se divide en C1 y C2)
@@ -257,23 +259,38 @@ Paso previo → A → B → C → D → E → F → G → H → I
 
 G y H dependen de C y F, pero no entre sí. El piloto (I) puede empezar tras F, solo con la ruta de perspectiva.
 
-## 7. Supuestos por verificar en la Fase A
+## 7. Supuestos comprobados en la Fase A
 
-No están comprobados y el diseño se apoya en ellos:
+Resultado de la prueba del 2026-11-12 en Linux, con Claude Code 2.1.322 y el plugin mínimo de `plugins/theaiwriter/` instalado desde el propio repositorio como marketplace:
 
-1. Que un plugin instalado desde el terminal aparece también en la app de escritorio (ambas comparten `~/.claude`).
-2. Que el catálogo de un marketplace puede incluir plugins de otros repositorios fijados en un commit. Si no, se copia `ai-research-writing-skill` en nuestro repositorio (licencia MIT, con su aviso de copyright).
-3. Que la configuración del servidor MCP de un plugin puede referirse a la carpeta del plugin para arrancarlo con `uv`.
-4. Que los hooks de un plugin pueden ejecutarse tras cada edición de un fichero concreto.
-5. Que un proceso largo lanzado desde un comando sigue en marcha mientras el alumno usa el chat.
-6. Que `claude -p` funciona dentro de la sesión del alumno con su cuenta, como ya funciona en tu máquina.
+| # | Supuesto | Resultado |
+|---|---|---|
+| 1 | Un plugin instalado desde el terminal aparece en la app de escritorio | **Pendiente.** Requiere abrir una sesión nueva en la pestaña Code de la app y ejecutar `/theaiwriter:diagnostico` |
+| 2 | El catálogo puede incluir plugins de otros repositorios fijados en un commit | **Sí.** `ai-research-writing-skill` se instala desde su repositorio fijada en `e8b5de9`, con `strict: false` y `skills: ["./"]`, porque no es un plugin sino una skill suelta. No hace falta copiarla |
+| 3 | El servidor MCP se arranca con `uv` desde la carpeta del plugin | **Sí,** con `uv run --script ${CLAUDE_PLUGIN_ROOT}/mcp/servidor.py` y las dependencias declaradas en el propio script |
+| 4 | Un hook se ejecuta tras editar un fichero concreto | **Sí.** El hook `PostToolUse` filtra por ruta (`borrador/documento.md`) y Claude recibe su mensaje; editar otros ficheros no lo dispara |
+| 5 | Un proceso largo sigue en marcha mientras el alumno usa el chat | **Sí.** La herramienta MCP lanza un proceso separado y responde al momento; el proceso termina aunque se cierre la sesión. En Windows usa `DETACHED_PROCESS`, sin probar |
+| 6 | `claude -p` funciona dentro de la sesión con la cuenta del usuario | **Sí,** desde el servidor MCP del plugin: respondió en 7 s con haiku |
+
+Hallazgos que cambian cosas:
+
+- **El SDK `mcp` está en la versión 2.x** y su API cambió: `FastMCP` es ahora `MCPServer`. El servidor fija `mcp>=2.3,<3`.
+- **Un servidor MCP que falla al arrancar queda marcado como fallido 15 minutos.** Si la primera instalación de dependencias tarda más que el arranque permitido, el alumno se queda sin herramientas un rato. `/theaiwriter:configurar` tiene que preparar el entorno antes del primer arranque.
+- **Instalación de los embeddings** (Linux, Python 3.12, entorno nuevo):
+
+  | Opción | Tamaño | Notas |
+  |---|---|---|
+  | sentence-transformers con torch para CPU | 1,1 GB | En Linux hay que pedir el torch de CPU de forma explícita; si no, uv descarga la versión CUDA y ocupa 5,5 GB |
+  | fastembed (ONNX) | 180 MB | No trae e5-small, pero lo carga con `add_custom_model` desde el ONNX oficial del modelo |
+
+  Con fastembed, los vectores son **idénticos** a los del índice actual (coseno medio 1,000 y el mismo top 10 en el 100 % de 50 consultas sobre 300 ideas), así que se puede cambiar sin reindexar. Es algo más lento: unos 18 textos por segundo frente a unos 31.
 
 ## 8. Decisiones
 
 Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 aceptaste mi recomendación tal como está escrita.
 
 1. **Quién escribe en la ruta de perspectiva**: el pipeline actual con `claude -p`.
-2. **Modelo de embeddings**: probar en la Fase A fastembed (ONNX, sin PyTorch) con el mismo modelo multilingüe. Si la calidad coincide, adoptarlo: la instalación baja de más de 1 GB a unos cientos de MB.
+2. **Modelo de embeddings**: fastembed (ONNX, sin PyTorch) con el mismo modelo multilingüe. Comprobado en la Fase A: da los mismos vectores y la instalación baja de 1,1 GB a 180 MB (sección 7). El cambio se hace en la Fase B.
 3. **Licencia del repositorio**: no tiene ninguna. PyMuPDF es AGPL, así que recomiendo publicar TheAIWriter con licencia **AGPL-3.0**. Como no se comercializa, no tiene coste, y permite seguir usando PyMuPDF. La alternativa es sustituir PyMuPDF por una librería con licencia permisiva, con riesgo de peor extracción de texto.
 4. **`ai-research-writing-skill`**: referenciarla desde el catálogo, fijada en un commit, y poner nuestras guías en un plugin aparte. Solo copiarla si el supuesto 2 falla.
 5. **Formato del borrador**: Markdown con citas `[@clave]`. Se edita bien en el chat y pandoc lo convierte a `.docx` y `.tex`.
@@ -301,7 +318,7 @@ Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 ace
 |---|---|
 | Fase 0 y paso 1.1 del plan anterior | hechos (`2888d1b`, `e93a9e6`) |
 | Paso previo: retirar OpenAI | hecho salvo README y `docs/architecture.md` (esperan tus cambios) |
-| A. Viabilidad del plugin | pendiente |
+| A. Viabilidad del plugin | hecha en Linux; faltan la app de escritorio y Windows o macOS |
 | B. Biblioteca y documento | pendiente |
 | C. Motor de evidencia por MCP | pendiente |
 | D. Ruta de perspectiva | pendiente |
