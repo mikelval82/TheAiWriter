@@ -153,11 +153,11 @@ class Library:
                 ]
             if not matches:
                 raise LibraryError(f"Ningún paper de la biblioteca coincide con «{query}».")
-            if len(matches) > 1:
+            # Copies of one work (same title) count as one match
+            if len({" ".join(p.title.lower().split()) for p in matches}) > 1:
                 titles = "; ".join(p.title for p in matches[:5])
                 raise LibraryError(f"«{query}» coincide con varios papers: {titles}.")
-            if matches[0] not in found:
-                found.append(matches[0])
+            found.extend(p for p in matches if p not in found)
         return found
 
     # PDFs and their processing

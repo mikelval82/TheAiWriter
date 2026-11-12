@@ -234,6 +234,16 @@ Verificada cuando: desde el chat de Claude se puede buscar evidencia en la bibli
 - C1: claves estables y `referencias.bib`, con el `.bib` de Zotero como fuente preferente.
 - C2: servidor MCP con las herramientas de la sección 3.3 y hook de validación.
 - Filtrar la búsqueda y los temas por las colecciones del documento, y marcar los papers duplicados para que cuenten como uno.
+- Estado: **hecha** (2026-11-12). Resultado:
+  - `ai_writer.citations`: claves BibTeX estables (`hasan2025empathy`) guardadas en `claves.json` de la biblioteca, que no cambian al añadir papers, y `referencias.bib` generado. Los duplicados se detectan por DOI o título y comparten clave: en el corpus real hay 3 (40 obras citables de 43 papers). `importar_zotero` empareja por DOI y título; la clave y los datos de Zotero mandan, y lo que no está en la biblioteca se lista y no se puede citar.
+  - Formato de cita: el de Pandoc, `[@clave]` o `[@a; @b, p. 4]`, que la Fase F convierte directamente. `[@?]` marca una cita pendiente. El formato antiguo `[@Autor et al., Año]` se rechaza como mal formado.
+  - Solo se citan los papers de la biblioteca, no las referencias que aparecen en sus bibliografías: de esas no hay texto que respalde la cita.
+  - `ai_writer.evidence`: búsqueda limitada a las colecciones del documento, con dos resultados como mucho por obra y la clave en cada resultado, y temas por k-means sobre las ideas de esas colecciones, sin llamadas al LLM. `EmbeddingIndex.restrict_to_papers` y los nuevos parámetros `paper_ids` y `citation_keys` de `EnhancedContextManager` dejan listo el pipeline para la Fase D.
+  - Herramientas MCP nuevas: `buscar_evidencia`, `temas_del_corpus`, `referencia`, `validar_citas`, `validar_documento` e `importar_zotero`. Cada búsqueda guarda en `revision/evidencia.json` qué obras devolvió, para avisar de citas que nunca salieron en una búsqueda. Comando nuevo: `/theaiwriter:validar`.
+  - El hook usa el mismo validador (`ai_writer.validation`) sin el entorno completo y tarda 1 s. Si una cita no existe o está fuera de las colecciones, devuelve `block` y Claude recibe qué corregir; si todo es correcto, no dice nada.
+  - Comprobado en una sesión real con la colección «Emoción»: Claude buscó evidencia, escribió un párrafo de 117 palabras con 3 claves reales y la validación lo dio por bueno. Al pedirle que añadiera `[@garcia2023empatia]`, el hook lo marcó, Claude lo explicó y no inventó una fuente.
+  - Límites conocidos: el hook avisa después de la edición pero no la impide (un `PreToolUse` podría impedirla, a costa de reconstruir el texto resultante de cada `Edit`). Tampoco ve los ficheros escritos desde Bash, aunque `validar_documento` sí los revisa.
+  - Para la Fase D: el pipeline sigue pidiendo `[@Autor et al., Año]` y resolviendo con `ReferenceProcessor`. Hay que pasarle `paper_ids` y `citation_keys` y quitar ese post-procesado.
 
 ### Fase D: Ruta de perspectiva dentro del plugin (Tamaño: L, se divide en D1 y D2)
 Verificada cuando: `/theaiwriter:escribir` produce un paper de perspectiva completo en segundo plano, se puede reanudar tras un corte y todas sus citas pasan la validación.
@@ -330,7 +340,7 @@ Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 ace
 | Paso previo: retirar OpenAI | hecho salvo README y `docs/architecture.md` (esperan tus cambios) |
 | A. Viabilidad del plugin | hecha en Linux (terminal y app); falta Windows o macOS |
 | B. Biblioteca y documento | hecha |
-| C. Motor de evidencia por MCP | pendiente |
+| C. Motor de evidencia por MCP | hecha |
 | D. Ruta de perspectiva | pendiente |
 | E. Revisión y versiones | pendiente |
 | F. Exportación | pendiente |

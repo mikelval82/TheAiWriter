@@ -147,6 +147,8 @@ class EnhancedContextManager:
         abstract_context: str,
         indices_dir: Path | None = None,
         embeddings_dir: Path | None = None,
+        paper_ids: set[str] | None = None,
+        citation_keys: dict[str, str] | None = None,
     ) -> None:
         """Initialize the enhanced context manager.
 
@@ -154,6 +156,10 @@ class EnhancedContextManager:
             abstract_context: The paper's abstract for relevance ranking.
             indices_dir: Directory containing JSONL indices.
             embeddings_dir: Directory containing embedding caches.
+            paper_ids: Papers evidence may come from (a document's collections);
+                ``None`` uses every paper.
+            citation_keys: Paper id → stable citation key, offered to the writer as
+                ``[@key]``. Without it, keys are built as "Author et al., Year".
         """
         self.abstract_context = abstract_context
         self.indices_dir = indices_dir or settings.paths.indices_dir
@@ -162,6 +168,9 @@ class EnhancedContextManager:
         # Initialize indices
         self.ideas_index = self._load_ideas_index()
         self.claims_index = self._load_claims_index()
+        self.ideas_index.restrict_to_papers(paper_ids)
+        self.claims_index.restrict_to_papers(paper_ids)
+        self.citation_keys = citation_keys
         
         # Cache for query embeddings (reuse across sections)
         self._embedding_cache: dict[str, np.ndarray] = {}
@@ -660,7 +669,7 @@ class EnhancedContextManager:
                 if idx >= len(items):
                     continue
                 item = items[idx]
-                if not self._is_item_used(item, "idea"):
+                if self.ideas_index.allows(item) and not self._is_item_used(item, "idea"):
                     # Use a fixed reasonable score
                     results.append((item, 0.5, "idea"))
                     break
@@ -995,10 +1004,7 @@ class EnhancedContextManager:
         importance = item.get("importance", "")
         keywords = item.get("keywords", [])[:3]  # Top 3 keywords
         
-        # Build citation key from authors and year
-        authors = item.get("authors", [])
-        year = item.get("year", "")
-        citation_key = self._build_citation_key(authors, year)
+        citation_key = self._citation_key_for(item)
         
         # Single line format
         kw_str = f" [{', '.join(keywords)}]" if keywords else ""
@@ -1019,10 +1025,7 @@ class EnhancedContextManager:
         evidence_type = item.get("evidence_type", "")
         paper = item.get("paper_title", "")[:40]
         
-        # Build citation key from authors and year
-        authors = item.get("authors", [])
-        year = item.get("year", "")
-        citation_key = self._build_citation_key(authors, year)
+        citation_key = self._citation_key_for(item)
         
         # Truncate evidence to key part
         if len(evidence) > 150:
@@ -1040,6 +1043,12 @@ class EnhancedContextManager:
         ]
         return "\n".join(lines)
     
+    def _citation_key_for(self, item: dict) -> str:
+        """The key the writer should cite this item's paper with."""
+        if self.citation_keys is not None:
+            return self.citation_keys.get(item.get("paper_id", ""), "")
+        return self._build_citation_key(item.get("authors", []), item.get("year", ""))
+
     def _build_citation_key(self, authors: list | str, year: str | int) -> str:
         """Build a citation key from authors and year.
         

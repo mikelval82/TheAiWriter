@@ -58,6 +58,9 @@ class EmbeddingIndex(Generic[T]):
         self.items: list[dict[str, Any]] = []
         self._embeddings_matrix: np.ndarray | None = None
         self._id_to_index: dict[str, int] = {}
+        # Papers searches may return (None: all), and the matching row mask
+        self._allowed_papers: set[str] | None = None
+        self._allowed: np.ndarray | None = None
 
     def build_from_jsonl(self, jsonl_path: Path, force_rebuild: bool = False) -> None:
         """Build index from a JSONL file.
@@ -192,6 +195,31 @@ class EmbeddingIndex(Generic[T]):
         """
         return self.embedder.embed([text], kind="query")[0]
 
+    def restrict_to_papers(self, paper_ids: set[str] | None) -> None:
+        """Limit searches to items of these papers; ``None`` lifts the limit."""
+        self._allowed_papers = set(paper_ids) if paper_ids is not None else None
+        self._allowed = None
+        if paper_ids is not None:
+            self._allowed = np.array([self.allows(item) for item in self.items], dtype=bool)
+
+    def allows(self, item: dict[str, Any]) -> bool:
+        """Whether searches may return this item."""
+        if self._allowed_papers is None:
+            return True
+        return (item.get("paper_id") or item.get("source_paper_id")) in self._allowed_papers
+
+    def _top(
+        self, scores: np.ndarray, top_k: int, min_score: float
+    ) -> list[tuple[dict[str, Any], float]]:
+        if self._allowed is not None:
+            scores = np.where(self._allowed, scores, -np.inf)
+        top_indices = np.argsort(scores)[::-1][:top_k]
+        return [
+            (self.items[idx], float(scores[idx]))
+            for idx in top_indices
+            if scores[idx] >= min_score
+        ]
+
     def search(
         self,
         query: str,
@@ -214,19 +242,8 @@ class EmbeddingIndex(Generic[T]):
         # Get query embedding
         query_embedding = self.get_embedding(query)
         
-        # Compute cosine similarities
         scores = self._cosine_similarity(query_embedding, self._embeddings_matrix)
-        
-        # Get top-k indices
-        top_indices = np.argsort(scores)[::-1][:top_k]
-        
-        results = []
-        for idx in top_indices:
-            score = float(scores[idx])
-            if score >= min_score:
-                results.append((self.items[idx], score))
-        
-        return results
+        return self._top(scores, top_k, min_score)
 
     def search_by_embedding(
         self,
@@ -248,15 +265,7 @@ class EmbeddingIndex(Generic[T]):
             return []
 
         scores = self._cosine_similarity(embedding, self._embeddings_matrix)
-        top_indices = np.argsort(scores)[::-1][:top_k]
-        
-        results = []
-        for idx in top_indices:
-            score = float(scores[idx])
-            if score >= min_score:
-                results.append((self.items[idx], score))
-        
-        return results
+        return self._top(scores, top_k, min_score)
 
     @staticmethod
     def _cosine_similarity(query: np.ndarray, matrix: np.ndarray) -> np.ndarray:
