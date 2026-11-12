@@ -212,7 +212,7 @@ Verificada cuando: un plugin mínimo, instalado desde el repositorio, funciona e
 - Un comando y un servidor MCP con una herramienta trivial, arrancado con `uv`.
 - Comprobar cada punto de la sección 7 y anotar el resultado.
 - Medir la primera instalación con sentence-transformers y con fastembed.
-- Estado: hecho en Linux (sección 7). Falta probar la app de escritorio (supuesto 1) y Windows o macOS.
+- Estado: hecho en Linux, en el terminal y en la app de escritorio (sección 7). Falta Windows o macOS.
 
 ### Fase B: Biblioteca y carpeta de documento (Tamaño: M)
 Verificada cuando: el corpus actual (43 papers) se migra a una biblioteca sin reprocesar PDFs, y un documento nuevo usa una colección de ella.
@@ -265,7 +265,7 @@ Resultado de la prueba del 2026-11-12 en Linux, con Claude Code 2.1.322 y el plu
 
 | # | Supuesto | Resultado |
 |---|---|---|
-| 1 | Un plugin instalado desde el terminal aparece en la app de escritorio | **Pendiente.** Requiere abrir una sesión nueva en la pestaña Code de la app y ejecutar `/theaiwriter:diagnostico` |
+| 1 | Un plugin instalado desde el terminal aparece en la app de escritorio | **Sí.** En una sesión nueva de la pestaña Code, `/theaiwriter:diagnostico` respondió con el servidor MCP y `claude -p` (5,9 s con haiku) |
 | 2 | El catálogo puede incluir plugins de otros repositorios fijados en un commit | **Sí.** `ai-research-writing-skill` se instala desde su repositorio fijada en `e8b5de9`, con `strict: false` y `skills: ["./"]`, porque no es un plugin sino una skill suelta. No hace falta copiarla |
 | 3 | El servidor MCP se arranca con `uv` desde la carpeta del plugin | **Sí,** con `uv run --script ${CLAUDE_PLUGIN_ROOT}/mcp/servidor.py` y las dependencias declaradas en el propio script |
 | 4 | Un hook se ejecuta tras editar un fichero concreto | **Sí.** El hook `PostToolUse` filtra por ruta (`borrador/documento.md`) y Claude recibe su mensaje; editar otros ficheros no lo dispara |
@@ -318,7 +318,7 @@ Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 ace
 |---|---|
 | Fase 0 y paso 1.1 del plan anterior | hechos (`2888d1b`, `e93a9e6`) |
 | Paso previo: retirar OpenAI | hecho salvo README y `docs/architecture.md` (esperan tus cambios) |
-| A. Viabilidad del plugin | hecha en Linux; faltan la app de escritorio y Windows o macOS |
+| A. Viabilidad del plugin | hecha en Linux (terminal y app); falta Windows o macOS |
 | B. Biblioteca y documento | pendiente |
 | C. Motor de evidencia por MCP | pendiente |
 | D. Ruta de perspectiva | pendiente |
