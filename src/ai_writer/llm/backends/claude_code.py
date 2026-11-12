@@ -65,7 +65,7 @@ class ClaudeCodeBackend:
             except FileNotFoundError as error:
                 raise LLMError(
                     f"Claude Code CLI not found ({self.executable!r}). Install it, set "
-                    "CLAUDE_BIN to its path, or set LLM_BACKEND=openai."
+                    "CLAUDE_BIN to its path."
                 ) from error
             except subprocess.TimeoutExpired as error:
                 raise LLMError(

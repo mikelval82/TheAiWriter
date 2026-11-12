@@ -6,7 +6,8 @@ import numpy as np
 
 from config.settings import settings
 
-# Model that built the indices created before the model name was recorded.
+# Model that built the indices created before the model name was recorded
+# (OpenAI's, no longer supported: such indices need `ai-writer reindex`).
 LEGACY_EMBEDDING_MODEL = "text-embedding-3-small"
 
 TextKind = Literal["passage", "query"]
@@ -57,7 +58,7 @@ class LocalEmbedder:
             except ImportError as error:
                 raise RuntimeError(
                     "EMBEDDING_BACKEND=local needs the sentence-transformers package "
-                    "(pip install sentence-transformers), or set EMBEDDING_BACKEND=openai."
+                    "(pip install sentence-transformers)."
                 ) from error
             self._model = SentenceTransformer(self.model_name)
 
@@ -71,35 +72,6 @@ class LocalEmbedder:
         return np.asarray(vectors, dtype=np.float32)
 
 
-class OpenAIEmbedder:
-    """Embeds through the OpenAI API with the key in ``OPENAI_API_KEY``."""
-
-    BATCH_SIZE = 100
-
-    def __init__(self, model_name: str | None = None) -> None:
-        """Initialize the embedder.
-
-        Args:
-            model_name: OpenAI embedding model. Defaults to settings.
-        """
-        from openai import OpenAI
-
-        if not settings.ai.openai_api_key:
-            raise RuntimeError("EMBEDDING_BACKEND=openai needs OPENAI_API_KEY to be set.")
-        self.model_name = model_name or settings.ai.embedding_model
-        self.client = OpenAI(api_key=settings.ai.openai_api_key)
-
-    def embed(self, texts: list[str], kind: TextKind = "passage") -> np.ndarray:
-        vectors = []
-        for i in range(0, len(texts), self.BATCH_SIZE):
-            response = self.client.embeddings.create(
-                model=self.model_name,
-                input=texts[i:i + self.BATCH_SIZE],
-            )
-            vectors.extend(data.embedding for data in response.data)
-        return np.array(vectors, dtype=np.float32)
-
-
 def build_embedder(backend: str | None = None) -> Embedder:
     """Create the embedder named in the settings.
 
@@ -109,9 +81,9 @@ def build_embedder(backend: str | None = None) -> Embedder:
     backend = backend or settings.ai.embedding_backend
     if backend == "local":
         return LocalEmbedder()
-    if backend == "openai":
-        return OpenAIEmbedder()
-    raise ValueError(f"Unknown EMBEDDING_BACKEND {backend!r}; use 'local' or 'openai'")
+    raise ValueError(
+        f"Unknown EMBEDDING_BACKEND {backend!r}; use 'local' (OpenAI is no longer supported)"
+    )
 
 
 _embedder: Embedder | None = None

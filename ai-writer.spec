@@ -32,7 +32,6 @@ a = Analysis(
         'typer',
         'rich',
         'pydantic',
-        'openai',
         'sklearn',
         'sklearn.metrics.pairwise',
     ],

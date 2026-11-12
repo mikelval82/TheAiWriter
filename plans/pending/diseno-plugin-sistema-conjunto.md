@@ -199,7 +199,7 @@ El traductor (`TranslatorAgent`) deja de ser necesario si se escribe directament
 Ordenadas por riesgo: primero se comprueba que el formato plugin funciona como suponemos.
 
 ### Paso previo: retirar OpenAI (Tamaño: S)
-Verificado cuando: `grep -rni openai src config tests pyproject.toml .env.example ai-writer.spec` solo encuentra la constante del modelo antiguo, `pytest` pasa y `ai-writer version` muestra `claude-code` y `local`.
+Verificado cuando: `grep -rni openai src config tests pyproject.toml .env.example ai-writer.spec` solo encuentra el comentario del modelo antiguo y los mensajes de error que avisan de que OpenAI ya no se admite, `pytest` pasa y `ai-writer version` muestra `claude-code` y `local`.
 - Borrar `llm/backends/openai.py`, `OpenAIEmbedder` y la opción `openai` de `LLM_BACKEND` y `EMBEDDING_BACKEND`, con un error claro si alguien la configura.
 - Quitar `openai_api_key`, los modelos por defecto de OpenAI y el bloque de `.env.example`; quitar `openai` de `pyproject.toml` y de `ai-writer.spec`.
 - Borrar `scripts/process_powerpoint.py` (ya quedaba fuera del plugin) y la guarda de `tests/conftest.py`, que deja de tener sentido sin el paquete.
@@ -300,7 +300,7 @@ Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 ace
 | Fase | Estado |
 |---|---|
 | Fase 0 y paso 1.1 del plan anterior | hechos (`2888d1b`, `e93a9e6`) |
-| Paso previo: retirar OpenAI | pendiente |
+| Paso previo: retirar OpenAI | hecho salvo README y `docs/architecture.md` (esperan tus cambios) |
 | A. Viabilidad del plugin | pendiente |
 | B. Biblioteca y documento | pendiente |
 | C. Motor de evidencia por MCP | pendiente |

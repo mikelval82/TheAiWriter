@@ -155,18 +155,8 @@ def _script_default_pipeline(llm: FakeLLM) -> None:
 
 
 @pytest.fixture
-def fake_llm(monkeypatch) -> FakeLLM:
-    """A FakeLLM and a FakeEmbedder installed as the shared client and embedder.
-
-    Building an OpenAI client fails the test: nothing may need an API key.
-    """
-    import openai
-
-    def no_openai(*args, **kwargs):
-        raise AssertionError("an OpenAI client was built")
-
-    monkeypatch.setattr(openai, "OpenAI", no_openai)
-
+def fake_llm() -> FakeLLM:
+    """A FakeLLM and a FakeEmbedder installed as the shared client and embedder."""
     llm = FakeLLM()
     _script_default_pipeline(llm)
     set_llm_client(LLMClient(llm, max_retries=0))

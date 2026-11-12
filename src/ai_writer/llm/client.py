@@ -217,11 +217,9 @@ def build_backend(name: str | None = None) -> LLMBackend:
         from ai_writer.llm.backends.claude_code import ClaudeCodeBackend
 
         return ClaudeCodeBackend()
-    if name == "openai":
-        from ai_writer.llm.backends.openai import OpenAIBackend
-
-        return OpenAIBackend()
-    raise ValueError(f"Unknown LLM_BACKEND {name!r}; use 'claude-code' or 'openai'")
+    raise ValueError(
+        f"Unknown LLM_BACKEND {name!r}; use 'claude-code' (OpenAI is no longer supported)"
+    )
 
 
 _client: LLMClient | None = None
