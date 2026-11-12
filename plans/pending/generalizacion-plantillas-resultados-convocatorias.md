@@ -1,7 +1,7 @@
 # De "paper de perspectiva" a escritor de documentos científicos: plantillas LaTeX, resultados/código y convocatorias
 
 Ticket: ninguno todavía
-Estado: **propuesta, pendiente de aprobación**. No se ha implementado nada.
+Estado: **sustituido en parte** (2026-11-12). La Fase 0 y el paso 1.1 están hechos. El resto se replantea en [`diseno-plugin-sistema-conjunto.md`](diseno-plugin-sistema-conjunto.md): TheAIWriter pasa a distribuirse como plugin de Claude Code, se reutilizan herramientas existentes y se quita la compilación de LaTeX.
 Fecha: 2026-11-10
 
 ## 1. Objetivo
