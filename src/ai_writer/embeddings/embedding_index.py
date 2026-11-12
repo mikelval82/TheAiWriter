@@ -44,7 +44,7 @@ class EmbeddingIndex(Generic[T]):
             embedder: Source of the vectors. Defaults to the shared embedder.
         """
         self.name = name
-        self.cache_dir = cache_dir or (settings.paths.data_dir / "processed" / "embeddings")
+        self.cache_dir = cache_dir or settings.paths.embeddings_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         self.cache_path = self.cache_dir / f"{name}_index.npz"

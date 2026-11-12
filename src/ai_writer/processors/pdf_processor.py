@@ -38,9 +38,7 @@ class PDFProcessor:
         self.extraction_agent = PDFExtractionAgent()
         
         # Setup output directories
-        self.output_dir = Path(output_dir) if output_dir else (
-            settings.paths.data_dir / "processed"
-        )
+        self.output_dir = Path(output_dir) if output_dir else settings.paths.processed_dir
         self.papers_dir = self.output_dir / "papers"
         self.indices_dir = self.output_dir / "indices"
         

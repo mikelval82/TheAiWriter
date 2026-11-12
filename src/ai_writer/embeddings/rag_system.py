@@ -26,8 +26,8 @@ class RAGSystem:
             indices_dir: Directory containing JSONL index files.
             embeddings_dir: Directory for embedding cache files.
         """
-        self.indices_dir = indices_dir or (settings.paths.data_dir / "processed" / "indices")
-        self.embeddings_dir = embeddings_dir or (settings.paths.data_dir / "processed" / "embeddings")
+        self.indices_dir = indices_dir or settings.paths.indices_dir
+        self.embeddings_dir = embeddings_dir or settings.paths.embeddings_dir
         
         # Initialize the three indices with appropriate text fields
         self.ideas_index = EmbeddingIndex(

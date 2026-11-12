@@ -82,7 +82,7 @@ class ReferenceProcessor:
         
         if path is None:
             # Default paths
-            jsonl_path = settings.paths.data_dir / "processed" / "indices" / "all_references.jsonl"
+            jsonl_path = settings.paths.indices_dir / "all_references.jsonl"
             if jsonl_path.exists():
                 path = jsonl_path
         

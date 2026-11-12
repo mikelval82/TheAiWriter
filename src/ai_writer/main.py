@@ -32,6 +32,30 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
+library_app = typer.Typer(help="📚 La biblioteca de papers: estado, colecciones y migración")
+app.add_typer(library_app, name="biblioteca")
+
+# Library chosen with --biblioteca, if any
+_active_library_dir: Optional[Path] = None
+
+
+@app.callback()
+def use_library(
+    library_dir: Optional[Path] = typer.Option(
+        None,
+        "--biblioteca",
+        envvar="THEAIWRITER_BIBLIOTECA",
+        help="Library folder to read and write. Without it, the repository's data/ is used.",
+    ),
+) -> None:
+    """🤖 TheAIWriter - AI-assisted academic writing for perspective papers"""
+    global _active_library_dir
+    _active_library_dir = library_dir
+    if library_dir:
+        from ai_writer.library import Library
+
+        Library(library_dir).activate()
+
 
 # =============================================================================
 # Main Commands
@@ -428,6 +452,124 @@ def version() -> None:
 # =============================================================================
 # Entry Point
 # =============================================================================
+
+# =============================================================================
+# Library Commands
+# =============================================================================
+
+def _library(library_dir: Optional[Path]):
+    from ai_writer.library import Library
+
+    return Library(library_dir or _active_library_dir)
+
+
+LIBRARY_OPTION = typer.Option(
+    None, "--ruta", help="Carpeta de la biblioteca. Por defecto, la de --biblioteca o tus documentos."
+)
+
+
+@library_app.command("estado")
+def library_status(library_dir: Optional[Path] = LIBRARY_OPTION) -> None:
+    """Muestra los papers y las colecciones de la biblioteca."""
+    library = _library(library_dir)
+    if not library.exists():
+        console.print(f"[yellow]No hay biblioteca en {library.root}[/yellow]")
+        raise typer.Exit(1)
+
+    papers = library.papers()
+    table = Table(title=f"📚 {library.root} ({len(papers)} papers)")
+    table.add_column("Paper", style="cyan")
+    table.add_column("Ideas", justify="right")
+    table.add_column("Claims", justify="right")
+    table.add_column("Referencias", justify="right")
+    for paper in papers:
+        table.add_row(paper.title, str(paper.ideas), str(paper.claims), str(paper.references))
+    console.print(table)
+
+    collections = library.collections()
+    if collections:
+        for name, ids in collections.items():
+            console.print(f"  • [bold]{name}[/bold]: {len(ids)} papers")
+    else:
+        console.print("  Sin colecciones.")
+
+
+@library_app.command("migrar")
+def library_migrate(
+    library_dir: Optional[Path] = LIBRARY_OPTION,
+    source: Path = typer.Option(
+        None, "--desde", help="Carpeta procesada de origen. Por defecto, data/processed del repositorio."
+    ),
+) -> None:
+    """Copia el corpus ya procesado a una biblioteca, sin reprocesar ni reindexar."""
+    from ai_writer.library import LibraryError
+
+    library = _library(library_dir)
+    source = source or settings.paths.data_dir / "processed"
+    try:
+        result = library.migrate_from(source, pdfs_dir=settings.paths.data_dir / "references" / "pdfs")
+    except LibraryError as error:
+        console.print(f"[red]✗ {error}[/red]")
+        raise typer.Exit(1)
+    console.print(
+        f"[green]✓ {result['papers']} papers, {result['vector_files']} ficheros de vectores "
+        f"y {result['pdfs']} PDFs copiados a {library.root}[/green]"
+    )
+
+
+@library_app.command("procesar")
+def library_process(library_dir: Optional[Path] = LIBRARY_OPTION) -> None:
+    """Procesa los PDFs pendientes y deja constancia en procesado/proceso.json."""
+    import os
+
+    from ai_writer.library import _now
+    from ai_writer.processors.batch_processor import BatchProcessor
+
+    library = _library(library_dir)
+    library.activate()
+    library.write_job(estado="en_curso", pid=os.getpid(), inicio=_now(), fin=None)
+    try:
+        stats = BatchProcessor(
+            pdfs_folder=library.pdfs_dir, output_folder=library.processed_dir
+        ).process_all()
+    except BaseException as error:
+        library.write_job(estado="error", error=str(error) or type(error).__name__, fin=_now())
+        raise
+    library.write_job(
+        estado="terminado",
+        papers_en_biblioteca=stats.get("processed_successfully", 0),
+        fallidos=stats.get("failed", 0),
+        fin=_now(),
+    )
+
+
+@library_app.command("coleccion")
+def library_collection(
+    name: str = typer.Argument(..., help="Nombre de la colección"),
+    papers: list[str] = typer.Argument(
+        None, help="Papers: id, nombre del fichero o parte del título"
+    ),
+    delete: bool = typer.Option(False, "--borrar", help="Borra la colección"),
+    library_dir: Optional[Path] = LIBRARY_OPTION,
+) -> None:
+    """Crea, reemplaza o borra una colección de papers."""
+    from ai_writer.library import LibraryError
+
+    library = _library(library_dir)
+    try:
+        if delete:
+            library.delete_collection(name)
+            console.print(f"[green]✓ Colección «{name}» borrada[/green]")
+            return
+        if not papers:
+            raise LibraryError("Indica al menos un paper.")
+        found = library.find_papers(papers)
+        library.save_collection(name, found)
+    except LibraryError as error:
+        console.print(f"[red]✗ {error}[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]✓ Colección «{name}» con {len(found)} papers[/green]")
+
 
 def main() -> None:
     """Main entry point for the CLI."""

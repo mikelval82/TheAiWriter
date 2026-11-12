@@ -26,10 +26,16 @@ class AISettings(BaseModel):
     llm_timeout: int = Field(default_factory=lambda: int(os.getenv("LLM_TIMEOUT", "600")))
     llm_max_retries: int = Field(default_factory=lambda: int(os.getenv("LLM_MAX_RETRIES", "2")))
 
-    # Embeddings: "local" (sentence-transformers) is the only backend
+    # Embeddings: "local" (fastembed, on this machine) is the only backend
     embedding_backend: str = Field(default_factory=lambda: os.getenv("EMBEDDING_BACKEND", "local"))
     embedding_model: str = Field(
         default_factory=lambda: os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
+    )
+    # Persistent: fastembed's own default is a temporary folder
+    embedding_cache_dir: Path = Field(
+        default_factory=lambda: Path(
+            os.getenv("EMBEDDING_CACHE_DIR", Path.home() / ".cache" / "theaiwriter" / "modelos")
+        )
     )
 
     default_model: str = Field(default_factory=lambda: os.getenv("DEFAULT_MODEL", "sonnet"))

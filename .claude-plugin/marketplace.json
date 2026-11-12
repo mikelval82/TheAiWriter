@@ -9,7 +9,7 @@
     {
       "name": "theaiwriter",
       "description": "Escribe papers de perspectiva y memorias de convocatoria con citas verificadas contra tu biblioteca",
-      "source": "./plugins/theaiwriter"
+      "source": "./"
     },
     {
       "name": "ai-research-writing",
@@ -20,7 +20,9 @@
         "sha": "e8b5de964737350757b5b17d8a658a22943c9595"
       },
       "strict": false,
-      "skills": ["./"]
+      "skills": [
+        "./"
+      ]
     }
   ]
 }

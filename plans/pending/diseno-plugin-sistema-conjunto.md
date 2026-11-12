@@ -62,7 +62,7 @@ flowchart TB
 Un único repositorio (`mikelval82/TheAiWriter`) con:
 
 - `.claude-plugin/marketplace.json`: el catálogo.
-- El plugin `theaiwriter`: comandos, skills propias, servidor MCP, hooks y el paquete de Python.
+- El plugin `theaiwriter`, en la raíz del repositorio: comandos, skills propias, servidor MCP, hooks y el paquete de Python. Tiene que estar en la raíz porque al instalar solo se copia la carpeta del plugin, y el servidor MCP necesita `src/`, `config/`, `pyproject.toml` y `uv.lock`.
 - Una entrada que apunta a `ai-research-writing-skill` fijada en un commit concreto (hoy `e8b5de9`). **Por verificar** que el formato del catálogo admite plugins de otros repositorios (sección 7).
 - Si hace falta, un segundo plugin pequeño con nuestras guías para revistas biomédicas, que complementa a `ai-research-writing-skill` sin tocar su código.
 
@@ -73,8 +73,8 @@ Un único repositorio (`mikelval82/TheAiWriter`) con:
 Una carpeta visible en sus documentos (por ejemplo `Documentos/TheAIWriter/biblioteca/`), compartida por todos sus documentos:
 
 - `pdfs/`: los PDFs originales.
-- `procesado/`: ideas, claims y referencias extraídos por paper; es lo que hoy está en `data/processed/`.
-- `indices/`: embeddings y metadatos, con el modelo con que se generaron.
+- `procesado/`: ideas, claims y referencias extraídos por paper, y los `.jsonl` que los reúnen; es lo que había en `data/processed/`.
+- `vectores/`: embeddings y metadatos, con el modelo con que se generaron.
 - `colecciones.yaml`: agrupaciones de papers ("Biomarcadores", "Revisión TFM"). Cada documento elige qué colecciones usa.
 - `referencias.bib`: la bibliografía con claves estables. Si el alumno aporta un `.bib` exportado de Zotero, manda sobre lo extraído de los PDFs.
 
@@ -219,11 +219,21 @@ Verificada cuando: el corpus actual (43 papers) se migra a una biblioteca sin re
 - Rutas de usuario por sistema operativo, colecciones, `proyecto.yaml`.
 - Cambiar `LocalEmbedder` a fastembed y quitar `sentence-transformers` y PyTorch de las dependencias.
 - Comando `/theaiwriter:biblioteca`.
+- Estado: **hecha** (2026-11-12). Resultado:
+  - El corpus está en `~/Documentos/TheAIWriter/biblioteca` (`ai-writer biblioteca migrar`): 43 papers y sus vectores copiados tal cual. La búsqueda carga el índice en 0,2 s, sin reindexar.
+  - `ai_writer.library`: carpeta de documentos localizada (en Linux, `~/Documentos`), `THEAIWRITER_BIBLIOTECA` para otra ruta, colecciones en `colecciones.yaml` con id y título de cada paper, y `proyecto.yaml` validado con pydantic. Los papers se leen de sus carpetas: `processing_status.json` perdía 2 de 43 porque dos PDFs tenían el mismo nombre de fichero.
+  - `LocalEmbedder` usa fastembed. Se han quitado sentence-transformers, PyTorch, python-pptx y Pillow. El modelo se guarda en `~/.cache/theaiwriter/modelos`, porque fastembed usa por defecto una carpeta temporal.
+  - El plugin está en la raíz del repositorio. El servidor MCP es `ai_writer.mcp_server` y arranca con `uv run --project ${CLAUDE_PLUGIN_ROOT} --frozen`, con su entorno en `${CLAUDE_PLUGIN_DATA}/entorno` (485 MB). En frío tarda 4 s si uv ya tiene los paquetes en caché.
+  - Herramientas: `estado_biblioteca`, `listar_papers`, `guardar_coleccion`, `borrar_coleccion`, `anadir_pdfs`, `procesar_pdfs` (en segundo plano, con `procesado/proceso.json` y `registro.log`), `crear_documento`, `diagnostico` y `probar_claude`. Comandos: `/theaiwriter:biblioteca`, `/theaiwriter:nuevo` y `/theaiwriter:diagnostico`.
+  - Comprobado en una sesión real: `/theaiwriter:biblioteca` creó la colección «Emoción» (22 papers) eligiendo por tema, y `/theaiwriter:nuevo` creó un documento con esa colección.
+  - Pendiente para la Fase C: aplicar las colecciones en la búsqueda (hoy el documento sabe qué papers puede usar, pero `EnhancedContextManager` busca en toda la biblioteca) y detectar papers duplicados (hay dos pares con el mismo título en el corpus).
+  - Pendiente para la Fase D: procesar un PDF nuevo rehace todos los vectores (unos minutos con 10.000 textos). Debería añadir solo los del paper nuevo.
 
 ### Fase C: Motor de evidencia por MCP y citas verificadas (Tamaño: L, se divide en C1 y C2)
 Verificada cuando: desde el chat de Claude se puede buscar evidencia en la biblioteca, y un texto con una cita inventada se rechaza.
 - C1: claves estables y `referencias.bib`, con el `.bib` de Zotero como fuente preferente.
 - C2: servidor MCP con las herramientas de la sección 3.3 y hook de validación.
+- Filtrar la búsqueda y los temas por las colecciones del documento, y marcar los papers duplicados para que cuenten como uno.
 
 ### Fase D: Ruta de perspectiva dentro del plugin (Tamaño: L, se divide en D1 y D2)
 Verificada cuando: `/theaiwriter:escribir` produce un paper de perspectiva completo en segundo plano, se puede reanudar tras un corte y todas sus citas pasan la validación.
@@ -319,7 +329,7 @@ Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 ace
 | Fase 0 y paso 1.1 del plan anterior | hechos (`2888d1b`, `e93a9e6`) |
 | Paso previo: retirar OpenAI | hecho salvo README y `docs/architecture.md` (esperan tus cambios) |
 | A. Viabilidad del plugin | hecha en Linux (terminal y app); falta Windows o macOS |
-| B. Biblioteca y documento | pendiente |
+| B. Biblioteca y documento | hecha |
 | C. Motor de evidencia por MCP | pendiente |
 | D. Ruta de perspectiva | pendiente |
 | E. Revisión y versiones | pendiente |

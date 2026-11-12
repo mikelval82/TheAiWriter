@@ -22,8 +22,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # CPU-only PyTorch: the default wheel pulls in several GB of CUDA libraries
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev]"
 
       # Only pyflakes rules for now: the style rules (whitespace, line length,

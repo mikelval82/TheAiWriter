@@ -156,8 +156,8 @@ class EnhancedContextManager:
             embeddings_dir: Directory containing embedding caches.
         """
         self.abstract_context = abstract_context
-        self.indices_dir = indices_dir or (settings.paths.data_dir / "processed" / "indices")
-        self.embeddings_dir = embeddings_dir or (settings.paths.data_dir / "processed" / "embeddings")
+        self.indices_dir = indices_dir or settings.paths.indices_dir
+        self.embeddings_dir = embeddings_dir or settings.paths.embeddings_dir
         
         # Initialize indices
         self.ideas_index = self._load_ideas_index()

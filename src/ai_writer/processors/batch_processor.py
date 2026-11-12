@@ -11,6 +11,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 from rich.table import Table
 
 from .pdf_processor import PDFProcessor
+from config.settings import settings
 
 console = Console()
 
@@ -29,10 +30,8 @@ class BatchProcessor:
             pdfs_folder: Path to folder containing PDFs. Defaults to data/references/pdfs.
             output_folder: Path to output folder. Defaults to data/processed.
         """
-        base_path = Path(__file__).parent.parent.parent.parent
-        
-        self.pdfs_folder = pdfs_folder or base_path / "data" / "references" / "pdfs"
-        self.output_folder = output_folder or base_path / "data" / "processed"
+        self.pdfs_folder = pdfs_folder or settings.paths.references_pdf_dir
+        self.output_folder = output_folder or settings.paths.processed_dir
         
         # Track processing status
         self.status_file = self.output_folder / "processing_status.json"

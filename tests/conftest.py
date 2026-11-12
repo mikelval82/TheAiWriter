@@ -191,6 +191,7 @@ def workspace(tmp_path, monkeypatch):
     for name, path in paths.items():
         path.mkdir(parents=True, exist_ok=True)
         monkeypatch.setattr(settings.paths, name, path)
+    monkeypatch.delenv("THEAIWRITER_BIBLIOTECA", raising=False)
 
     (paths["references_markdown_dir"] / "ABSTRACT.md").write_text(
         "Abstract de prueba sobre robots sociales.", encoding="utf-8"
