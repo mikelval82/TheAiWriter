@@ -41,6 +41,9 @@ class SectionConfig:
     top_k: int
 
 
+# A work cited this many times in the document ranks at half its relevance
+CITATION_DAMPING = 8
+
 # Section-specific configurations
 # NOTE: top_k increased to ensure enough context per paragraph with exclusion enabled
 SECTION_CONFIGS: dict[str, SectionConfig] = {
@@ -187,6 +190,13 @@ class EnhancedContextManager:
         self._idea_retrieval_counts: dict[str, int] = {}
         self._claim_retrieval_counts: dict[str, int] = {}
         
+        # Citation key → times the document already cites it; set by the caller.
+        # Works cited often lose rank, so that the other works get their turn.
+        self.citation_counts: dict[str, int] = {}
+
+        # (top_k, max_per_paper) caps over the section configs, or None
+        self.limits: tuple[int, int] | None = None
+
         # MMR diversity parameter (0=pure relevance, 1=pure diversity)
         self.mmr_lambda: float = 0.7  # 70% relevance, 30% diversity
         
@@ -773,11 +783,21 @@ class EnhancedContextManager:
         if not all_results:
             return []
         
+        if self.citation_counts:
+            all_results = [
+                (item, score / (1 + self.citation_counts.get(self._citation_key_for(item), 0) / CITATION_DAMPING), kind)
+                for item, score, kind in all_results
+            ]
+
         # Sort by score (descending) for initial ranking
         all_results.sort(key=lambda x: x[1], reverse=True)
-        
+
+        top_k, max_per_paper = config.top_k, config.max_per_paper
+        if self.limits:
+            top_k, max_per_paper = min(top_k, self.limits[0]), min(max_per_paper, self.limits[1])
+
         # Apply MMR for diversity
-        selected = self._apply_mmr(all_results, config.top_k, config.max_per_paper)
+        selected = self._apply_mmr(all_results, top_k, max_per_paper)
         
         return selected
     

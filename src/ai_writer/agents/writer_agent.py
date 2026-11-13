@@ -306,6 +306,7 @@ Write only the expanded content."""
         reference_context: str,
         thesis: str,
         memory_context: str = "",
+        words: tuple[int, int] | None = None,
     ) -> str:
         """Write a single paragraph based on a specific key idea.
         
@@ -321,10 +322,12 @@ Write only the expanded content."""
             reference_context: Context from embeddings search.
             thesis: Paper's thesis statement.
             memory_context: Summaries of previous sections for coherence.
+            words: The paragraph's length range in words; without it, 4-8 sentences.
             
         Returns:
             Written paragraph text.
         """
+        length = f"entre {words[0]} y {words[1]} palabras" if words else "4-8 oraciones"
         previous_text = "\n\n".join(previous_paragraphs) if previous_paragraphs else ""
         
         supporting_text = ""
@@ -361,7 +364,7 @@ Write only the expanded content."""
 {reference_context if reference_context else "(Sin contexto adicional)"}
 
 # INSTRUCCIONES
-1. Escribe ÚNICAMENTE un párrafo coherente (4-8 oraciones)
+1. Escribe ÚNICAMENTE un párrafo coherente ({length}); no te pases de esa extensión
 2. Desarrolla la IDEA CLAVE como argumento central del párrafo
 3. Incorpora los puntos de apoyo de forma natural
 4. CITA la literatura copiando exactamente el marcador "→ Citar: [@...]" de cada fuente

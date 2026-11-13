@@ -443,6 +443,8 @@ INSTRUCCIONES:
   insights relevantes para fortalecer los argumentos (cita las fuentes si las usas,
   copiando exactamente su marcador "→ Citar: [@...]")
 - Conserva SIN CAMBIOS los marcadores de cita [@...] que ya tiene el texto
+- Mantén la extensión: el resultado debe tener aproximadamente las mismas palabras
+  que el contenido actual (como mucho un 10 % más)
 - Escribe en español académico formal
 - NO incluyas comentarios sobre los cambios, solo el contenido mejorado
 
@@ -535,6 +537,55 @@ NO incluyas el Abstract (ya está definido). Comienza desde la Introducción."""
             authors=paper.authors,
             keywords=paper.keywords,
         )
+
+    def review_section_coherence(
+        self,
+        section: Section,
+        summaries: dict[str, str],
+        previous_tail: str = "",
+        next_head: str = "",
+    ) -> str:
+        """Revise one section for the coherence of the whole paper; return its new content.
+
+        The rest of the paper is given as section summaries plus the paragraphs that
+        border this section, so the call stays small whatever the paper's length.
+        """
+        outline = "\n".join(
+            f"- {title}{' (ESTA SECCIÓN)' if title == section.title else ''}: {summary}"
+            for title, summary in summaries.items()
+        )
+        borders = ""
+        if previous_tail:
+            borders += f"\nÚLTIMO PÁRRAFO DE LA SECCIÓN ANTERIOR:\n{previous_tail}\n"
+        if next_head:
+            borders += f"\nPRIMER PÁRRAFO DE LA SECCIÓN SIGUIENTE:\n{next_head}\n"
+
+        user_prompt = f"""Haz la revisión final de coherencia de UNA sección de un artículo académico.
+
+EL ARTÍCULO, SECCIÓN A SECCIÓN (resúmenes):
+{outline}
+{borders}
+SECCIÓN A REVISAR: {section.title}
+
+CONTENIDO ACTUAL:
+{section.content}
+
+OBJETIVOS:
+1. Que la sección encaje con las demás: elimina lo que ya se dice en otra sección y
+   ajusta las transiciones con la sección anterior y la siguiente
+2. Terminología coherente con el resto del artículo
+3. Que el argumento avance hacia las conclusiones
+
+REGLAS:
+- Conserva SIN CAMBIOS los marcadores de cita [@...] y no añadas citas nuevas
+- Mantén la extensión: aproximadamente las mismas palabras que el contenido actual
+- Escribe solo el contenido revisado de la sección, sin título ni comentarios"""
+
+        return self._call_api(
+            system_prompt=self.system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=4096,
+        ).strip()
 
     def generate_critical_review(self, paper: Paper) -> str:
         """Generate a comprehensive critical review document.

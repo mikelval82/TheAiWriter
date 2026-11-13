@@ -5,10 +5,11 @@ Imports nothing heavy (no embeddings), so the plugin's hook can run it after eve
 
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ai_writer.citations import CitationIndex, CitationReport, check_citations
+from ai_writer.citations import CitationIndex, CitationReport, check_citations, find_citations
 from ai_writer.library import Project
 
 DRAFT = Path("borrador") / "documento.md"
@@ -23,6 +24,8 @@ class DocumentReport:
     citations: CitationReport
     gaps: list[str] = field(default_factory=list)
     words_per_section: dict[str, int] = field(default_factory=dict)
+    times_cited: dict[str, int] = field(default_factory=dict)
+    uncited: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -34,6 +37,12 @@ class DocumentReport:
         lines += [f"- {gap}" for gap in self.gaps] or ["Ninguno."]
         lines += ["", "## Extensión por sección", "", "| Sección | Palabras |", "|---|---|"]
         lines += [f"| {name} | {words} |" for name, words in self.words_per_section.items()]
+        if self.times_cited:
+            lines += ["", "## Veces que se cita cada obra", "", "| Obra | Citas |", "|---|---|"]
+            lines += [f"| {key} | {n} |" for key, n in self.times_cited.items()]
+        if self.uncited:
+            lines += ["", "## Obras de las colecciones sin citar", ""]
+            lines += [f"- {key}" for key in self.uncited]
         return "\n".join(lines) + "\n"
 
 
@@ -59,21 +68,27 @@ def record_retrieved(folder: Path, query: str, keys: list[str]) -> None:
 
 def check_text(text: str, folder: Path) -> CitationReport:
     """Check the citations of a text written for the document in ``folder``."""
+    return check_citations(text, *_index_and_allowed(folder), retrieved_keys(folder))
+
+
+def _index_and_allowed(folder: Path) -> tuple[CitationIndex, set[str]]:
     project = Project.load(folder)
-    library = project.library()
-    index = CitationIndex.load(library)
-    allowed = index.keys_for_papers(project.paper_ids())
-    return check_citations(text, index, allowed, retrieved_keys(folder))
+    index = CitationIndex.load(project.library())
+    return index, index.keys_for_papers(project.paper_ids())
 
 
 def validate_document(folder: Path, write_report: bool = True) -> DocumentReport:
     """Validate ``borrador/documento.md`` and write ``revision/validacion.md``."""
     folder = Path(folder)
     text = (folder / DRAFT).read_text(encoding="utf-8")
+    index, allowed = _index_and_allowed(folder)
+    times_cited = Counter(find_citations(text)[0])
     report = DocumentReport(
-        citations=check_text(text, folder),
+        citations=check_citations(text, index, allowed, retrieved_keys(folder)),
         gaps=PENDING_GAP.findall(text),
         words_per_section=_words_per_section(text),
+        times_cited=dict(times_cited.most_common()),
+        uncited=sorted(allowed - set(times_cited)),
     )
     if write_report:
         (folder / REPORT).parent.mkdir(parents=True, exist_ok=True)

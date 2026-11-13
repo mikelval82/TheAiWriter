@@ -259,10 +259,12 @@ Verificada cuando: `/theaiwriter:escribir` produce un paper de perspectiva compl
   - Al reconstruir un índice solo se calculan los vectores de los textos nuevos; el resto se reutiliza de la caché si el modelo es el mismo. Añadir un PDF ya no rehace los vectores de toda la biblioteca.
   - Tests con el LLM falso: escritura completa, solo claves de las colecciones, reanudación tras un fallo, pausa con plan editado, detención e idioma.
   - **Prueba real** (2026-11-13), en `~/Documentos/TheAIWriter/prueba-empatia`, con la colección «Emoción» (22 papers), lanzada con `/theaiwriter:escribir` desde una sesión de Claude: terminó sola en 22 minutos con 64 llamadas (3,81 USD estimados al precio de la API; con suscripción cuenta como uso de la cuenta). El resultado son 8 secciones y 35 párrafos con 223 citas a 17 obras, todas válidas sin corregir ninguna, y 13 huecos `[@?]` marcados por el propio escritor. La revisión crítica automática le da un 7/10 y pide una revisión mayor.
-  - **A calibrar** (antes del piloto):
-    - Extensión: 12.100 palabras, con párrafos de unas 300. Un paper de perspectiva suele tener entre 4.000 y 6.000. Hay que fijar una extensión objetivo por perfil y por párrafo.
-    - Concentración de fuentes: dos obras se citan más de 40 veces cada una y 5 de los 22 papers no se citan. La penalización por popularidad de `EnhancedContextManager` no basta.
-    - La revisión global no devolvió todas las secciones con este tamaño. La protección conservó el texto revisado por sección, pero así esa revisión no aporta nada. Habría que hacerla por secciones o quitarla.
+  - **Calibración** (2026-11-13), tras la prueba real:
+    - Extensión: cada perfil tiene una extensión objetivo (`perspectiva` 5.000 palabras, `revision` 6.000, `ensayo` 3.000) y cada párrafo pide su parte, entre 110 y 230 palabras. Si el planificador pasa del máximo de párrafos del perfil, los sobrantes se convierten en puntos de apoyo del último párrafo de la sección (`fit_plan`). La revisión por sección debe mantener la extensión.
+    - Diversidad de fuentes: cada párrafo recibe como mucho 20 fuentes y 3 por obra. Cuanto más se cita ya una obra en el documento, menos peso tienen sus fuentes (`EnhancedContextManager.citation_counts`, con la mitad de peso a las 8 citas). Al escritor se le avisa de las obras citadas 6 veces o más.
+    - Revisión global: se hace sección a sección, con los resúmenes de todas y los párrafos de los bordes, y se guarda tras cada una. Una revisión que añade citas o cambia la extensión más de un 20 % se descarta (`revision_is_safe`).
+    - El informe de validación dice cuántas veces se cita cada obra y qué obras de las colecciones no se citan.
+    - **Segunda prueba real**, en `prueba-empatia-2`, con el mismo abstract y la misma colección: 15 minutos, 64 llamadas y 2,58 USD estimados. El resultado son 8 secciones y 28 párrafos con unas 6.050 palabras y 116 citas a 19 obras, todas válidas, más 10 huecos `[@?]`. La obra más citada aparece 18 veces y solo queda una sin citar. La revisión global aceptó las 8 secciones, y la revisión crítica le da un 7,5/10.
 
 ### Fase E: Revisión, notas y versiones (Tamaño: M)
 Verificada cuando: una tanda de notas se aplica con `/theaiwriter:resolver`, cada cambio queda en el historial y se puede deshacer.
@@ -355,7 +357,7 @@ Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 ace
 | A. Viabilidad del plugin | hecha en Linux (terminal y app); falta Windows o macOS |
 | B. Biblioteca y documento | hecha |
 | C. Motor de evidencia por MCP | hecha |
-| D. Ruta de perspectiva | hecha; extensión y diversidad de fuentes por calibrar |
+| D. Ruta de perspectiva | hecha y calibrada |
 | E. Revisión y versiones | pendiente |
 | F. Exportación | pendiente |
 | G. Paper con resultados | pendiente |

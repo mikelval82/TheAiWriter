@@ -7,12 +7,16 @@ ideas come from, with topics ordered from largest to smallest:
 - ``todos``: every topic (state of the art, discussion)
 - ``minoritarios``: the smaller half (gaps, open problems)
 - ``variados``: every other topic (challenges, contrasts)
+
+``target_words`` is the length the whole document aims at; each paragraph gets
+its share of it (see ``Profile.paragraph_words``).
 """
 
 from dataclasses import dataclass
 from typing import Literal
 
 TopicChoice = Literal["principales", "todos", "minoritarios", "variados"]
+PARAGRAPH_WORDS = (110, 230)  # a paragraph's length is kept between these, whatever the target
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,15 @@ class Profile:
     name: str
     description: str
     sections: tuple[SectionSpec, ...]
+    target_words: int
+
+    def section(self, name: str) -> SectionSpec | None:
+        return next((s for s in self.sections if s.name == name), None)
+
+    def paragraph_words(self, n_paragraphs: int) -> tuple[int, int]:
+        """The word range for each of ``n_paragraphs`` paragraphs to add up to ``target_words``."""
+        words = min(PARAGRAPH_WORDS[1], max(PARAGRAPH_WORDS[0], self.target_words // max(1, n_paragraphs)))
+        return round(words * 0.8), round(words * 1.2)
 
     def topic_ids(self, section: SectionSpec, ordered_topic_ids: list[int]) -> list[int]:
         """The topics feeding ``section``, given the topic ids from largest to smallest."""
@@ -49,6 +62,7 @@ PROFILES = {
     "perspectiva": Profile(
         name="perspectiva",
         description="Paper de perspectiva: propone una visión propia apoyada en la literatura",
+        target_words=5000,
         sections=(
             SectionSpec("Introducción", "Presentar el tema, su relevancia y la tesis central del paper", 2, 3),
             SectionSpec("Estado Actual del Arte", "Revisar los avances recientes y el conocimiento establecido", 3, 5, "todos"),
@@ -63,6 +77,7 @@ PROFILES = {
     "revision": Profile(
         name="revision",
         description="Revisión narrativa: sintetiza y compara lo que dice la literatura sobre un tema",
+        target_words=6000,
         sections=(
             SectionSpec("Introducción", "Presentar el tema, por qué importa y la pregunta que guía la revisión", 2, 3),
             SectionSpec("Alcance y Fuentes", "Describir qué trabajos se revisan, de qué tipo son y qué periodo cubren", 1, 2, "todos"),
@@ -75,6 +90,7 @@ PROFILES = {
     "ensayo": Profile(
         name="ensayo",
         description="Ensayo breve: un argumento central, sus apoyos y sus objeciones",
+        target_words=3000,
         sections=(
             SectionSpec("Introducción", "Plantear la pregunta y la tesis", 1, 2),
             SectionSpec("Argumento", "Desarrollar la tesis con la evidencia más sólida", 2, 4, "todos"),

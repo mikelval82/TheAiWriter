@@ -12,6 +12,7 @@ library's stable keys; whatever citation still fails at the end becomes ``[@?]``
 
 import json
 import re
+from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 
@@ -34,6 +35,8 @@ CORRECTIONS = Path("revision") / "citas_corregidas.md"
 CRITICAL_REVIEW = Path("revision") / "revision_critica.md"
 
 IDEAS_PER_SECTION = 16
+CONTEXT_LIMITS = (20, 3)  # evidence items offered per paragraph, and at most per work
+OVERCITED = 6  # a work cited this often is pointed out to the writer
 _SPANISH = {"es", "español", "espanol", "castellano", "spanish"}
 _CITED_KEY = re.compile(r"Citar: \[@([^\]]+)\]")
 
@@ -227,6 +230,7 @@ class PerspectiveRun:
         feedback = reviewer.review_outline(outline)
         if feedback and "sin cambios" not in feedback.lower():
             outline = planner.refine_outline(outline, feedback)
+        outline = fit_plan(outline, self.profile)
         self._check_stop()
         (self.folder / PLAN).write_text(outline.model_dump_json(indent=2), encoding="utf-8")
         (self.folder / PLAN_MD).write_text(outline.to_markdown(), encoding="utf-8")
@@ -277,7 +281,9 @@ class PerspectiveRun:
         from ai_writer.validation import record_retrieved
 
         outline = self._load_plan()
+        words = self.profile.paragraph_words(outline.total_paragraphs)
         manager = self.context_manager(abstract)
+        manager.limits = CONTEXT_LIMITS
         writer = WriterAgent(abstract_context=abstract)
         writer.llm = self.llm
         reviewer = ReviewerAgent(abstract_context=abstract, context_manager=manager)
@@ -296,12 +302,15 @@ class PerspectiveRun:
                     continue
                 self._check_stop()
                 query = paragraph.to_query()
+                cited = self._cited_so_far()
+                manager.citation_counts = dict(cited)
                 context = manager.get_context_for_idea(
                     idea_query=query,
                     section_name=section_outline.section_name,
                     suggested_topics=paragraph.suggested_sources,
                 )
                 record_retrieved(self.folder, query, _CITED_KEY.findall(context))
+                context += _overcited_note(cited)
                 text = writer.write_paragraph(
                     key_idea=paragraph.key_idea,
                     supporting_points=paragraph.supporting_points,
@@ -311,6 +320,7 @@ class PerspectiveRun:
                     reference_context=context,
                     thesis=outline.thesis_statement,
                     memory_context=memory,
+                    words=words,
                 )
                 state["parrafos"].append(text)
                 self._save_used()
@@ -333,6 +343,14 @@ class PerspectiveRun:
                 state["resumen"] = self._summarize(state["titulo"], state["contenido"])
                 self._track_usage()
                 self.save()
+
+    def _cited_so_far(self) -> Counter:
+        """How many times the document written so far cites each work."""
+        text = "\n".join(
+            section.get("contenido") or "\n".join(section.get("parrafos", []))
+            for section in self.state.get("secciones", [])
+        )
+        return Counter(re.findall(r"@([\w:-]+)", text))
 
     def _summaries(self, sections: list[dict]) -> dict[str, str]:
         return {s["titulo"]: s["resumen"] for s in sections if s.get("resumen")}
@@ -367,40 +385,45 @@ RESUMEN:"""
             max_tokens=300,
         ).strip()
 
-    # Phase 4: global review
+    # Phase 4: global review, one section at a time
 
     def _global_review(self, abstract: str) -> None:
-        from ai_writer.agents.reviewer_agent import ReviewerAgent
-        from ai_writer.models.paper import Paper, Section
+        """Revise each section for the coherence of the whole, saving after each one.
 
-        self._check_stop()
+        A revision that adds citations or changes the length a lot is discarded and
+        the section keeps its text.
+        """
+        from ai_writer.agents.reviewer_agent import ReviewerAgent
+        from ai_writer.models.paper import Section
+
         self.save(fase="revision_global")
         sections = self.state["secciones"]
-        paper = Paper(
-            title=self.project.titulo,
-            sections=[Section(title="Abstract", content=abstract)]
-            + [Section(title=s["titulo"], content=s["contenido"]) for s in sections],
-        )
+        summaries = {s["titulo"]: s["resumen"] for s in sections}
         reviewer = ReviewerAgent(abstract_context=abstract)
         reviewer.llm = self.llm
-        reviewed = {}
-        try:
-            result = reviewer.review_full_paper(paper)
-            reviewed = {s.title: s.content for s in result.sections[1:]}
-        except LLMError as error:
-            self.state["aviso_revision_global"] = str(error)
-        # Only a complete answer replaces the sections: a partial one would drop text
-        if set(reviewed) == {s["titulo"] for s in sections} and all(reviewed.values()):
-            for s in sections:
-                s["revisada_global"] = reviewed[s["titulo"]]
-        else:
-            self.state["aviso_revision_global"] = self.state.get(
-                "aviso_revision_global",
-                "La revisión global no devolvió todas las secciones; se conserva el texto revisado por sección.",
-            )
-        self._track_usage()
+        kept = self.state.setdefault("revision_global_descartada", [])
+        for i, section in enumerate(sections):
+            if "revisada_global" in section:
+                continue
+            self._check_stop()
+            previous = sections[i - 1]["contenido"].split("\n\n")[-1] if i > 0 else ""
+            following = sections[i + 1]["contenido"].split("\n\n")[0] if i + 1 < len(sections) else ""
+            try:
+                revised = reviewer.review_section_coherence(
+                    Section(title=section["titulo"], content=section["contenido"]),
+                    summaries, previous, following,
+                )
+            except LLMError:
+                revised = ""
+            if revision_is_safe(section["contenido"], revised):
+                section["revisada_global"] = revised
+            else:
+                section["revisada_global"] = None
+                kept.append(section["titulo"])
+            self._track_usage()
+            self.save()
+            self.render(abstract)
         self.save(revision_global_hecha=now())
-        self.render(abstract)
 
     # Phase 5: closing
 
@@ -462,6 +485,42 @@ RESUMEN:"""
 
     def render(self, abstract: str) -> None:
         (self.folder / DRAFT).write_text(self.document_text(abstract), encoding="utf-8")
+
+
+def fit_plan(outline, profile):
+    """Keep each section within its profile's paragraph count.
+
+    The planner sometimes adds paragraphs beyond the profile's maximum; the extra
+    ones become supporting points of the section's last paragraph.
+    """
+    for section in outline.sections:
+        spec = profile.section(section.section_name)
+        if spec is None or len(section.paragraphs) <= spec.max_paragraphs:
+            continue
+        kept, extra = section.paragraphs[: spec.max_paragraphs], section.paragraphs[spec.max_paragraphs:]
+        kept[-1].supporting_points += [paragraph.key_idea for paragraph in extra]
+        section.paragraphs = kept
+    return outline
+
+
+def revision_is_safe(original: str, revised: str) -> bool:
+    """Whether a coherence revision can replace the text: no new citations, similar length."""
+    if not revised.strip():
+        return False
+    keys = lambda text: set(re.findall(r"@([\w:-]+)", text))  # noqa: E731
+    ratio = len(revised.split()) / max(1, len(original.split()))
+    return keys(revised) <= keys(original) and 0.75 <= ratio <= 1.2
+
+
+def _overcited_note(cited: Counter) -> str:
+    frequent = [(key, n) for key, n in cited.most_common(4) if n >= OVERCITED and key != "?"]
+    if not frequent:
+        return ""
+    works = ", ".join(f"[@{key}] ({n} veces)" for key, n in frequent)
+    return (
+        f"\n\nOBRAS YA MUY CITADAS EN EL DOCUMENTO: {works}. Cítalas solo si ninguna otra "
+        "fuente del contexto sirve para la afirmación; prefiere las que aún no se citan."
+    )
 
 
 def replace_invalid_citations(text: str, index: CitationIndex, allowed: set[str]) -> tuple[str, list[str]]:
