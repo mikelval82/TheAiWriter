@@ -62,3 +62,15 @@ def test_outline_refinement_prompt_names_the_parsed_keys(fake_llm):
     for key in ("section_name", "section_purpose", "key_idea", "supporting_points"):
         assert f'"{key}"' in prompt
     assert [s.section_name for s in refined.sections] == ["Introducción", "Conclusiones"]
+
+
+def test_section_structure_is_asked_again_when_the_answer_is_unreadable(fake_llm):
+    from ai_writer.processors.extraction_agent import PDFExtractionAgent
+
+    answers = iter(["no es JSON", '[{"section_name": "Introduction", "section_number": 1}]'])
+    fake_llm.on("identify its section structure", lambda prompt: next(answers))
+
+    structure = PDFExtractionAgent()._identify_section_structure("Introduction\nSome text.")
+
+    assert structure == [{"section_name": "Introduction", "section_number": 1}]
+    assert len(fake_llm.prompts_containing("identify its section structure")) == 2

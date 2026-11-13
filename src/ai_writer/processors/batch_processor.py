@@ -1,6 +1,7 @@
 """Batch processor for processing all PDFs in the references folder."""
 
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -216,6 +217,13 @@ class BatchProcessor:
                     # Process the PDF
                     processed_paper = self.pdf_processor.process_pdf(pdf_path)
                     
+                    if processed_paper and not (processed_paper.ideas or processed_paper.claims):
+                        # Saved but empty: drop it so that the next run tries again
+                        shutil.rmtree(
+                            self.output_folder / "papers" / processed_paper.metadata.paper_id,
+                            ignore_errors=True,
+                        )
+                        raise ValueError("No se extrajo ninguna idea ni claim del paper")
                     if processed_paper:
                         # Update status
                         self.status["processed"][pdf_path.name] = {

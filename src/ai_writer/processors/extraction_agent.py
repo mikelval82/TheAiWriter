@@ -13,6 +13,9 @@ from ai_writer.processors.models import (
 from config.settings import settings
 
 
+STRUCTURE_ATTEMPTS = 3  # tries at finding the sections before giving up
+
+
 def _safe_get(data: dict, key: str, default: Any = "") -> Any:
     """Get value from dict, treating None as missing.
     
@@ -148,8 +151,14 @@ Important:
 
 Return ONLY the JSON array."""
 
-        response = self._call_api(self.system_prompt, prompt, max_tokens=2000)
-        return self._parse_json_response(response, default=[])
+        # An unreadable answer comes back now and then; without sections the paper
+        # yields no ideas, so ask again before giving up
+        for _ in range(STRUCTURE_ATTEMPTS):
+            response = self._call_api(self.system_prompt, prompt, max_tokens=2000)
+            structure = self._parse_json_response(response, default=[])
+            if isinstance(structure, list) and structure:
+                return structure
+        return []
 
     def _extract_section_contents(
         self,
