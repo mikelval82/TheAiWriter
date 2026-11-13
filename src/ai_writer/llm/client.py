@@ -28,6 +28,10 @@ class LLMError(RuntimeError):
         self.retryable = retryable
 
 
+class UsageLimitError(LLMError):
+    """The account reached its usage limit: every call fails until it resets."""
+
+
 @dataclass
 class LLMRequest:
     """One generation call, as the backends receive it."""

@@ -10,7 +10,7 @@ import subprocess
 import pytest
 from pydantic import BaseModel
 
-from ai_writer.llm import LLMClient, LLMError, LLMRequest, LLMResponse
+from ai_writer.llm import LLMClient, LLMError, LLMRequest, LLMResponse, UsageLimitError
 from ai_writer.llm.backends import claude_code
 from ai_writer.llm.backends.claude_code import ClaudeCodeBackend
 from ai_writer.llm.client import build_backend, extract_json
@@ -118,6 +118,15 @@ def test_claude_backend_not_logged_in_is_not_retried(cli):
     cli(stdout=json.dumps({"result": "Not logged in · Please run /login", "is_error": True}))
 
     with pytest.raises(LLMError, match="not logged in") as raised:
+        ClaudeCodeBackend("claude").complete(_request())
+
+    assert not raised.value.retryable
+
+
+def test_claude_backend_usage_limit_is_its_own_error_and_not_retried(cli):
+    cli(stdout=json.dumps({"result": "You've hit your 5-hour limit · resets 8pm", "is_error": True}))
+
+    with pytest.raises(UsageLimitError, match="5-hour limit") as raised:
         ClaudeCodeBackend("claude").complete(_request())
 
     assert not raised.value.retryable

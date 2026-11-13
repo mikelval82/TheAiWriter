@@ -11,6 +11,8 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 
+from ai_writer.llm import UsageLimitError
+
 from .pdf_processor import PDFProcessor
 from config.settings import settings
 
@@ -240,6 +242,13 @@ class BatchProcessor:
                     else:
                         raise ValueError("Processing returned None")
                         
+                except UsageLimitError as e:
+                    # Every further call would fail too: stop, and leave the rest pending
+                    console.print(f"\n[red]✗ {e}[/red]")
+                    console.print("[yellow]Procesado detenido. Los PDFs que faltan siguen pendientes: "
+                                  "vuelve a lanzarlo cuando se restablezca el límite.[/yellow]")
+                    results["errors"].append({"file": pdf_path.name, "error": str(e)})
+                    break
                 except Exception as e:
                     error_msg = str(e)
                     self.status["processed"][pdf_path.name] = {

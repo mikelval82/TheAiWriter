@@ -6,6 +6,7 @@ from ai_writer.llm.client import (
     LLMError,
     LLMRequest,
     LLMResponse,
+    UsageLimitError,
     get_llm_client,
     set_llm_client,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "LLMError",
     "LLMRequest",
     "LLMResponse",
+    "UsageLimitError",
     "get_llm_client",
     "set_llm_client",
 ]
