@@ -42,6 +42,7 @@ class EvidenceEngine:
         self._topics: list[Topic] | None = None
         self._centroids: np.ndarray | None = None
         self._labels: dict[str, np.ndarray] = {}
+        self._members: dict[int, list[int]] = {}
 
     def _load(self, name, text_field, fields, jsonl) -> EmbeddingIndex:
         index = EmbeddingIndex(
@@ -151,6 +152,7 @@ class EvidenceEngine:
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10).fit(matrix)
         self._centroids = kmeans.cluster_centers_
         self._labels = {}
+        self._members = {}
 
         topics = []
         for topic_id in range(k):
@@ -162,8 +164,9 @@ class EvidenceEngine:
             distances = np.linalg.norm(
                 self.ideas._embeddings_matrix[members] - self._centroids[topic_id], axis=1
             )
+            self._members[topic_id] = [int(row) for row in np.array(members)[np.argsort(distances)]]
             examples = []
-            for row in np.array(members)[np.argsort(distances)]:
+            for row in self._members[topic_id]:
                 item = self.ideas.items[row]
                 key = self.citations.key_for(item.get("paper_id", ""))
                 if key and all(example["clave"] != key for example in examples):
@@ -180,6 +183,28 @@ class EvidenceEngine:
         topics.sort(key=lambda topic: topic.ideas, reverse=True)
         self._topics = topics
         return topics
+
+    def topic_ideas(self, topic_id: int, n: int, used_rows: set[int]) -> list[dict]:
+        """Up to ``n`` ideas of a topic not in ``used_rows``, closest to its centre first.
+
+        The rows taken are added to ``used_rows``, so successive calls never repeat an idea.
+        """
+        self.topics()
+        topic = next(t for t in self._topics if t.id == topic_id)
+        ideas = []
+        for row in self._members.get(topic_id, []):
+            if len(ideas) >= n:
+                break
+            if row in used_rows:
+                continue
+            used_rows.add(row)
+            item = self.ideas.items[row]
+            ideas.append({
+                "idea": item.get("idea", ""),
+                "cluster": ", ".join(topic.keywords[:3]),
+                "clave": self.citations.key_for(item.get("paper_id", "")),
+            })
+        return ideas
 
     # Works
 

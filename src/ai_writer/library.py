@@ -18,16 +18,15 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
 
+from ai_writer.background import now, process_alive, spawn_cli
 from config.settings import settings
 
 LIBRARY_ENV = "THEAIWRITER_BIBLIOTECA"
@@ -211,7 +210,7 @@ class Library:
         if not self.job_file.exists():
             return None
         job = json.loads(self.job_file.read_text(encoding="utf-8"))
-        if job.get("estado") == "en_curso" and not _process_alive(job.get("pid")):
+        if job.get("estado") == "en_curso" and not process_alive(job.get("pid")):
             job["estado"] = "interrumpido"
         return job
 
@@ -233,22 +232,8 @@ class Library:
         if not pending:
             raise LibraryError("No hay PDFs pendientes de procesar.")
 
-        options = {}
-        if os.name == "nt":
-            options["creationflags"] = (
-                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-            )
-        else:
-            options["start_new_session"] = True
-        with open(self.log_file, "w", encoding="utf-8") as log:
-            process = subprocess.Popen(
-                [sys.executable, "-m", "ai_writer", "--biblioteca", str(self.root),
-                 "biblioteca", "procesar"],
-                stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                env=os.environ | {"PYTHONIOENCODING": "utf-8"}, **options,
-            )
-        self.write_job(estado="en_curso", pid=process.pid, pendientes=len(pending),
-                       inicio=_now(), fin=None)
+        pid = spawn_cli(["--biblioteca", str(self.root), "biblioteca", "procesar"], self.log_file)
+        self.write_job(estado="en_curso", pid=pid, pendientes=len(pending), inicio=now(), fin=None)
         return self.job()
 
     # Collections
@@ -344,32 +329,6 @@ class Library:
         return {"papers": len(self.papers()), "vector_files": vectors, "pdfs": pdfs}
 
 
-def _now() -> str:
-    return datetime.now().isoformat(timespec="seconds")
-
-
-def _process_alive(pid: int | None) -> bool:
-    if not pid:
-        return False
-    if os.name == "nt":
-        import ctypes
-
-        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
-        if not handle:
-            return False
-        code = ctypes.c_ulong()
-        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
-        ctypes.windll.kernel32.CloseHandle(handle)
-        return code.value == 259  # STILL_ACTIVE
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
 def _count_lines(path: Path) -> int:
     if not path.is_file():
         return 0
@@ -386,6 +345,9 @@ class Project(BaseModel):
     tipo: DocumentKind
     titulo: str
     idioma: str = "es"
+    perfil: str | None = Field(
+        default=None, description="Estructura de secciones; vacío: la del tipo de documento"
+    )
     colecciones: list[str] = Field(
         default_factory=list, description="Vacío: toda la biblioteca"
     )

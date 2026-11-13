@@ -117,3 +117,27 @@ def test_e5_models_get_query_and_passage_prefixes():
 def test_unknown_embedding_backend_is_rejected():
     with pytest.raises(ValueError, match="EMBEDDING_BACKEND"):
         build_embedder("cohere")
+
+
+def test_rebuilding_only_embeds_new_texts(workspace):
+    embedded = []
+
+    class CountingEmbedder(FakeEmbedder):
+        def embed(self, texts, kind="passage"):
+            if kind == "passage":
+                embedded.extend(texts)
+            return super().embed(texts, kind)
+
+    built = _build(workspace, CountingEmbedder())
+    first = len(embedded)
+    jsonl = workspace.indices_dir / "all_ideas.jsonl"
+    with open(jsonl, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"id": "new", "paper_id": "p", "idea": "a brand new idea"}) + "\n")
+
+    index = _ideas_index(workspace, CountingEmbedder())
+    index.build_from_jsonl(jsonl, force_rebuild=True)
+
+    assert first == len(built)
+    assert embedded[first:] == ["a brand new idea"]
+    assert len(index) == len(built) + 1
+    assert np.allclose(index._embeddings_matrix[:-1], built._embeddings_matrix)

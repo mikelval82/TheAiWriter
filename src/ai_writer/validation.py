@@ -83,8 +83,12 @@ def validate_document(folder: Path, write_report: bool = True) -> DocumentReport
 
 def _words_per_section(text: str) -> dict[str, int]:
     headings = list(_HEADING.finditer(text))
+    # A level-1 heading opening the text is the document's title, not a section
+    if headings and headings[0].start() == 0 and headings[0].group(1) == "#" and len(headings) > 1:
+        text = text[headings[0].end():]
+        headings = list(_HEADING.finditer(text))
     sections = {}
-    if headings and headings[0].start() > 0:
+    if headings and _words(text[: headings[0].start()]):
         sections["(antes del primer título)"] = _words(text[: headings[0].start()])
     for i, heading in enumerate(headings):
         end = headings[i + 1].start() if i + 1 < len(headings) else len(text)

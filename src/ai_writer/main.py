@@ -34,6 +34,8 @@ app = typer.Typer(
 
 library_app = typer.Typer(help="📚 La biblioteca de papers: estado, colecciones y migración")
 app.add_typer(library_app, name="biblioteca")
+document_app = typer.Typer(help="📝 Un documento: escribirlo y ver cómo va")
+app.add_typer(document_app, name="documento")
 
 # Library chosen with --biblioteca, if any
 _active_library_dir: Optional[Path] = None
@@ -522,7 +524,7 @@ def library_process(library_dir: Optional[Path] = LIBRARY_OPTION) -> None:
     """Procesa los PDFs pendientes y deja constancia en procesado/proceso.json."""
     import os
 
-    from ai_writer.library import _now
+    from ai_writer.background import now as _now
     from ai_writer.processors.batch_processor import BatchProcessor
 
     library = _library(library_dir)
@@ -569,6 +571,42 @@ def library_collection(
         console.print(f"[red]✗ {error}[/red]")
         raise typer.Exit(1)
     console.print(f"[green]✓ Colección «{name}» con {len(found)} papers[/green]")
+
+
+# =============================================================================
+# Document Commands
+# =============================================================================
+
+@document_app.command("escribir")
+def document_write(
+    folder: Path = typer.Argument(Path("."), help="Carpeta del documento"),
+    pause: bool = typer.Option(False, "--pausar", help="Para tras el plan hasta aprobarlo"),
+) -> None:
+    """Escribe el documento (o lo continúa donde se quedó) y deja el progreso en borrador/estado.json."""
+    from ai_writer.library import LibraryError
+    from ai_writer.perspective_run import PerspectiveRun
+
+    try:
+        status = PerspectiveRun(folder).run(pause_after_plan=pause)
+    except LibraryError as error:
+        console.print(f"[red]✗ {error}[/red]")
+        raise typer.Exit(1)
+    console.print(status)
+
+
+@document_app.command("estado")
+def document_status(
+    folder: Path = typer.Argument(Path("."), help="Carpeta del documento"),
+) -> None:
+    """Muestra en qué fase está la escritura del documento."""
+    from ai_writer.library import LibraryError
+    from ai_writer.perspective_run import PerspectiveRun
+
+    try:
+        console.print(PerspectiveRun(folder).status())
+    except LibraryError as error:
+        console.print(f"[red]✗ {error}[/red]")
+        raise typer.Exit(1)
 
 
 def main() -> None:

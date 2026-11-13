@@ -227,7 +227,7 @@ Verificada cuando: el corpus actual (43 papers) se migra a una biblioteca sin re
   - Herramientas: `estado_biblioteca`, `listar_papers`, `guardar_coleccion`, `borrar_coleccion`, `anadir_pdfs`, `procesar_pdfs` (en segundo plano, con `procesado/proceso.json` y `registro.log`), `crear_documento`, `diagnostico` y `probar_claude`. Comandos: `/theaiwriter:biblioteca`, `/theaiwriter:nuevo` y `/theaiwriter:diagnostico`.
   - Comprobado en una sesión real: `/theaiwriter:biblioteca` creó la colección «Emoción» (22 papers) eligiendo por tema, y `/theaiwriter:nuevo` creó un documento con esa colección.
   - Pendiente para la Fase C: aplicar las colecciones en la búsqueda (hoy el documento sabe qué papers puede usar, pero `EnhancedContextManager` busca en toda la biblioteca) y detectar papers duplicados (hay dos pares con el mismo título en el corpus).
-  - Pendiente para la Fase D: procesar un PDF nuevo rehace todos los vectores (unos minutos con 10.000 textos). Debería añadir solo los del paper nuevo.
+  - Pendiente para la Fase D (hecho en ella): procesar un PDF nuevo rehacía todos los vectores.
 
 ### Fase C: Motor de evidencia por MCP y citas verificadas (Tamaño: L, se divide en C1 y C2)
 Verificada cuando: desde el chat de Claude se puede buscar evidencia en la biblioteca, y un texto con una cita inventada se rechaza.
@@ -249,6 +249,20 @@ Verificada cuando: desde el chat de Claude se puede buscar evidencia en la bibli
 Verificada cuando: `/theaiwriter:escribir` produce un paper de perspectiva completo en segundo plano, se puede reanudar tras un corte y todas sus citas pasan la validación.
 - D1: perfiles de documento e idioma como parámetro.
 - D2: ejecución en segundo plano, checkpoints, `/theaiwriter:estado` y pausa opcional tras el plan.
+- Estado: **implementada** (2026-11-13). Cómo quedó:
+  - `ai_writer.perspective_run.PerspectiveRun` recorre las fases del pipeline actual (temas, plan, párrafos, revisión por sección, revisión global y cierre) usando sus agentes, y guarda cada paso en `borrador/estado.json` al terminarlo. Si se corta, se detiene o falla, la siguiente ejecución sigue en el primer párrafo sin escribir. También recupera qué ideas ya se usaron, para no repetirlas.
+  - Los temas y las ideas de cada sección salen del motor de la Fase C (las colecciones del documento), no de `ClusterAnalyzer`, que mira toda la biblioteca. El plan queda en `borrador/plan.json` y en `plan.md`; si se edita antes de aprobarlo, se escribe el plan editado.
+  - El escritor y el revisor copian el marcador que acompaña a cada fuente (`→ Citar: [@clave]`) y escriben `[@?]` cuando falta la fuente. El revisor conserva las citas existentes. Al cerrar, toda cita que no exista o esté fuera de las colecciones pasa a `[@?]` y se lista en `revision/citas_corregidas.md`, de modo que el documento final siempre pasa la validación. `ReferenceProcessor` ya no se usa en esta ruta.
+  - Perfiles (`ai_writer.profiles`): `perspectiva` (las 8 secciones de siempre), `revision` (revisión narrativa) y `ensayo`. Cada sección indica de qué temas salen sus ideas. Se elige con `perfil:` en `proyecto.yaml`; por defecto, el del tipo de documento.
+  - Idioma: si no es español, cada llamada lleva una nota que pide la salida en ese idioma y no tocar las citas, sin reescribir los prompts.
+  - En segundo plano: `escribir_documento` lanza `ai-writer documento escribir <carpeta>` como proceso independiente (con `ai_writer.background`, que también usa el procesado de PDFs). Las demás herramientas son `estado_escritura` (con las últimas líneas de `borrador/registro.log`), `aprobar_plan` y `detener_escritura`, que para al terminar el párrafo en curso. Comandos: `/theaiwriter:escribir` y `/theaiwriter:estado`.
+  - Al reconstruir un índice solo se calculan los vectores de los textos nuevos; el resto se reutiliza de la caché si el modelo es el mismo. Añadir un PDF ya no rehace los vectores de toda la biblioteca.
+  - Tests con el LLM falso: escritura completa, solo claves de las colecciones, reanudación tras un fallo, pausa con plan editado, detención e idioma.
+  - **Prueba real** (2026-11-13), en `~/Documentos/TheAIWriter/prueba-empatia`, con la colección «Emoción» (22 papers), lanzada con `/theaiwriter:escribir` desde una sesión de Claude: terminó sola en 22 minutos con 64 llamadas (3,81 USD estimados al precio de la API; con suscripción cuenta como uso de la cuenta). El resultado son 8 secciones y 35 párrafos con 223 citas a 17 obras, todas válidas sin corregir ninguna, y 13 huecos `[@?]` marcados por el propio escritor. La revisión crítica automática le da un 7/10 y pide una revisión mayor.
+  - **A calibrar** (antes del piloto):
+    - Extensión: 12.100 palabras, con párrafos de unas 300. Un paper de perspectiva suele tener entre 4.000 y 6.000. Hay que fijar una extensión objetivo por perfil y por párrafo.
+    - Concentración de fuentes: dos obras se citan más de 40 veces cada una y 5 de los 22 papers no se citan. La penalización por popularidad de `EnhancedContextManager` no basta.
+    - La revisión global no devolvió todas las secciones con este tamaño. La protección conservó el texto revisado por sección, pero así esa revisión no aporta nada. Habría que hacerla por secciones o quitarla.
 
 ### Fase E: Revisión, notas y versiones (Tamaño: M)
 Verificada cuando: una tanda de notas se aplica con `/theaiwriter:resolver`, cada cambio queda en el historial y se puede deshacer.
@@ -341,7 +355,7 @@ Todas cerradas el 2026-11-12: la 1 y la 10 las decidiste tú; de la 2 a la 9 ace
 | A. Viabilidad del plugin | hecha en Linux (terminal y app); falta Windows o macOS |
 | B. Biblioteca y documento | hecha |
 | C. Motor de evidencia por MCP | hecha |
-| D. Ruta de perspectiva | pendiente |
+| D. Ruta de perspectiva | hecha; extensión y diversidad de fuentes por calibrar |
 | E. Revisión y versiones | pendiente |
 | F. Exportación | pendiente |
 | G. Paper con resultados | pendiente |

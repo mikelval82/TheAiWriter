@@ -223,7 +223,9 @@ Responde SOLO en formato JSON:
                 for item, score in results:
                     idea = item.get("idea", "")
                     paper = item.get("paper_title", "Unknown")[:50]
-                    section_text += f"- [{paper}] {idea}\n"
+                    key = self.context_manager._citation_key_for(item)
+                    cite_hint = f" → Citar: [@{key}]" if key else ""
+                    section_text += f"- [{paper}]{cite_hint} {idea}\n"
                 
                 evidence_sections.append(section_text)
         
@@ -438,7 +440,9 @@ INSTRUCCIONES:
 - Mejora el contenido manteniendo las ideas centrales
 - Asegura coherencia con el contexto del paper (resúmenes de secciones anteriores)
 - Si se proporciona EVIDENCIA ADICIONAL DE LA LITERATURA, considera incorporar 
-  insights relevantes para fortalecer los argumentos (cita las fuentes si las usas)
+  insights relevantes para fortalecer los argumentos (cita las fuentes si las usas,
+  copiando exactamente su marcador "→ Citar: [@...]")
+- Conserva SIN CAMBIOS los marcadores de cita [@...] que ya tiene el texto
 - Escribe en español académico formal
 - NO incluyas comentarios sobre los cambios, solo el contenido mejorado
 
@@ -482,6 +486,7 @@ OBJETIVOS DE LA REVISIÓN FINAL:
 5. Verificar que las conclusiones derivan de los argumentos presentados
 
 Para cada sección, proporciona una versión mejorada que maximice la coherencia global.
+Conserva SIN CAMBIOS los marcadores de cita [@...] y no añadas citas nuevas.
 Responde en formato estructurado con cada sección claramente delimitada:
 
 ### [Nombre de Sección]

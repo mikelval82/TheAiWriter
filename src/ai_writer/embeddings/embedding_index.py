@@ -122,12 +122,41 @@ class EmbeddingIndex(Generic[T]):
         if not self.items:
             return
 
-        texts_to_embed = [self._get_text_for_embedding(item) for item in self.items]
-        
-        console.print(f"  [dim]Generating {len(texts_to_embed)} embeddings...[/dim]")
+        texts = [self._get_text_for_embedding(item) for item in self.items]
+        previous = self._cached_vectors_by_text()
+        missing = [text for text in dict.fromkeys(texts) if text not in previous]
 
-        self._embeddings_matrix = self.embedder.embed(texts_to_embed, kind="passage")
+        console.print(
+            f"  [dim]Generating {len(missing)} embeddings "
+            f"({len(texts) - len(missing)} reused from the cache)...[/dim]"
+        )
+        if missing:
+            previous.update(zip(missing, self.embedder.embed(missing, kind="passage")))
+        self._embeddings_matrix = np.array([previous[text] for text in texts], dtype=np.float32)
         self._build_id_index()
+
+    def _cached_vectors_by_text(self) -> dict[str, np.ndarray]:
+        """Vectors of the current cache, by embedding text, if built with the same model.
+
+        Rebuilding after adding papers then only embeds the new texts.
+        """
+        if not self.cache_path.exists() or not self.metadata_path.exists():
+            return {}
+        try:
+            with open(self.metadata_path, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+            if metadata.get("embedding_model", LEGACY_EMBEDDING_MODEL) != self.embedder.model_name:
+                return {}
+            with np.load(self.cache_path) as data:
+                embeddings = data["embeddings"]
+        except Exception:
+            return {}
+        items = metadata.get("items", [])
+        if len(items) != len(embeddings):
+            return {}
+        return {
+            self._get_text_for_embedding(item): vector for item, vector in zip(items, embeddings)
+        }
 
     def _build_id_index(self) -> None:
         """Build mapping from item IDs to matrix indices."""

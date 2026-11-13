@@ -41,13 +41,11 @@ Al escribir:
 6. Escribes en ESPAÑOL de forma académica y profesional
 
 FORMATO DE CITAS:
-Cuando cites una fuente, usa SIEMPRE el formato de marcador: [@Autor et al., Año]
-Ejemplos:
-- [@Brown et al., 2020]
-- [@Smith & Jones, 2019]
-- [@García, 2021]
+Cada fuente del contexto de la literatura viene con su marcador de cita ("→ Citar: [@...]").
+Cuando cites una fuente, copia EXACTAMENTE ese marcador, sin cambiarlo ni inventar otros.
+Si una afirmación necesita una fuente que no está en el contexto, escribe [@?] en su lugar.
 
-ESTO ES OBLIGATORIO. Las citas se procesarán automáticamente al final para generar la bibliografía."""
+ESTO ES OBLIGATORIO. Las citas se comprueban automáticamente contra la biblioteca."""
 
         if self.abstract_context:
             base_prompt += f"""
@@ -162,8 +160,7 @@ REQUISITOS:
 - Sé exhaustivo pero conciso
 - Mantén coherencia con las secciones anteriores y el abstract
 - Incluye análisis crítico y reflexivo apropiado para un paper de perspectivas
-- CITA las referencias usando el formato: [@Autor et al., Año]
-  Ejemplo: [@Brown et al., 2020] o [@Smith & Jones, 2019]
+- CITA copiando exactamente el marcador "→ Citar: [@...]" de cada fuente del contexto
 - No incluyas el título de la sección, solo el contenido
 
 Escribe únicamente el contenido de esta sección:"""
@@ -367,14 +364,13 @@ Write only the expanded content."""
 1. Escribe ÚNICAMENTE un párrafo coherente (4-8 oraciones)
 2. Desarrolla la IDEA CLAVE como argumento central del párrafo
 3. Incorpora los puntos de apoyo de forma natural
-4. CITA la literatura usando el formato [@Autor et al., Año]
-   - Ejemplo: "...como demostró [@Brown et al., 2020]..."
-   - Ejemplo: "...según investigaciones recientes [@Smith & Jones, 2019]..."
+4. CITA la literatura copiando exactamente el marcador "→ Citar: [@...]" de cada fuente
+   del contexto; si falta la fuente de una afirmación, escribe [@?]
 5. Asegura transición fluida desde el párrafo anterior
 6. Mantén consistencia con la tesis del paper y las secciones anteriores
 7. Escribe en español académico formal
 
-IMPORTANTE: Usa SIEMPRE [@...] para las citas, NO uses paréntesis simples como (Brown, 2020).
+IMPORTANTE: Usa SIEMPRE los marcadores [@...] del contexto, NO uses paréntesis simples como (Brown, 2020) ni marcadores inventados.
 
 Escribe SOLO el párrafo, sin títulos ni comentarios adicionales."""
 

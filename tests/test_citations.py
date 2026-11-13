@@ -172,8 +172,8 @@ def _document(library, tmp_path, text):
 
 def test_validate_document_reports_citations_gaps_and_lengths(library, tmp_path):
     folder = _document(library, tmp_path, (
-        "# Introducción\nRobots [@smith2020emotion] sienten [[PENDIENTE: dato]].\n\n"
-        "# Conclusiones\nFin [@brown2021navigation].\n"
+        "# Robots\n\n## Introducción\nRobots [@smith2020emotion] sienten [[PENDIENTE: dato]].\n\n"
+        "## Conclusiones\nFin [@brown2021navigation].\n"
     ))
     record_retrieved(folder, "robots", ["smith2020emotion"])
 

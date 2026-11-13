@@ -334,6 +334,80 @@ def importar_zotero(ruta: str) -> dict:
     return result
 
 
+# Writing the document
+
+
+def _document_project() -> tuple[Path, dict | None]:
+    folder = _document_folder()
+    if not (folder / PROJECT_FILE).exists():
+        return folder, {"error": "La carpeta actual no es un documento: créalo con /theaiwriter:nuevo."}
+    return folder, None
+
+
+@tool
+def escribir_documento(pausar_tras_plan: bool = False) -> dict:
+    """Escribe el documento entero en segundo plano: temas de sus colecciones, plan,
+    párrafo a párrafo con evidencia, revisión por sección, revisión global y validación de
+    citas. Si se cortó o se detuvo, continúa donde se quedó. Responde al momento; el
+    progreso se consulta con `estado_escritura`. Con `pausar_tras_plan` se detiene tras el
+    plan (borrador/plan.md) hasta `aprobar_plan`. Necesita materiales/abstract.md."""
+    from ai_writer.perspective_run import start_in_background
+
+    folder, error = _document_project()
+    if error:
+        return error
+    try:
+        return start_in_background(folder, pause_after_plan=pausar_tras_plan)
+    except (LibraryError, ValueError) as problem:
+        return {"error": str(problem)}
+
+
+@tool
+def estado_escritura() -> dict:
+    """Progreso de la escritura del documento: estado (en_curso, esperando_aprobacion,
+    detenido, interrumpido, error, terminado), fase, párrafos escritos, secciones terminadas,
+    llamadas al LLM, coste estimado y las últimas líneas del registro."""
+    from ai_writer.perspective_run import LOG, PerspectiveRun
+
+    folder, error = _document_project()
+    if error:
+        return error
+    status = PerspectiveRun(folder).status()
+    log = folder / LOG
+    if log.exists():
+        lines = [line for line in log.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
+        status["registro"] = lines[-8:]
+    return status
+
+
+@tool
+def aprobar_plan() -> dict:
+    """Aprueba el plan (borrador/plan.json, con los cambios que se le hayan hecho) y sigue
+    escribiendo en segundo plano."""
+    from ai_writer.perspective_run import approve_plan
+
+    folder, error = _document_project()
+    if error:
+        return error
+    try:
+        return approve_plan(folder)
+    except (LibraryError, ValueError) as problem:
+        return {"error": str(problem)}
+
+
+@tool
+def detener_escritura() -> dict:
+    """Pide a la escritura en curso que se detenga al terminar el párrafo que está
+    escribiendo. Se reanuda con `escribir_documento`."""
+    from ai_writer.perspective_run import request_stop
+
+    folder, error = _document_project()
+    if error:
+        return error
+    request_stop(folder)
+    return {"detener": "solicitado; se parará al terminar el párrafo en curso"}
+
+
 def main() -> None:
     server.run()
 
