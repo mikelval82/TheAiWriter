@@ -299,7 +299,8 @@ def validar_citas(texto: str) -> dict:
 @tool
 def validar_documento() -> dict:
     """Valida el borrador `borrador/documento.md`: citas, huecos `[[PENDIENTE]]` y palabras
-    por sección. Escribe el informe en `revision/validacion.md`."""
+    por sección, y sugiere obras de las colecciones para cada `[@?]`. Escribe el informe
+    en `revision/validacion.md`. Las sugerencias no se aplican solas: compruébalas antes."""
     from ai_writer.validation import DRAFT, REPORT, validate_document
 
     library, project = _current_library()
@@ -308,11 +309,15 @@ def validar_documento() -> dict:
         return {"error": "La carpeta actual no es un documento de TheAIWriter."}
     if not (folder / DRAFT).exists():
         return {"error": f"Todavía no hay borrador en {DRAFT}."}
-    report = validate_document(folder)
+    report = validate_document(folder, suggest=True)
     return {
         "correcto": report.ok,
         "informe": report.citations.summary(),
         "huecos": report.gaps,
+        "fuentes_posibles_para_huecos": [
+            {"frase": gap["frase"], "claves": [source["cita"] for source in gap["fuentes"]]}
+            for gap in report.gap_sources
+        ],
         "palabras_por_seccion": report.words_per_section,
         "fichero": str(folder / REPORT),
     }

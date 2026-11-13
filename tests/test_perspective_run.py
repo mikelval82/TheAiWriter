@@ -22,6 +22,7 @@ from ai_writer.perspective_run import (
 )
 from ai_writer.profiles import PROFILES
 from ai_writer.citations import CitationIndex
+from tests.conftest import DEFAULT_OUTLINE
 from tests.test_citations import library  # noqa: F401  (fixture)
 
 
@@ -218,3 +219,20 @@ def test_revision_is_safe_checks_citations_and_length():
     assert not revision_is_safe(original, "Uno dos tres cuatro cinco seis siete ocho [@c].")
     assert not revision_is_safe(original, "Uno [@a].")
     assert not revision_is_safe(original, "")
+
+
+def test_each_paragraph_is_offered_the_works_its_plan_ideas_come_from(document, fake_llm):
+    outline = json.loads(json.dumps(DEFAULT_OUTLINE))
+    outline["sections"][1]["paragraphs"][0]["source_keys"] = [
+        "brown2021navigation", "green2022speech", "made2020up",
+    ]
+    fake_llm.on("planificador de papers", json.dumps(outline))
+
+    PerspectiveRun(document).run()
+
+    assert "(fuente: smith2020emotion)" in fake_llm.prompts_containing("planificador de papers")[0]
+    intro, closing = fake_llm.prompts_containing("Escribe UN SOLO PÁRRAFO")
+    assert "FUENTES DE LAS IDEAS DEL PLAN" not in intro
+    plan_sources = closing.split("FUENTES DE LAS IDEAS DEL PLAN")[1].split("CONTEXTO PARA")[0]
+    # only works of the document's collections, whatever the planner wrote
+    assert set(re.findall(r"Citar: \[@([^\]]+)\]", plan_sources)) == {"brown2021navigation"}

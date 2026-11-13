@@ -5,6 +5,7 @@ from it can be checked against the library afterwards.
 """
 
 import math
+import re
 from collections import Counter
 from dataclasses import dataclass
 
@@ -16,6 +17,8 @@ from ai_writer.library import Library
 
 # Same text fields the indices were built with (see RAGSystem)
 _IDEA_FIELDS = ["context", "keywords", "section", "paper_title"]
+# Below this relevance a work is too loosely related to suggest it for a gap
+GAP_RELEVANCE = 0.85
 _CLAIM_FIELDS = ["evidence", "section", "paper_title"]
 
 
@@ -68,6 +71,7 @@ class EvidenceEngine:
         topic: int | None = None,
         exclude_keys: set[str] | None = None,
         max_per_paper: int = 2,
+        keys: set[str] | None = None,
     ) -> list[dict]:
         """The ``n`` most relevant ideas and claims, at most ``max_per_paper`` per work.
 
@@ -75,13 +79,14 @@ class EvidenceEngine:
             kind: "ideas", "claims" or "todo".
             topic: Only items of this topic (see ``topics``).
             exclude_keys: Works not to return, for example those already cited.
+            keys: Only these works.
         """
         embedding = self.ideas.get_embedding(query)
         pool = []
         if kind in ("ideas", "todo"):
-            pool += [(item, s, "idea") for item, s in self._candidates(self.ideas, embedding, n, topic)]
+            pool += [(item, s, "idea") for item, s in self._candidates(self.ideas, embedding, n, topic, keys)]
         if kind in ("claims", "todo"):
-            pool += [(item, s, "claim") for item, s in self._candidates(self.claims, embedding, n, topic)]
+            pool += [(item, s, "claim") for item, s in self._candidates(self.claims, embedding, n, topic, keys)]
         pool.sort(key=lambda entry: entry[1], reverse=True)
 
         results, per_key, seen_texts = [], Counter(), set()
@@ -99,12 +104,31 @@ class EvidenceEngine:
                 break
         return results
 
-    def _candidates(self, index: EmbeddingIndex, embedding, n, topic):
-        if topic is None:
+    def sources_for_gaps(self, text: str, n: int = 2, min_relevance: float = GAP_RELEVANCE) -> list[dict]:
+        """For each sentence of ``text`` with a ``[@?]``, the works that could back it.
+
+        Only suggestions: whoever writes decides whether the work really says it.
+        """
+        gaps = []
+        for sentence in re.findall(r"[^.!?\n]*\[@\?\][^.!?\n]*[.!?]?", text):
+            query = re.sub(r"\[[^\]]*@[^\]]*\]", "", sentence).strip()
+            if not query:
+                continue
+            found = [r for r in self.search(query, n=n, max_per_paper=1) if r["relevancia"] >= min_relevance]
+            if found:
+                gaps.append({"frase": sentence.strip(), "fuentes": found})
+        return gaps
+
+    def _candidates(self, index: EmbeddingIndex, embedding, n, topic, keys=None):
+        if topic is None and keys is None:
             return index.search_by_embedding(embedding, top_k=n * 8)
-        self.topics()
         scores = index._cosine_similarity(embedding, index._embeddings_matrix)
-        scores = np.where(self._topic_labels(index) == topic, scores, -np.inf)
+        if topic is not None:
+            self.topics()
+            scores = np.where(self._topic_labels(index) == topic, scores, -np.inf)
+        if keys is not None:
+            in_keys = np.array([self.citations.key_for(item.get("paper_id", "")) in keys for item in index.items])
+            scores = np.where(in_keys, scores, -np.inf)
         return index._top(scores, n * 8, min_score=-1.0)
 
     def _topic_labels(self, index: EmbeddingIndex) -> np.ndarray:

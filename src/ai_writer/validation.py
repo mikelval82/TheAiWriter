@@ -26,6 +26,7 @@ class DocumentReport:
     words_per_section: dict[str, int] = field(default_factory=dict)
     times_cited: dict[str, int] = field(default_factory=dict)
     uncited: list[str] = field(default_factory=list)
+    gap_sources: list[dict] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -40,6 +41,15 @@ class DocumentReport:
         if self.times_cited:
             lines += ["", "## Veces que se cita cada obra", "", "| Obra | Citas |", "|---|---|"]
             lines += [f"| {key} | {n} |" for key, n in self.times_cited.items()]
+        if self.gap_sources:
+            lines += ["", "## Posibles fuentes para los huecos [@?]", "",
+                      "Son sugerencias: comprueba que la obra dice eso antes de citarla.", ""]
+            for gap in self.gap_sources:
+                lines.append(f"- «{gap['frase']}»")
+                lines += [
+                    f"  - {source['cita']} ({source['relevancia']:.2f}): {source['texto'][:200]}"
+                    for source in gap["fuentes"]
+                ]
         if self.uncited:
             lines += ["", "## Obras de las colecciones sin citar", ""]
             lines += [f"- {key}" for key in self.uncited]
@@ -77,8 +87,12 @@ def _index_and_allowed(folder: Path) -> tuple[CitationIndex, set[str]]:
     return index, index.keys_for_papers(project.paper_ids())
 
 
-def validate_document(folder: Path, write_report: bool = True) -> DocumentReport:
-    """Validate ``borrador/documento.md`` and write ``revision/validacion.md``."""
+def validate_document(folder: Path, write_report: bool = True, suggest: bool = False) -> DocumentReport:
+    """Validate ``borrador/documento.md`` and write ``revision/validacion.md``.
+
+    With ``suggest``, it also looks for works that could fill each ``[@?]``; that
+    loads the embeddings, so the hook does not ask for it.
+    """
     folder = Path(folder)
     text = (folder / DRAFT).read_text(encoding="utf-8")
     index, allowed = _index_and_allowed(folder)
@@ -90,6 +104,11 @@ def validate_document(folder: Path, write_report: bool = True) -> DocumentReport
         times_cited=dict(times_cited.most_common()),
         uncited=sorted(allowed - set(times_cited)),
     )
+    if suggest and "[@?]" in text:
+        from ai_writer.evidence import EvidenceEngine
+
+        project = Project.load(folder)
+        report.gap_sources = EvidenceEngine(project.library(), project.paper_ids()).sources_for_gaps(text)
     if write_report:
         (folder / REPORT).parent.mkdir(parents=True, exist_ok=True)
         (folder / REPORT).write_text(report.markdown(), encoding="utf-8")

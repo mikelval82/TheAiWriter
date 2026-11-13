@@ -40,7 +40,8 @@ OUTLINE_JSON_FORMAT = """## Formato de Salida (JSON)
           "paragraph_number": 1,
           "key_idea": "Idea específica y argumentativa (NO genérica)",
           "supporting_points": ["Punto de apoyo 1", "Punto de apoyo 2"],
-          "suggested_sources": ["Topic1", "Topic2"]
+          "suggested_sources": ["Topic1", "Topic2"],
+          "source_keys": ["clave1", "clave2"]
         }
       ]
     }
@@ -187,11 +188,13 @@ class PlannerAgent:
                     for i, idea in enumerate(ideas, 1):
                         text = idea.get("idea") or idea.get("statement") or idea.get("text", "")
                         cluster = idea.get("cluster", "")
+                        key = idea.get("clave")
                         if text:
                             # Truncate cleanly at sentence boundary if possible
                             text = text[:250].rsplit('.', 1)[0] + '.' if len(text) > 250 else text
                             cluster_tag = f" [{cluster}]" if cluster else ""
-                            section_block += f"  {i}. {text}{cluster_tag}\n"
+                            source_tag = f" (fuente: {key})" if key else ""
+                            section_block += f"  {i}. {text}{cluster_tag}{source_tag}\n"
             
             sections_with_ideas.append(section_block)
         
@@ -212,7 +215,9 @@ class PlannerAgent:
 1. Genera exactamente el número de párrafos indicado por sección
 2. Basa cada key_idea en las ideas de literatura proporcionadas
 3. Usa suggested_sources para indicar qué topics fundamentan cada párrafo
-4. Todos los campos deben tener contenido"""
+4. En source_keys pon la fuente (la clave tal cual aparece en "fuente: ...") de cada idea
+   de la literatura en que se basa el párrafo
+5. Todos los campos deben tener contenido"""
 
     def generate_outline(
         self,
@@ -351,6 +356,7 @@ IMPORTANTE: Responde ÚNICAMENTE con JSON válido, sin texto adicional.
                     key_idea=para_data.get("key_idea", ""),
                     supporting_points=para_data.get("supporting_points", []),
                     suggested_sources=para_data.get("suggested_sources", []),
+                    source_keys=para_data.get("source_keys", []),
                 )
                 paragraphs.append(paragraph)
             
@@ -455,7 +461,8 @@ Asegúrate de:
 4. PRESERVAR LA ESTRUCTURA: Mantén aproximadamente el mismo número de secciones y párrafos
 5. Solo elimina o fusiona párrafos si hay redundancia MUY CLARA (dicen exactamente lo mismo)
 6. Es preferible mejorar el contenido de los párrafos existentes que reducir su cantidad
-7. La profundidad y exhaustividad del paper es valiosa - no la sacrifiques"""
+7. Conservar los source_keys de cada párrafo (y llevarlos con las ideas que muevas)
+8. La profundidad y exhaustividad del paper es valiosa - no la sacrifiques"""
 
         try:
             content = self.llm.complete(

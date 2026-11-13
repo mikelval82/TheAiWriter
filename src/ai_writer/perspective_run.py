@@ -309,6 +309,7 @@ class PerspectiveRun:
                     section_name=section_outline.section_name,
                     suggested_topics=paragraph.suggested_sources,
                 )
+                context = self._plan_sources(paragraph, query) + context
                 record_retrieved(self.folder, query, _CITED_KEY.findall(context))
                 context += _overcited_note(cited)
                 text = writer.write_paragraph(
@@ -343,6 +344,23 @@ class PerspectiveRun:
                 state["resumen"] = self._summarize(state["titulo"], state["contenido"])
                 self._track_usage()
                 self.save()
+
+    def _plan_sources(self, paragraph, query: str) -> str:
+        """The evidence of the works the plan built this paragraph on, offered first.
+
+        The general search may leave those works out (limits per work, works
+        already cited often); without them the writer knows a claim from the plan
+        but not its source, and leaves a ``[@?]``.
+        """
+        keys = set(paragraph.source_keys) & self.engine().allowed_keys()
+        if not keys:
+            return ""
+        results = self.engine().search(query, n=2 * len(keys), keys=keys)
+        lines = ["\n📌 FUENTES DE LAS IDEAS DEL PLAN PARA ESTE PÁRRAFO "
+                 "(cítalas cuando uses sus ideas):"]
+        for result in results:
+            lines.append(f"• [{result['paper'][:50]}] → Citar: {result['cita']}\n   {result['texto']}")
+        return "\n".join(lines) + "\n"
 
     def _cited_so_far(self) -> Counter:
         """How many times the document written so far cites each work."""
@@ -445,7 +463,7 @@ RESUMEN:"""
                 + "\n".join(f"- `{c}`" for c in corrections) + "\n",
                 encoding="utf-8",
             )
-        report = validate_document(self.folder)
+        report = validate_document(self.folder, suggest=True)
 
         if not self.state.get("revision_critica_hecha"):
             from ai_writer.agents.reviewer_agent import ReviewerAgent

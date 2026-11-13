@@ -209,3 +209,18 @@ def test_hook_blocks_invented_citations_and_stays_quiet_when_all_is_well(library
 
     (folder / "borrador" / "documento.md").write_text("Robots [@smith2020emotion].", encoding="utf-8")
     assert _run_hook(folder, env) is None
+
+
+def test_gaps_get_suggested_sources_from_the_collections_only(library):
+    library.save_collection("Robots", library.find_papers(["emotion models", "crowded"]))
+    engine = EvidenceEngine(library, library.paper_ids(["Robots"]))
+
+    gaps = engine.sources_for_gaps(
+        "Los robots usan modelos de emoción [@?]. Esto está citado [@smith2020emotion].",
+        min_relevance=-1,
+    )
+
+    assert [gap["frase"] for gap in gaps] == ["Los robots usan modelos de emoción [@?]."]
+    keys = [source["clave"] for source in gaps[0]["fuentes"]]
+    assert keys and len(keys) == len(set(keys))
+    assert set(keys) <= {"smith2020emotion", "brown2021navigation"}

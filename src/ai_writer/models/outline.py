@@ -10,6 +10,7 @@ class ParagraphOutline(BaseModel):
     key_idea: str  # The main idea this paragraph should develop
     supporting_points: list[str] = Field(default_factory=list)  # Additional points to cover
     suggested_sources: list[str] = Field(default_factory=list)  # Paper titles to cite
+    source_keys: list[str] = Field(default_factory=list)  # Citation keys of the ideas it builds on
     
     def to_query(self) -> str:
         """Convert to a search query for embeddings."""
@@ -82,6 +83,8 @@ class PaperOutline(BaseModel):
                     lines.append(f"- **Puntos de apoyo:** {', '.join(para.supporting_points)}")
                 if para.suggested_sources:
                     lines.append(f"- **Fuentes sugeridas:** {', '.join(para.suggested_sources[:3])}")
+                if para.source_keys:
+                    lines.append(f"- **source_keys:** {', '.join(para.source_keys)}")
                 lines.append("")
         
         return "\n".join(lines)
