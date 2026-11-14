@@ -73,10 +73,9 @@ class RAGSystem:
         else:
             console.print(f"[yellow]⚠ Claims index not found: {claims_path}[/yellow]")
         
+        # Papers processed from now on have no bibliography index; older ones still do
         if references_path.exists():
             self.references_index.build_from_jsonl(references_path, force_rebuild)
-        else:
-            console.print(f"[yellow]⚠ References index not found: {references_path}[/yellow]")
         
         console.print("\n[bold green]✓ RAG system ready![/bold green]")
         self._print_summary()

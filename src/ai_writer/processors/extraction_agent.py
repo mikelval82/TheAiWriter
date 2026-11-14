@@ -5,15 +5,24 @@ import re
 from typing import Any
 
 from ai_writer.agents.base_agent import BaseAgent
-from ai_writer.processors.models import (
-    Claim,
-    Idea,
-    Reference,
-)
+from ai_writer.processors.models import Claim, Idea
+from ai_writer.processors.segmentation import segment
 from config.settings import settings
 
 
 STRUCTURE_ATTEMPTS = 3  # tries at finding the sections before giving up
+SECTION_ATTEMPTS = 3  # tries at getting a readable answer for one segment
+IDEA_KINDS = ("finding", "concept", "method", "limitation", "proposal", "background")
+
+
+class ExtractionError(RuntimeError):
+    """The model never returned a readable answer for a segment."""
+
+
+def _idea_kind(value: Any) -> str | None:
+    """The idea's kind if it is one of IDEA_KINDS, else None."""
+    kind = str(value or "").strip().lower()
+    return kind if kind in IDEA_KINDS else None
 
 
 def _safe_get(data: dict, key: str, default: Any = "") -> Any:
@@ -34,21 +43,6 @@ def _safe_get_list(data: dict, key: str) -> list:
     if value is None or not isinstance(value, list):
         return []
     return value
-
-
-def _safe_get_int(data: dict, key: str) -> int | None:
-    """Get int from dict, handling various formats."""
-    value = data.get(key)
-    if value is None:
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        try:
-            return int(value)
-        except ValueError:
-            return None
-    return None
 
 
 class PDFExtractionAgent(BaseAgent):
@@ -100,20 +94,33 @@ Return ONLY the JSON, no other text."""
         return self._parse_json_response(response)
 
     def extract_sections(self, text: str) -> list[dict[str, Any]]:
-        """Identify and segment the paper into sections.
-        
+        """Cut the paper into non-overlapping segments, one per extraction pass.
+
+        The model only names the sections; the cutting is done by ``segment``, which
+        falls back to size-based pieces when the model finds no usable structure.
+
         Args:
             text: Full paper text.
-            
+
         Returns:
-            List of sections with name and content.
+            List of sections with name, number and content.
         """
-        # First, identify section structure
         structure = self._identify_section_structure(text)
-        
-        # Then extract content for each section
-        sections = self._extract_section_contents(text, structure)
-        
+        names = [
+            str(item["section_name"])
+            for item in structure
+            if isinstance(item, dict) and item.get("section_name")
+        ]
+
+        sections = []
+        for piece in segment(text, names):
+            content = self.clean_text(piece.content)
+            if content:
+                sections.append({
+                    "section_name": piece.name,
+                    "section_number": piece.number,
+                    "content": content,
+                })
         return sections
 
     def _identify_section_structure(self, text: str) -> list[dict[str, Any]]:
@@ -160,80 +167,15 @@ Return ONLY the JSON array."""
                 return structure
         return []
 
-    def _extract_section_contents(
-        self,
-        text: str,
-        structure: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        """Extract content for each identified section.
+    def clean_text(self, content: str) -> str:
+        """Clean paper text from PDF artifacts.
         
         Args:
-            text: Full paper text.
-            structure: List of section names and numbers.
+            content: Raw text.
             
         Returns:
-            List of sections with full content.
+            Cleaned text.
         """
-        import re
-        
-        sections = []
-        section_names = [s.get("section_name", "") for s in structure]
-        
-        for i, sec_info in enumerate(structure):
-            section_name = sec_info.get("section_name", f"Section {i+1}")
-            section_num = sec_info.get("section_number", i + 1)
-            
-            # Try to find section boundaries using regex
-            # Build pattern for current section
-            escaped_name = re.escape(section_name)
-            pattern = rf'(?:^|\n)\s*(?:\d+\.?\s*)?{escaped_name}\s*\n'
-            
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                start_pos = match.end()
-                
-                # Find next section start
-                end_pos = len(text)
-                next_section_name = section_names[i + 1] if i + 1 < len(section_names) else "References"
-                escaped_next = re.escape(next_section_name)
-                next_pattern = rf'(?:^|\n)\s*(?:\d+\.?\s*)?{escaped_next}\s*\n'
-                next_match = re.search(next_pattern, text[start_pos:], re.IGNORECASE)
-                
-                if next_match:
-                    end_pos = start_pos + next_match.start()
-                else:
-                    # Try to find References as end boundary
-                    ref_match = re.search(r'\n\s*References\s*\n', text[start_pos:], re.IGNORECASE)
-                    if ref_match:
-                        end_pos = start_pos + ref_match.start()
-                
-                content = text[start_pos:end_pos].strip()
-                
-                # Clean up content
-                content = self._clean_section_content(content)
-            else:
-                # Fallback: use LLM to extract
-                content = self._extract_section_with_llm(text, section_name)
-            
-            sections.append({
-                "section_name": section_name,
-                "section_number": section_num,
-                "content": content,
-            })
-        
-        return sections
-
-    def _clean_section_content(self, content: str) -> str:
-        """Clean section content from PDF artifacts.
-        
-        Args:
-            content: Raw section content.
-            
-        Returns:
-            Cleaned content.
-        """
-        import re
-        
         # Remove page markers
         content = re.sub(r'---\s*Page\s*\d+\s*---', '', content)
         # Remove repeated header/footer lines
@@ -243,33 +185,7 @@ Return ONLY the JSON array."""
         
         return content.strip()
 
-    def _extract_section_with_llm(self, text: str, section_name: str) -> str:
-        """Use LLM to extract a specific section when regex fails.
-        
-        Args:
-            text: Full paper text.
-            section_name: Name of section to extract.
-            
-        Returns:
-            Section content.
-        """
-        prompt = f"""Find and extract the "{section_name}" section from this academic paper.
-
-TEXT:
-{text[:60000]}
-
-Return ONLY the content of the "{section_name}" section, nothing else.
-If the section doesn't exist in the paper, return "SECTION_NOT_FOUND"."""
-
-        response = self._call_api(self.system_prompt, prompt, max_tokens=8000)
-        
-        if "SECTION_NOT_FOUND" in response:
-            return ""
-        
-        return response.strip()
-        return self._parse_json_response(response, default=[])
-
-    def extract_ideas_from_section(
+    def extract_from_section(
         self,
         section_name: str,
         section_content: str,
@@ -277,56 +193,102 @@ If the section doesn't exist in the paper, return "SECTION_NOT_FOUND"."""
         authors: list[str],
         year: int | None,
         paper_id: str,
-    ) -> list[Idea]:
-        """Extract main ideas from a section.
-        
+    ) -> tuple[list[Idea], list[Claim]]:
+        """Extract the ideas and the claims of a segment in one call.
+
+        Every item carries a ``quote``; checking it against the paper is up to the caller.
+
         Args:
-            section_name: Name of the section.
-            section_content: Text content of the section.
+            section_name: Name of the segment.
+            section_content: Text content of the segment.
             paper_title: Title of the paper.
             authors: List of authors.
             year: Publication year.
             paper_id: Unique paper identifier.
-            
+
         Returns:
-            List of Idea objects.
+            The Idea and the Claim objects.
+
+        Raises:
+            ExtractionError: If no attempt returned readable JSON.
         """
-        prompt = f"""Analyze this section from an academic paper and extract the MAIN IDEAS.
+        prompt = f"""Analyze this section from an academic paper and extract its MAIN IDEAS and its CLAIMS WITH EVIDENCE.
 
 PAPER: {paper_title}
 SECTION: {section_name}
 
 CONTENT:
-{section_content[:12000]}
+{section_content}
 
-Extract 3-7 main ideas from this section. For each idea, provide:
+Return ONE JSON object with two lists:
 
-[
-    {{
-        "idea": "Clear, concise statement of the main idea (1-2 sentences)",
-        "context": "Brief quote or paraphrase providing context",
-        "importance": "high|medium|low",
-        "keywords": ["keyword1", "keyword2", ...],
-        "related_references": ["Author2024", "Smith2023", ...] (if mentioned)
-    }},
-    ...
-]
+{{
+    "ideas": [
+        {{
+            "idea": "Clear, concise statement of the main idea (1-2 sentences)",
+            "context": "Short explanation that situates the idea",
+            "quote": "Sentence copied verbatim from the CONTENT that states the idea",
+            "kind": "finding|concept|method|limitation|proposal|background",
+            "importance": "high|medium|low",
+            "keywords": ["keyword1", "keyword2", ...],
+            "related_references": ["Author2024", "Smith2023", ...] (if mentioned)
+        }}
+    ],
+    "claims": [
+        {{
+            "claim": "The specific assertion being made",
+            "evidence": "The supporting evidence or citation",
+            "evidence_type": "experiment|data|observation|citation",
+            "quote": "Sentence copied verbatim from the CONTENT that states the claim",
+            "cited_references": ["Author2024", ...],
+            "confidence": "high|medium|low"
+        }}
+    ]
+}}
 
-Focus on:
+IDEAS: extract up to 7 main ideas (fewer when the section is short, none when it has no substance). Focus on:
 - Novel contributions and claims
 - Key arguments and findings
 - Important definitions or frameworks
 - Significant conclusions
 
-Return ONLY the JSON array, no other text."""
+Set "kind" of each idea to exactly one of:
+- finding: a result or conclusion of the paper
+- concept: a definition, framework, model or theoretical position
+- method: how the study was done (procedure, materials, datasets, apparatus, features, metrics, implementation details)
+- limitation: a limitation, gap, risk or open problem
+- proposal: something the paper proposes or recommends
+- background: context from prior work
 
-        response = self._call_api(self.system_prompt, prompt, max_tokens=4000)
-        ideas_data = self._parse_json_response(response, default=[])
-        
+CLAIMS: extract up to 10 claims that are supported by evidence. Focus on:
+- Claims backed by citations
+- Statistical findings
+- Experimental results
+- Comparative analyses
+Set evidence_type to "experiment" for the paper's own experiments or studies, "data" for its own quantitative or statistical findings, "observation" for its own qualitative observations or arguments, and "citation" when the support is another work that the paper cites.
+
+QUOTES (required for every idea and every claim):
+- Copy ONE sentence, or one contiguous passage, from the CONTENT that states the idea or the claim, character by character, between 8 and 40 words.
+- Do not paraphrase, translate, add words or edit with brackets. Keep the language of the paper.
+- The ellipsis "…" is allowed only to drop the middle of a long sentence.
+- Items whose quote is not found verbatim in the text are DISCARDED, so copy exactly. If you cannot back an item with a quote, leave that item out.
+
+Return ONLY the JSON object, no other text."""
+
+        for _ in range(SECTION_ATTEMPTS):
+            response = self._call_api(self.system_prompt, prompt, max_tokens=8000)
+            data = self._parse_json_response(response)
+            if isinstance(data, dict) and ("ideas" in data or "claims" in data):
+                break
+        else:
+            raise ExtractionError(
+                f"Respuesta ilegible del modelo para el tramo «{section_name}» "
+                f"tras {SECTION_ATTEMPTS} intentos"
+            )
+
         ideas = []
-        for data in ideas_data:
-            idea_text = _safe_get(data, "idea")
-            if not idea_text:  # Skip empty ideas
+        for item in _safe_get_list(data, "ideas"):
+            if not isinstance(item, dict) or not _safe_get(item, "idea"):
                 continue
             ideas.append(Idea(
                 paper_id=paper_id,
@@ -334,263 +296,32 @@ Return ONLY the JSON array, no other text."""
                 authors=authors,
                 year=year,
                 section=section_name,
-                idea=idea_text,
-                context=_safe_get(data, "context"),
-                importance=_safe_get(data, "importance", "medium"),
-                keywords=_safe_get_list(data, "keywords"),
-                related_references=_safe_get_list(data, "related_references"),
+                idea=item["idea"],
+                context=_safe_get(item, "context"),
+                kind=_idea_kind(item.get("kind")),
+                importance=_safe_get(item, "importance", "medium"),
+                keywords=_safe_get_list(item, "keywords"),
+                related_references=_safe_get_list(item, "related_references"),
+                quote=str(_safe_get(item, "quote")),
             ))
-        
-        return ideas
 
-    def extract_claims_from_section(
-        self,
-        section_name: str,
-        section_content: str,
-        paper_title: str,
-        paper_id: str,
-    ) -> list[Claim]:
-        """Extract claims with evidence from a section.
-        
-        Args:
-            section_name: Name of the section.
-            section_content: Text content of the section.
-            paper_title: Title of the paper.
-            paper_id: Unique paper identifier.
-            
-        Returns:
-            List of Claim objects.
-        """
-        prompt = f"""Analyze this section and extract CLAIMS WITH EVIDENCE.
-
-PAPER: {paper_title}
-SECTION: {section_name}
-
-CONTENT:
-{section_content[:12000]}
-
-Extract claims that are supported by evidence (citations, data, experiments).
-
-[
-    {{
-        "claim": "The specific assertion being made",
-        "evidence": "The supporting evidence or citation",
-        "evidence_type": "citation|data|experiment|observation",
-        "cited_references": ["Author2024", ...],
-        "confidence": "high|medium|low"
-    }},
-    ...
-]
-
-Focus on:
-- Claims backed by citations
-- Statistical findings
-- Experimental results
-- Comparative analyses
-
-Return ONLY the JSON array, no other text."""
-
-        response = self._call_api(self.system_prompt, prompt, max_tokens=4000)
-        claims_data = self._parse_json_response(response, default=[])
-        
         claims = []
-        for data in claims_data:
-            claim_text = _safe_get(data, "claim")
-            if not claim_text:  # Skip empty claims
+        for item in _safe_get_list(data, "claims"):
+            if not isinstance(item, dict) or not _safe_get(item, "claim"):
                 continue
             claims.append(Claim(
                 paper_id=paper_id,
                 paper_title=paper_title,
                 section=section_name,
-                claim=claim_text,
-                evidence=_safe_get(data, "evidence"),
-                evidence_type=_safe_get(data, "evidence_type", "citation"),
-                cited_references=_safe_get_list(data, "cited_references"),
-                confidence=_safe_get(data, "confidence", "medium"),
+                claim=item["claim"],
+                evidence=str(_safe_get(item, "evidence")),
+                evidence_type=str(_safe_get(item, "evidence_type", "observation")),
+                cited_references=_safe_get_list(item, "cited_references"),
+                confidence=_safe_get(item, "confidence", "medium"),
+                quote=str(_safe_get(item, "quote")),
             ))
-        
-        return claims
 
-    def extract_references(
-        self,
-        references_text: str,
-        paper_id: str,
-    ) -> list[Reference]:
-        """Extract structured references from the references section.
-        
-        Args:
-            references_text: Text of the references section.
-            paper_id: Unique paper identifier.
-            
-        Returns:
-            List of Reference objects.
-        """
-        # Clean up the text - rejoin lines that were split by PDF extraction
-        cleaned_text = self._clean_references_text(references_text)
-        
-        # Split into logical chunks by finding reference boundaries
-        # Each chunk should contain complete references
-        chunks = self._split_references_into_chunks(cleaned_text, max_chunk_size=8000)
-        
-        all_references = []
-        for chunk in chunks:
-            if not chunk.strip():
-                continue
-            refs = self._extract_references_chunk(chunk, paper_id)
-            all_references.extend(refs)
-        
-        return all_references
-
-    def _split_references_into_chunks(self, text: str, max_chunk_size: int = 8000) -> list[str]:
-        """Split references text into chunks at reference boundaries.
-        
-        Args:
-            text: Cleaned references text.
-            max_chunk_size: Maximum size of each chunk.
-            
-        Returns:
-            List of text chunks, each containing complete references.
-        """
-        import re
-        
-        # Split by lines that look like reference starts
-        lines = text.split('\n')
-        chunks = []
-        current_chunk = []
-        current_size = 0
-        
-        for line in lines:
-            line_size = len(line) + 1  # +1 for newline
-            
-            # Check if this is a new reference start and we're near the limit
-            is_ref_start = bool(re.match(
-                r'^[A-Z][a-z]+,?\s+[A-Z]\.?|^\[[0-9]+\]|^[A-Z]\.\s+[A-Z]',
-                line.strip()
-            ))
-            
-            if current_size + line_size > max_chunk_size and current_chunk and is_ref_start:
-                # Save current chunk and start new one
-                chunks.append('\n'.join(current_chunk))
-                current_chunk = [line]
-                current_size = line_size
-            else:
-                current_chunk.append(line)
-                current_size += line_size
-        
-        # Don't forget the last chunk
-        if current_chunk:
-            chunks.append('\n'.join(current_chunk))
-        
-        return chunks
-
-    def _clean_references_text(self, text: str) -> str:
-        """Clean up references text from PDF extraction artifacts.
-        
-        Args:
-            text: Raw text from PDF.
-            
-        Returns:
-            Cleaned text with references properly formatted.
-        """
-        import re
-        
-        # Remove page markers
-        text = re.sub(r'---\s*Page\s*\d+\s*---', '\n', text)
-        
-        # Remove header/footer artifacts (journal info repeated)
-        text = re.sub(r'Published in [^\n]+\n', '\n', text)
-        
-        # Normalize whitespace but preserve paragraph breaks
-        lines = text.split('\n')
-        cleaned_lines = []
-        current_ref = []
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                if current_ref:
-                    cleaned_lines.append(' '.join(current_ref))
-                    current_ref = []
-                continue
-            
-            # Check if this looks like a new reference start
-            # (starts with author name pattern, number, or bracket)
-            is_new_ref = bool(re.match(
-                r'^(\[[0-9]+\]|[A-Z][a-z]+,?\s+[A-Z]\.?|[A-Z]\.\s+[A-Z])',
-                line
-            ))
-            
-            if is_new_ref and current_ref:
-                cleaned_lines.append(' '.join(current_ref))
-                current_ref = [line]
-            else:
-                current_ref.append(line)
-        
-        if current_ref:
-            cleaned_lines.append(' '.join(current_ref))
-        
-        return '\n'.join(cleaned_lines)
-
-    def _extract_references_chunk(
-        self,
-        chunk: str,
-        paper_id: str,
-    ) -> list[Reference]:
-        """Extract references from a chunk of text.
-        
-        Args:
-            chunk: Cleaned text chunk containing references.
-            paper_id: Unique paper identifier.
-            
-        Returns:
-            List of Reference objects.
-        """
-        prompt = f"""You are parsing a bibliography section from an academic paper.
-Extract ALL references you can find in this text.
-
-TEXT:
-{chunk}
-
-For EACH reference found, extract:
-{{
-    "citation_key": "AuthorYear format (e.g., 'Smith2024') or number '[1]'",
-    "full_citation": "The complete citation text as it appears",
-    "authors": ["Surname, FirstName", ...],
-    "title": "Title of the paper/book",
-    "year": 2024,
-    "doi": "DOI if present, null otherwise",
-    "venue": "Journal, Conference, or arXiv"
-}}
-
-IMPORTANT:
-- Extract EVERY reference, even if some fields are unclear
-- For arXiv papers, use "arXiv" as venue
-- Generate citation_key from first author surname + year
-- Return a JSON array with all references
-
-Return ONLY a valid JSON array, no explanation."""
-
-        response = self._call_api(self.system_prompt, prompt, max_tokens=8000)
-        refs_data = self._parse_json_response(response, default=[])
-        
-        references = []
-        for data in refs_data:
-            full_citation = _safe_get(data, "full_citation")
-            title = _safe_get(data, "title")
-            if not full_citation and not title:
-                continue  # Skip empty entries
-            references.append(Reference(
-                source_paper_id=paper_id,
-                citation_key=_safe_get(data, "citation_key"),
-                full_citation=full_citation,
-                authors=_safe_get_list(data, "authors"),
-                title=title,
-                year=_safe_get_int(data, "year"),
-                doi=_safe_get(data, "doi") or None,  # Convert empty string to None
-                venue=_safe_get(data, "venue") or None,
-            ))
-        
-        return references
+        return ideas, claims
 
     def _parse_json_response(
         self,

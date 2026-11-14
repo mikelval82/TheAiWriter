@@ -161,7 +161,7 @@ def process(
     This command:
     
     1. Converts PDFs to Markdown using Docling
-    2. Extracts ideas, claims, and references
+    2. Extracts ideas and claims, each backed by a verbatim quote
     3. Generates embeddings and builds search indices
     
     Example:
@@ -189,8 +189,7 @@ def process(
     console.print(Panel(
         f"✅ Processed: {stats.get('processed_successfully', 0)} papers\n"
         f"💡 Ideas extracted: {stats.get('total_ideas', 0)}\n"
-        f"📌 Claims extracted: {stats.get('total_claims', 0)}\n"
-        f"📚 References extracted: {stats.get('total_references', 0)}",
+        f"📌 Claims extracted: {stats.get('total_claims', 0)}",
         title="[bold green]✓ Processing Complete[/bold green]",
         border_style="green",
     ))

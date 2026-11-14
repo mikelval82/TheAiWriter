@@ -128,8 +128,35 @@ class FakeLLM:
         raise AssertionError(f"FakeLLM has no rule for prompt:\n{prompt[:400]}")
 
 
+def _segment_answer(prompt: str) -> str:
+    """Ideas and claims whose quotes are the opening words of the segment's text."""
+    content = prompt.split("CONTENT:\n", 1)[1].split("\n\nReturn ONE JSON", 1)[0]
+    quote = " ".join(content.split()[:12])
+    return json.dumps(
+        {
+            "ideas": [
+                {"idea": "Idea del tramo", "context": "Contexto", "kind": "finding", "quote": quote}
+            ],
+            "claims": [
+                {
+                    "claim": "Claim del tramo",
+                    "evidence": "Evidencia",
+                    "evidence_type": "data",
+                    "quote": quote,
+                }
+            ],
+        }
+    )
+
+
 def _script_default_pipeline(llm: FakeLLM) -> None:
-    """Rules covering every call of AdvancedPerspectiveOrchestrator.run()."""
+    """Rules covering every call of AdvancedPerspectiveOrchestrator.run() and of PDF processing.
+
+    Processing makes metadata, structure, then one call per segment (see tests/test_extraction.py).
+    """
+    llm.on("extract metadata", json.dumps({"title": "Paper de prueba", "authors": ["Ana Smith"], "year": 2020}))
+    llm.on("identify its section structure", json.dumps([{"section_name": "Introduction", "section_number": 1}]))
+    llm.on("MAIN IDEAS and its CLAIMS", _segment_answer)
     llm.on("planificador de papers", json.dumps(DEFAULT_OUTLINE))
     llm.on("ESQUEMA A REVISAR", "Sin cambios necesarios")
     llm.on("Escribe UN SOLO PÁRRAFO", f"Párrafo escrito {KNOWN_CITATION}.")

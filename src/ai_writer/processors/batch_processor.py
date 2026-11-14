@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 
+from ai_writer.library import count_usable_items
 from ai_writer.llm import UsageLimitError
 
 from .pdf_processor import PDFProcessor
@@ -92,14 +93,8 @@ class BatchProcessor:
                 
                 # If not in status, add it
                 if filename not in status["processed"]:
-                    # Count ideas, claims, references
-                    ideas_file = paper_folder / "ideas.jsonl"
-                    claims_file = paper_folder / "claims.jsonl"
-                    refs_file = paper_folder / "references.jsonl"
-                    
-                    ideas_count = sum(1 for _ in open(ideas_file)) if ideas_file.exists() else 0
-                    claims_count = sum(1 for _ in open(claims_file)) if claims_file.exists() else 0
-                    refs_count = sum(1 for _ in open(refs_file)) if refs_file.exists() else 0
+                    ideas_count = count_usable_items(paper_folder / "ideas.jsonl")
+                    claims_count = count_usable_items(paper_folder / "claims.jsonl")
                     
                     status["processed"][filename] = {
                         "paper_id": metadata.get("paper_id", paper_folder.name),
@@ -108,7 +103,6 @@ class BatchProcessor:
                         "success": True,
                         "ideas_count": ideas_count,
                         "claims_count": claims_count,
-                        "references_count": refs_count,
                     }
                     
             except Exception:
@@ -219,13 +213,15 @@ class BatchProcessor:
                     # Process the PDF
                     processed_paper = self.pdf_processor.process_pdf(pdf_path)
                     
-                    if processed_paper and not (processed_paper.ideas or processed_paper.claims):
-                        # Saved but empty: drop it so that the next run tries again
+                    if processed_paper and not (
+                        processed_paper.usable_ideas or processed_paper.usable_claims
+                    ):
+                        # Saved but nothing verified: drop it so that the next run tries again
                         shutil.rmtree(
                             self.output_folder / "papers" / processed_paper.metadata.paper_id,
                             ignore_errors=True,
                         )
-                        raise ValueError("No se extrajo ninguna idea ni claim del paper")
+                        raise ValueError("No se extrajo ninguna idea ni claim verificado del paper")
                     if processed_paper:
                         # Update status
                         self.status["processed"][pdf_path.name] = {
@@ -233,9 +229,8 @@ class BatchProcessor:
                             "title": processed_paper.metadata.title,
                             "timestamp": datetime.now().isoformat(),
                             "success": True,
-                            "ideas_count": len(processed_paper.ideas),
-                            "claims_count": len(processed_paper.claims),
-                            "references_count": len(processed_paper.references),
+                            "ideas_count": len(processed_paper.usable_ideas),
+                            "claims_count": len(processed_paper.usable_claims),
                         }
                         results["success"] += 1
                         console.print(f"  [green]✓[/green] {pdf_path.name[:60]}")
@@ -302,13 +297,11 @@ class BatchProcessor:
         """Get processing summary."""
         total_ideas = 0
         total_claims = 0
-        total_refs = 0
         
         for info in self.status["processed"].values():
             if info.get("success"):
                 total_ideas += info.get("ideas_count", 0)
                 total_claims += info.get("claims_count", 0)
-                total_refs += info.get("references_count", 0)
         
         return {
             "total_pdfs": len(list(self.pdfs_folder.glob("*.pdf"))),
@@ -316,7 +309,6 @@ class BatchProcessor:
             "failed": self.status["total_failed"],
             "total_ideas": total_ideas,
             "total_claims": total_claims,
-            "total_references": total_refs,
             "last_run": self.status["last_run"],
         }
     
@@ -332,7 +324,6 @@ class BatchProcessor:
         table.add_row("─" * 20, "─" * 10)
         table.add_row("Total Ideas", str(summary["total_ideas"]))
         table.add_row("Total Claims", str(summary["total_claims"]))
-        table.add_row("Total References", str(summary["total_references"]))
         
         console.print("\n")
         console.print(table)
@@ -357,7 +348,6 @@ class BatchProcessor:
             table.add_column("Title", style="cyan", max_width=50)
             table.add_column("Ideas", justify="right")
             table.add_column("Claims", justify="right")
-            table.add_column("Refs", justify="right")
             table.add_column("Status", justify="center")
             
             for i, (filename, info) in enumerate(self.status["processed"].items(), 1):
@@ -369,14 +359,12 @@ class BatchProcessor:
                         title,
                         str(info.get("ideas_count", 0)),
                         str(info.get("claims_count", 0)),
-                        str(info.get("references_count", 0)),
                         status,
                     )
                 else:
                     table.add_row(
                         str(i),
                         filename[:50],
-                        "-",
                         "-",
                         "-",
                         "[red]✗[/red]",

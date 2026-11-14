@@ -20,6 +20,7 @@ class PaperMetadata(BaseModel):
     processed_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     total_pages: int = 0
     sections_found: list[str] = Field(default_factory=list)
+    procesado: dict[str, int | float] = Field(default_factory=dict)  # metodo, llamadas, segundos, tramos
 
 
 class SectionData(BaseModel):
@@ -47,8 +48,11 @@ class Idea(BaseModel):
     idea: str
     context: str = ""  # Surrounding text for reference
     importance: str = "medium"  # high, medium, low
+    kind: Optional[str] = None  # finding, concept, method, limitation, proposal, background
     keywords: list[str] = Field(default_factory=list)
     related_references: list[str] = Field(default_factory=list)
+    quote: str = ""  # Sentence copied verbatim from the paper that states the idea
+    quote_verified: Optional[bool] = None  # None until checked against the paper's text
 
 
 class Claim(BaseModel):
@@ -63,21 +67,9 @@ class Claim(BaseModel):
     evidence_type: str = "citation"  # citation, data, experiment, observation
     cited_references: list[str] = Field(default_factory=list)
     confidence: str = "medium"  # high, medium, low
-
-
-class Reference(BaseModel):
-    """A bibliographic reference from the paper."""
-    
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    source_paper_id: str  # Paper that cites this reference
-    citation_key: str = ""  # e.g., "Smith2024" or "[1]"
-    full_citation: str  # Complete citation text
-    authors: list[str] = Field(default_factory=list)
-    title: str = ""
-    year: Optional[int] = None
-    doi: Optional[str] = None
-    venue: Optional[str] = None
-    citation_count_in_paper: int = 1  # How many times cited in source paper
+    origin: str = "propio"  # "citado" if the evidence is another work, else "propio"
+    quote: str = ""  # Sentence copied verbatim from the paper that states the claim
+    quote_verified: Optional[bool] = None  # None until checked against the paper's text
 
 
 class ProcessedPaper(BaseModel):
@@ -87,4 +79,12 @@ class ProcessedPaper(BaseModel):
     sections: list[SectionData] = Field(default_factory=list)
     ideas: list[Idea] = Field(default_factory=list)
     claims: list[Claim] = Field(default_factory=list)
-    references: list[Reference] = Field(default_factory=list)
+
+    @property
+    def usable_ideas(self) -> list[Idea]:
+        """Ideas whose quote was not found in the paper are kept out of the indices."""
+        return [idea for idea in self.ideas if idea.quote_verified is not False]
+
+    @property
+    def usable_claims(self) -> list[Claim]:
+        return [claim for claim in self.claims if claim.quote_verified is not False]

@@ -128,8 +128,8 @@ class Library:
                     file=Path(metadata.get("source_file", "")).name,
                     authors=tuple(metadata.get("authors") or ()),
                     year=metadata.get("year"),
-                    ideas=_count_lines(folder / "ideas.jsonl"),
-                    claims=_count_lines(folder / "claims.jsonl"),
+                    ideas=count_usable_items(folder / "ideas.jsonl"),
+                    claims=count_usable_items(folder / "claims.jsonl"),
                     references=_count_lines(folder / "references.jsonl"),
                 )
             )
@@ -327,6 +327,20 @@ class Library:
                 shutil.copy2(pdf, self.pdfs_dir)
                 pdfs += 1
         return {"papers": len(self.papers()), "vector_files": vectors, "pdfs": pdfs}
+
+
+def count_usable_items(path: Path) -> int:
+    """Items of a paper's ideas or claims file that reach the indices.
+
+    Items whose quote was not found in the paper (``quote_verified`` false) are kept in
+    the file for auditing but do not count; items without the field are counted.
+    """
+    if not path.is_file():
+        return 0
+    with open(path, encoding="utf-8") as f:
+        return sum(
+            1 for line in f if line.strip() and json.loads(line).get("quote_verified") is not False
+        )
 
 
 def _count_lines(path: Path) -> int:
