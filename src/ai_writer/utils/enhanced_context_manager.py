@@ -5,7 +5,6 @@ using semantic search across ideas, claims, and references with configurable
 priorities, confidence filtering, and paper diversity constraints.
 """
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,36 +12,23 @@ import numpy as np
 from rich.console import Console
 
 from ai_writer.embeddings.embedding_index import EmbeddingIndex
+from ai_writer.profiles import SectionConfig
 from config.settings import settings
 
 console = Console()
 
 
-@dataclass
-class SectionConfig:
-    """Configuration for context selection per section type."""
-    
-    # Weight for ideas vs claims (0.0 = only claims, 1.0 = only ideas)
-    ideas_weight: float
-    
-    # Minimum confidence level for claims ("high", "medium", "low")
-    min_confidence: str
-    
-    # Preferred evidence types for claims (None = all)
-    evidence_types: list[str] | None
-    
-    # Keywords to boost in search (section-specific focus)
-    boost_keywords: list[str]
-    
-    # Maximum items per paper (for diversity)
-    max_per_paper: int
-    
-    # Total items to retrieve
-    top_k: int
-
-
 # A work cited this many times in the document ranks at half its relevance
 CITATION_DAMPING = 8
+
+# A claim the paper takes from another work ranks lower than the paper's own findings
+CITED_CLAIM_WEIGHT = 0.85
+
+# Settings of a section without its own config nor a SECTION_CONFIGS entry
+DEFAULT_SECTION_CONFIG = SectionConfig(
+    ideas_weight=0.5, min_confidence="medium", evidence_types=None,
+    boost_keywords=[], max_per_paper=6, top_k=28,
+)
 
 # Section-specific configurations
 # NOTE: top_k increased to ensure enough context per paragraph with exclusion enabled
@@ -130,6 +116,18 @@ SECTION_CONFIGS: dict[str, SectionConfig] = {
 CONFIDENCE_ORDER = {"high": 3, "medium": 2, "low": 1}
 
 
+def is_cited_claim(item: dict) -> bool:
+    """Whether a claim is second-hand: the paper supports it on another work."""
+    return item.get("origin") == "citado" or item.get("evidence_type") == "citation"
+
+
+def _literal_quote(item: dict) -> str:
+    """The item's verified literal quote as a line for the writer; empty if it has none."""
+    if item.get("quote") and item.get("quote_verified"):
+        return f"\n   Cita literal: «{item['quote']}»"
+    return ""
+
+
 class EnhancedContextManager:
     """Manages intelligent, multi-level context selection for paper sections.
     
@@ -174,6 +172,7 @@ class EnhancedContextManager:
         self.ideas_index.restrict_to_papers(paper_ids)
         self.claims_index.restrict_to_papers(paper_ids)
         self.citation_keys = citation_keys
+        self.last_items: list[tuple[dict, float, str]] = []  # items of the last context built
         
         # Cache for query embeddings (reuse across sections)
         self._embedding_cache: dict[str, np.ndarray] = {}
@@ -531,6 +530,7 @@ class EnhancedContextManager:
         
         if not combined:
             return ""
+        self.last_items = combined
         
         # Mark items as used for exploration tracking
         self._mark_items_as_used(combined)
@@ -783,6 +783,11 @@ class EnhancedContextManager:
         if not all_results:
             return []
         
+        all_results = [
+            (item, score * CITED_CLAIM_WEIGHT if kind == "claim" and is_cited_claim(item) else score, kind)
+            for item, score, kind in all_results
+        ]
+
         if self.citation_counts:
             all_results = [
                 (item, score / (1 + self.citation_counts.get(self._citation_key_for(item), 0) / CITATION_DAMPING), kind)
@@ -1031,7 +1036,7 @@ class EnhancedContextManager:
         imp_marker = "⭐" if importance == "high" else "•"
         cite_hint = f" → Citar: [@{citation_key}]" if citation_key else ""
         
-        return f"{imp_marker} [{paper}]{cite_hint}\n   {idea}{kw_str}"
+        return f"{imp_marker} [{paper}]{cite_hint}\n   {idea}{kw_str}{_literal_quote(item)}"
 
     def _format_claim_compact(self, item: dict, score: float) -> str:
         """Format a single claim in compact form.
@@ -1056,10 +1061,13 @@ class EnhancedContextManager:
         type_marker = {"experiment": "🔬", "data": "📊", "citation": "📖", "observation": "👁️"}.get(evidence_type, "")
         cite_hint = f" → Citar: [@{citation_key}]" if citation_key else ""
         
+        cited_note = (
+            " (afirmación citada: el paper la apoya en otra obra)" if is_cited_claim(item) else ""
+        )
         lines = [
             f"{conf_marker}{type_marker} [{paper}]{cite_hint}",
-            f"   Claim: {claim}",
-            f"   Evidence: {evidence}",
+            f"   Claim: {claim}{cited_note}",
+            f"   Evidence: {evidence}{_literal_quote(item)}",
         ]
         return "\n".join(lines)
     
@@ -1178,6 +1186,7 @@ class EnhancedContextManager:
         idea_query: str,
         section_name: str,
         suggested_topics: list[str] | None = None,
+        config: SectionConfig | None = None,
     ) -> str:
         """Get context for a specific idea query (paragraph-level).
         
@@ -1188,12 +1197,14 @@ class EnhancedContextManager:
             idea_query: The key idea and supporting points as a query string.
             section_name: Name of the section being written.
             suggested_topics: Optional topic suggestions from the planner.
+            config: The section's search settings (a profile section's ``search``);
+                without it, the ``SECTION_CONFIGS`` entry of the name, or a neutral default.
             
         Returns:
             Formatted context string for the paragraph.
         """
-        # Get section config, fallback to Introducción if not found
-        config = SECTION_CONFIGS.get(section_name, SECTION_CONFIGS["Introducción"])
+        config = config or SECTION_CONFIGS.get(section_name, DEFAULT_SECTION_CONFIG)
+        self.last_items = []
         
         if config.top_k == 0:
             return ""

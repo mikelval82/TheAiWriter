@@ -8,6 +8,11 @@ ideas come from, with topics ordered from largest to smallest:
 - ``minoritarios``: the smaller half (gaps, open problems)
 - ``variados``: every other topic (challenges, contrasts)
 
+``search`` is the section's evidence-search settings (``SectionConfig``). Without
+it, the section uses the legacy ``SECTION_CONFIGS`` entry of its name (the
+"perspectiva" sections and the Introducción/Conclusiones of every profile) or, if
+there is none, the neutral default.
+
 ``target_words`` is the length the whole document aims at; each paragraph gets
 its share of it (see ``Profile.paragraph_words``).
 """
@@ -19,6 +24,29 @@ TopicChoice = Literal["principales", "todos", "minoritarios", "variados"]
 PARAGRAPH_WORDS = (110, 230)  # a paragraph's length is kept between these, whatever the target
 
 
+@dataclass
+class SectionConfig:
+    """Configuration for context selection per section type."""
+
+    # Weight for ideas vs claims (0.0 = only claims, 1.0 = only ideas)
+    ideas_weight: float
+
+    # Minimum confidence level for claims ("high", "medium", "low")
+    min_confidence: str
+
+    # Preferred evidence types for claims (None = all)
+    evidence_types: list[str] | None
+
+    # Keywords to boost in search (section-specific focus)
+    boost_keywords: list[str]
+
+    # Maximum items per paper (for diversity)
+    max_per_paper: int
+
+    # Total items to retrieve
+    top_k: int
+
+
 @dataclass(frozen=True)
 class SectionSpec:
     name: str
@@ -26,6 +54,7 @@ class SectionSpec:
     min_paragraphs: int
     max_paragraphs: int
     topics: TopicChoice = "principales"
+    search: SectionConfig | None = None
 
     def as_planner_tuple(self) -> tuple[str, str, int, int]:
         return (self.name, self.purpose, self.min_paragraphs, self.max_paragraphs)
@@ -80,10 +109,16 @@ PROFILES = {
         target_words=6000,
         sections=(
             SectionSpec("Introducción", "Presentar el tema, por qué importa y la pregunta que guía la revisión", 2, 3),
-            SectionSpec("Alcance y Fuentes", "Describir qué trabajos se revisan, de qué tipo son y qué periodo cubren", 1, 2, "todos"),
-            SectionSpec("Síntesis Temática", "Organizar los hallazgos por temas, con lo que cada grupo de trabajos aporta", 4, 6, "todos"),
-            SectionSpec("Convergencias y Tensiones", "Contrastar resultados y enfoques: dónde coinciden y dónde se contradicen", 2, 4, "variados"),
-            SectionSpec("Lagunas y Líneas Abiertas", "Señalar lo que la literatura no resuelve y qué habría que investigar", 2, 3, "minoritarios"),
+            SectionSpec("Alcance y Fuentes", "Describir qué trabajos se revisan, de qué tipo son y qué periodo cubren", 1, 2, "todos",
+                        SectionConfig(0.6, "medium", None, ["methods", "study design", "sample", "dataset", "scope"], 6, 28)),
+            SectionSpec("Síntesis Temática", "Organizar los hallazgos por temas, con lo que cada grupo de trabajos aporta", 4, 6, "todos",
+                        SectionConfig(0.5, "medium", None, ["findings", "results", "review", "evidence", "synthesis"], 6, 36)),
+            SectionSpec("Convergencias y Tensiones", "Contrastar resultados y enfoques: dónde coinciden y dónde se contradicen", 2, 4, "variados",
+                        SectionConfig(0.3, "medium", ["experiment", "data", "observation"],
+                                      ["contradiction", "inconsistent", "agreement", "comparison", "differs"], 6, 32)),
+            SectionSpec("Lagunas y Líneas Abiertas", "Señalar lo que la literatura no resuelve y qué habría que investigar", 2, 3, "minoritarios",
+                        SectionConfig(0.65, "medium", ["observation", "citation"],
+                                      ["limitation", "gap", "future work", "unresolved", "lack"], 6, 28)),
             SectionSpec("Conclusiones", "Resumir el estado de la cuestión y su utilidad práctica", 1, 2),
         ),
     ),
@@ -93,9 +128,14 @@ PROFILES = {
         target_words=3000,
         sections=(
             SectionSpec("Introducción", "Plantear la pregunta y la tesis", 1, 2),
-            SectionSpec("Argumento", "Desarrollar la tesis con la evidencia más sólida", 2, 4, "todos"),
-            SectionSpec("Objeciones y Respuestas", "Presentar las objeciones más serias y responderlas", 2, 3, "variados"),
-            SectionSpec("Conclusión", "Cerrar con lo que se sigue de la tesis", 1, 2),
+            SectionSpec("Argumento", "Desarrollar la tesis con la evidencia más sólida", 2, 4, "todos",
+                        SectionConfig(0.6, "medium", ["experiment", "data"],
+                                      ["evidence", "argument", "demonstrate", "results", "support"], 8, 32)),
+            SectionSpec("Objeciones y Respuestas", "Presentar las objeciones más serias y responderlas", 2, 3, "variados",
+                        SectionConfig(0.4, "medium", None,
+                                      ["limitation", "criticism", "counterexample", "alternative", "contradict"], 6, 28)),
+            SectionSpec("Conclusión", "Cerrar con lo que se sigue de la tesis", 1, 2,
+                        search=SectionConfig(0.5, "high", None, ["conclusion", "summary", "key finding", "contribution"], 8, 24)),
         ),
     ),
 }

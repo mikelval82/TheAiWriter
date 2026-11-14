@@ -21,7 +21,6 @@ from ai_writer.citations import CitationIndex, check_citations
 from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMClient, LLMError, get_llm_client
 from ai_writer.profiles import profile_for
-from config.settings import settings
 
 BORRADOR = Path("borrador")
 STATE = BORRADOR / "estado.json"
@@ -111,7 +110,7 @@ class PerspectiveRun:
             "fase": state.get("fase"),
             "parrafos": f"{written}/{total}" if total else None,
             "secciones_terminadas": [
-                s["titulo"] for s in state.get("secciones", []) if s.get("resumen")
+                s["titulo"] for s in state.get("secciones", []) if s.get("contenido")
             ],
             "inicio": state.get("inicio"),
             "actualizado": state.get("actualizado"),
@@ -278,7 +277,7 @@ class PerspectiveRun:
         from ai_writer.agents.reviewer_agent import ReviewerAgent
         from ai_writer.agents.writer_agent import WriterAgent
         from ai_writer.models.paper import Section
-        from ai_writer.validation import record_retrieved
+        from ai_writer.validation import record_retrieved, record_seen
 
         outline = self._load_plan()
         words = self.profile.paragraph_words(outline.total_paragraphs)
@@ -295,7 +294,8 @@ class PerspectiveRun:
             if i == len(sections):
                 sections.append({"titulo": section_outline.section_name, "parrafos": []})
             state = sections[i]
-            memory = self._memory_context(sections[:i])
+            memory = self._memory_context(sections[:i], outline.sections[i + 1:])
+            spec = self.profile.section(section_outline.section_name)
 
             for j, paragraph in enumerate(section_outline.paragraphs):
                 if j < len(state["parrafos"]):
@@ -308,9 +308,13 @@ class PerspectiveRun:
                     idea_query=query,
                     section_name=section_outline.section_name,
                     suggested_topics=paragraph.suggested_sources,
+                    config=spec.search if spec else None,
                 )
-                context = self._plan_sources(paragraph, query) + context
+                plan_text, plan_results = self._plan_sources(paragraph, query)
+                context = plan_text + context
                 record_retrieved(self.folder, query, _CITED_KEY.findall(context))
+                record_seen(self.folder, section_outline.section_name,
+                            _seen_items(manager, plan_results))
                 context += _overcited_note(cited)
                 text = writer.write_paragraph(
                     key_idea=paragraph.key_idea,
@@ -332,20 +336,16 @@ class PerspectiveRun:
             if state.get("contenido") is None:
                 self._check_stop()
                 section = Section(title=state["titulo"], content="\n\n".join(state["parrafos"]))
-                reviewer.section_summaries = self._summaries(sections[:i])
                 section = reviewer.review_section(
-                    section=section, previous_sections=None, update_memory=False
+                    section=section, previous_sections=None, update_memory=False,
+                    other_sections={s["titulo"]: s["contenido"] for s in sections[:i]},
                 )
                 state["contenido"] = section.content
                 self._track_usage()
                 self.save()
                 self.render(abstract)
-            if state.get("resumen") is None:
-                state["resumen"] = self._summarize(state["titulo"], state["contenido"])
-                self._track_usage()
-                self.save()
 
-    def _plan_sources(self, paragraph, query: str) -> str:
+    def _plan_sources(self, paragraph, query: str) -> tuple[str, list[dict]]:
         """The evidence of the works the plan built this paragraph on, offered first.
 
         The general search may leave those works out (limits per work, works
@@ -354,13 +354,13 @@ class PerspectiveRun:
         """
         keys = set(paragraph.source_keys) & self.engine().allowed_keys()
         if not keys:
-            return ""
+            return "", []
         results = self.engine().search(query, n=2 * len(keys), keys=keys)
         lines = ["\n📌 FUENTES DE LAS IDEAS DEL PLAN PARA ESTE PÁRRAFO "
                  "(cítalas cuando uses sus ideas):"]
         for result in results:
             lines.append(f"• [{result['paper'][:50]}] → Citar: {result['cita']}\n   {result['texto']}")
-        return "\n".join(lines) + "\n"
+        return "\n".join(lines) + "\n", results
 
     def _cited_so_far(self) -> Counter:
         """How many times the document written so far cites each work."""
@@ -370,38 +370,20 @@ class PerspectiveRun:
         )
         return Counter(re.findall(r"@([\w:-]+)", text))
 
-    def _summaries(self, sections: list[dict]) -> dict[str, str]:
-        return {s["titulo"]: s["resumen"] for s in sections if s.get("resumen")}
-
-    def _memory_context(self, sections: list[dict]) -> str:
-        summaries = self._summaries(sections)
-        if not summaries:
-            return ""
-        lines = ["\n\nMEMORIA DEL PAPER (resúmenes de secciones anteriores):"]
-        lines += [f"\n### {title}\n{summary}" for title, summary in summaries.items()]
-        return "\n".join(lines) + "\n"
-
-    def _summarize(self, title: str, content: str) -> str:
-        prompt = f"""Genera un resumen conciso de la siguiente sección de un paper académico.
-
-SECCIÓN: {title}
-
-CONTENIDO:
-{content}
-
-INSTRUCCIONES:
-- Resume en 3-5 oraciones los puntos clave y argumentos principales
-- Incluye la tesis o idea central de la sección
-- Menciona conceptos o términos importantes introducidos
-- Sé preciso y conciso (máximo 150 palabras)
-
-RESUMEN:"""
-        return self.llm.complete(
-            "Eres un asistente experto en síntesis de textos académicos.",
-            prompt,
-            model=settings.ai.fast_model,
-            max_tokens=300,
-        ).strip()
+    def _memory_context(self, sections: list[dict], upcoming: list) -> str:
+        """The full text of the sections already written and the plan of those still to write."""
+        lines = []
+        if sections:
+            lines.append("\n\nTEXTO YA ESCRITO DEL DOCUMENTO (secciones anteriores, completas). "
+                         "No repitas lo ya dicho: remite a ello.")
+            lines += [f"\n### {s['titulo']}\n{s['contenido']}" for s in sections]
+        if upcoming:
+            lines.append("\n\nPLAN DE LAS SECCIONES QUE FALTAN POR ESCRIBIR "
+                         "(no adelantes lo que les corresponde):")
+            for section in upcoming:
+                lines.append(f"\n### {section.section_name}\nPropósito: {section.section_purpose}")
+                lines += [f"- {paragraph.key_idea}" for paragraph in section.paragraphs]
+        return "\n".join(lines) + "\n" if lines else ""
 
     # Phase 4: global review, one section at a time
 
@@ -416,7 +398,6 @@ RESUMEN:"""
 
         self.save(fase="revision_global")
         sections = self.state["secciones"]
-        summaries = {s["titulo"]: s["resumen"] for s in sections}
         reviewer = ReviewerAgent(abstract_context=abstract)
         reviewer.llm = self.llm
         kept = self.state.setdefault("revision_global_descartada", [])
@@ -426,10 +407,11 @@ RESUMEN:"""
             self._check_stop()
             previous = sections[i - 1]["contenido"].split("\n\n")[-1] if i > 0 else ""
             following = sections[i + 1]["contenido"].split("\n\n")[0] if i + 1 < len(sections) else ""
+            whole = {s["titulo"]: s.get("revisada_global") or s["contenido"] for s in sections}
             try:
                 revised = reviewer.review_section_coherence(
                     Section(title=section["titulo"], content=section["contenido"]),
-                    summaries, previous, following,
+                    whole, previous, following,
                 )
             except LLMError:
                 revised = ""
@@ -463,6 +445,15 @@ RESUMEN:"""
                 + "\n".join(f"- `{c}`" for c in corrections) + "\n",
                 encoding="utf-8",
             )
+        if not self.state.get("apoyo"):
+            from ai_writer import support
+
+            self._check_stop()
+            entries = support.judge_document(self.folder, self.llm)
+            support.save(self.folder, entries)
+            self.state["apoyo"] = support.summary(entries)
+            self._track_usage()
+            self.save()
         report = validate_document(self.folder, suggest=True)
 
         if not self.state.get("revision_critica_hecha"):
@@ -528,6 +519,26 @@ def revision_is_safe(original: str, revised: str) -> bool:
     keys = lambda text: set(re.findall(r"@([\w:-]+)", text))  # noqa: E731
     ratio = len(revised.split()) / max(1, len(original.split()))
     return keys(revised) <= keys(original) and 0.75 <= ratio <= 1.2
+
+
+def _seen_items(manager, plan_results: list[dict]) -> list[dict]:
+    """The evidence the writer got for a paragraph, as ``{clave, tipo, texto, cita_literal, origen}``."""
+    from ai_writer.utils.enhanced_context_manager import is_cited_claim
+
+    items = []
+    for result in plan_results:
+        verified = result.get("cita_verificada")
+        items.append({"clave": result["clave"], "tipo": result["tipo"], "texto": result["texto"],
+                      "cita_literal": result.get("cita_literal") if verified else None,
+                      "origen": result.get("origen") if result["tipo"] == "claim" else None})
+    for item, _score, kind in manager.last_items:
+        key = manager._citation_key_for(item)
+        if not key:
+            continue
+        verified = item.get("quote") if item.get("quote_verified") else None
+        items.append({"clave": key, "tipo": kind, "texto": item.get(kind, ""), "cita_literal": verified,
+                      "origen": ("citado" if is_cited_claim(item) else "propio") if kind == "claim" else None})
+    return items
 
 
 def _overcited_note(cited: Counter) -> str:

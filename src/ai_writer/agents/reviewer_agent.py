@@ -10,6 +10,12 @@ if TYPE_CHECKING:
     from ai_writer.utils.enhanced_context_manager import EnhancedContextManager
 
 
+def _sections_text(sections: dict[str, str], header: str) -> str:
+    """Sections (title -> content) as prompt text, each under its own heading."""
+    body = "\n".join(f"\n### {title}\n{text}\n" for title, text in sections.items())
+    return f"\n\n{header}:\n{body}" if header else body
+
+
 class ReviewerAgent(BaseAgent):
     """Agent specialized in reviewing and improving academic papers."""
 
@@ -390,6 +396,7 @@ Provide a consistency report with specific issues and locations."""
         previous_sections: list[Section] | None = None,
         update_memory: bool = True,
         use_rag_enhancement: bool = True,
+        other_sections: dict[str, str] | None = None,
     ) -> Section:
         """Review and improve a single section with context from memory.
 
@@ -398,19 +405,26 @@ Provide a consistency report with specific issues and locations."""
             previous_sections: Already written sections (used to sync memory if empty).
             update_memory: Whether to update memory after review (default True).
             use_rag_enhancement: Whether to search for additional evidence (default True).
+            other_sections: Full text (title -> content) of the sections already written.
+                When given, it replaces the memory summaries as context.
 
         Returns:
             The improved section.
         """
         # Sync memory with previous sections if memory is empty
         # (This handles the case where we're starting fresh or sections were written without review)
-        if previous_sections and not self.section_summaries:
+        if other_sections is None and previous_sections and not self.section_summaries:
             for sec in previous_sections:
                 if sec.title not in self.section_summaries:
                     self.update_section_memory(sec)
         
-        # Build context from memory (summaries) instead of truncated text
-        previous_context = self.get_context_from_memory()
+        if other_sections is not None:
+            previous_context = (
+                _sections_text(other_sections, "SECCIONES ANTERIORES DEL PAPER (texto completo)")
+                if other_sections else ""
+            )
+        else:
+            previous_context = self.get_context_from_memory()
         
         # RAG Enhancement: Search for additional evidence to strengthen arguments
         rag_context = ""
@@ -438,7 +452,7 @@ CRITERIOS DE REVISIÓN:
 
 INSTRUCCIONES:
 - Mejora el contenido manteniendo las ideas centrales
-- Asegura coherencia con el contexto del paper (resúmenes de secciones anteriores)
+- Asegura coherencia con el contexto del paper (secciones anteriores)
 - Si se proporciona EVIDENCIA ADICIONAL DE LA LITERATURA, considera incorporar 
   insights relevantes para fortalecer los argumentos (cita las fuentes si las usas,
   copiando exactamente su marcador "→ Citar: [@...]")
@@ -541,18 +555,20 @@ NO incluyas el Abstract (ya está definido). Comienza desde la Introducción."""
     def review_section_coherence(
         self,
         section: Section,
-        summaries: dict[str, str],
+        sections: dict[str, str],
         previous_tail: str = "",
         next_head: str = "",
     ) -> str:
         """Revise one section for the coherence of the whole paper; return its new content.
 
-        The rest of the paper is given as section summaries plus the paragraphs that
-        border this section, so the call stays small whatever the paper's length.
+        The rest of the paper is given in full (title -> content, in document order;
+        the entry of ``section`` itself is not repeated), plus the paragraphs that
+        border this section.
         """
-        outline = "\n".join(
-            f"- {title}{' (ESTA SECCIÓN)' if title == section.title else ''}: {summary}"
-            for title, summary in summaries.items()
+        outline = _sections_text(
+            {title: ("(ESTA SECCIÓN: va más abajo)" if title == section.title else text)
+             for title, text in sections.items()},
+            "",
         )
         borders = ""
         if previous_tail:
@@ -562,7 +578,7 @@ NO incluyas el Abstract (ya está definido). Comienza desde la Introducción."""
 
         user_prompt = f"""Haz la revisión final de coherencia de UNA sección de un artículo académico.
 
-EL ARTÍCULO, SECCIÓN A SECCIÓN (resúmenes):
+EL ARTÍCULO COMPLETO, SECCIÓN A SECCIÓN:
 {outline}
 {borders}
 SECCIÓN A REVISAR: {section.title}

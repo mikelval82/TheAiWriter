@@ -321,7 +321,7 @@ Write only the expanded content."""
             previous_paragraphs: Already written paragraphs in this section.
             reference_context: Context from embeddings search.
             thesis: Paper's thesis statement.
-            memory_context: Summaries of previous sections for coherence.
+            memory_context: The text of the previous sections and the plan still to write.
             words: The paragraph's length range in words; without it, 4-8 sentences.
             
         Returns:
@@ -338,8 +338,7 @@ Write only the expanded content."""
         memory_section = ""
         if memory_context:
             memory_section = f"""
-# CONTEXTO DE SECCIONES ANTERIORES
-(Resúmenes para mantener coherencia con lo ya escrito)
+# CONTEXTO DEL DOCUMENTO
 {memory_context}
 """
         
@@ -370,8 +369,12 @@ Write only the expanded content."""
 4. CITA la literatura copiando exactamente el marcador "→ Citar: [@...]" de cada fuente
    del contexto; si falta la fuente de una afirmación, escribe [@?]
 5. Asegura transición fluida desde el párrafo anterior
-6. Mantén consistencia con la tesis del paper y las secciones anteriores
-7. Escribe en español académico formal
+6. Mantén consistencia con la tesis del paper y las secciones anteriores; no repitas
+   lo ya dicho en ellas, remite a ello
+7. Una afirmación marcada como "afirmación citada" solo puede usarse atribuyéndola a esa
+   obra como algo que recoge ("según recoge…", "como señala la revisión de…"), nunca como
+   hallazgo propio de esa obra
+8. Escribe en español académico formal
 
 IMPORTANTE: Usa SIEMPRE los marcadores [@...] del contexto, NO uses paréntesis simples como (Brown, 2020) ni marcadores inventados.
 

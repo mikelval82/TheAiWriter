@@ -14,7 +14,9 @@ from ai_writer.library import Project
 
 DRAFT = Path("borrador") / "documento.md"
 RETRIEVED = Path("revision") / "evidencia.json"
+SEEN = Path("revision") / "evidencia_vista.json"  # what the writer was shown, per section and work
 REPORT = Path("revision") / "validacion.md"
+SUPPORT = Path("revision") / "apoyo.json"  # written by ai_writer.support when a document closes
 PENDING_GAP = re.compile(r"\[\[PENDIENTE[^\]]*\]\]")
 _HEADING = re.compile(r"^(#{1,3})\s+(.+?)\s*$", re.M)
 
@@ -27,6 +29,7 @@ class DocumentReport:
     times_cited: dict[str, int] = field(default_factory=dict)
     uncited: list[str] = field(default_factory=list)
     gap_sources: list[dict] = field(default_factory=list)
+    support: list[dict] = field(default_factory=list)  # verdicts of the support judge, if it ran
 
     @property
     def ok(self) -> bool:
@@ -53,6 +56,10 @@ class DocumentReport:
         if self.uncited:
             lines += ["", "## Obras de las colecciones sin citar", ""]
             lines += [f"- {key}" for key in self.uncited]
+        if self.support:
+            from ai_writer.support import markdown
+
+            lines += ["", markdown(self.support).rstrip()]
         return "\n".join(lines) + "\n"
 
 
@@ -74,6 +81,25 @@ def record_retrieved(folder: Path, query: str, keys: list[str]) -> None:
             queries.append(query)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def record_seen(folder: Path, section_title: str, items: list[dict]) -> None:
+    """Remember the evidence items the writer was shown in a section, by work (no repeated text)."""
+    path = Path(folder) / SEEN
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    section = data.setdefault(section_title, {})
+    for item in items:
+        stored = section.setdefault(item["clave"], [])
+        if all(item["texto"] != other["texto"] for other in stored):
+            stored.append(item)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def seen_evidence(folder: Path) -> dict:
+    """``{section: {key: [item, ...]}}`` the writer was shown; empty if nothing was recorded."""
+    path = Path(folder) / SEEN
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
 def check_text(text: str, folder: Path) -> CitationReport:
@@ -109,6 +135,8 @@ def validate_document(folder: Path, write_report: bool = True, suggest: bool = F
 
         project = Project.load(folder)
         report.gap_sources = EvidenceEngine(project.library(), project.paper_ids()).sources_for_gaps(text)
+    if (folder / SUPPORT).exists():
+        report.support = json.loads((folder / SUPPORT).read_text(encoding="utf-8")).get("entradas", [])
     if write_report:
         (folder / REPORT).parent.mkdir(parents=True, exist_ok=True)
         (folder / REPORT).write_text(report.markdown(), encoding="utf-8")
