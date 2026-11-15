@@ -1,4 +1,4 @@
-from ai_writer.processors.quotes import QuoteChecker, find_quote, normalize
+from ai_writer.processors.quotes import QuoteChecker, explain_mismatch, find_quote, normalize
 
 TEXT = (
     "Empathy is a multidimensional construct that involves both affective sharing and\n"
@@ -67,3 +67,58 @@ def test_checker_reuses_normalised_text():
     checker = QuoteChecker(normalize(TEXT), normalized=True)
     assert checker.has("Participants were recruited online by the team") is False
     assert checker.has("of the variance in prosocial helping across all samples")
+
+
+def test_explain_mismatch_replaced_word() -> None:
+    passage = "The model explained twelve percent of the variance."
+    quote = "The model explained twenty percent of the variance."
+    result = explain_mismatch(quote, f"Earlier findings were mixed. {passage} More work follows.")
+    assert result == {
+        "pasaje": passage,
+        "parecido": 0.88,
+        "diferencias": [{"cita": "twenty", "texto": "twelve"}],
+    }
+
+
+def test_explain_mismatch_dropped_word() -> None:
+    passage = "The final model explained twelve percent of the variance."
+    result = explain_mismatch("The model explained twelve percent of the variance.", passage)
+    assert result is not None
+    assert result["pasaje"] == passage
+    assert result["diferencias"] == [{"cita": "", "texto": "final"}]
+
+
+def test_explain_mismatch_extra_word() -> None:
+    passage = "The model explained twelve percent of the variance."
+    result = explain_mismatch("The final model explained twelve percent of the variance.", passage)
+    assert result is not None
+    assert result["pasaje"] == passage
+    assert result["diferencias"] == [{"cita": "final", "texto": ""}]
+
+
+def test_explain_mismatch_preserves_original_characters() -> None:
+    result = explain_mismatch(
+        "THE model explains a large effect", "“The model”\nexplains a small effect."
+    )
+    assert result is not None
+    assert result["pasaje"] == "“The model” explains a small effect."
+    assert result["diferencias"] == [{"cita": "large", "texto": "small"}]
+
+
+def test_explain_mismatch_unrelated_or_short_quote() -> None:
+    assert explain_mismatch("Distant planets orbit bright stars", TEXT) is None
+    assert explain_mismatch("The ocean contains many fish", "The model explained variance") is None
+    assert explain_mismatch("Participants were recruited", TEXT) is None
+    assert explain_mismatch("", TEXT) is None
+    assert explain_mismatch("Participants were recruited online", "") is None
+
+
+def test_explain_mismatch_long_text() -> None:
+    filler = "Background research discusses several other topics in detail. " * 2000
+    passage = "Participants demonstrated greater empathy after the experimental intervention."
+    text = filler + passage + " " + filler
+    quote = "Participants demonstrated lower empathy after the experimental intervention."
+    result = explain_mismatch(quote, text)
+    assert result is not None
+    assert result["pasaje"] == passage
+    assert result["diferencias"] == [{"cita": "lower", "texto": "greater"}]

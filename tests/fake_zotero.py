@@ -100,3 +100,34 @@ class FakeZotero:
     def delete_collection(self, key: str) -> None:
         self.db.execute("INSERT INTO deletedCollections VALUES (?)", (self._collections[key],))
         self.db.commit()
+
+
+def filler(topic: str, words: int) -> str:
+    """Deterministic sentences about ``topic``, about ``words`` words long."""
+    sentence = f"The {topic} study reports that {topic} outcomes depend on {topic} conditions. "
+    return (sentence * (words // len(sentence.split()) + 1)).strip()
+
+
+def make_pdf(path: Path, sections: list[tuple[str, str]], outline: bool = False) -> Path:
+    """A PDF with one bold heading per section, each section starting on a new page."""
+    import fitz
+
+    doc = fitz.open()
+    toc = []
+    for heading, body in sections:
+        words = body.split()
+        first = True
+        while words or first:
+            page = doc.new_page()
+            if first:
+                page.insert_text((72, 72), heading, fontsize=14, fontname="hebo")
+                toc.append([1, heading, doc.page_count])
+            chunk, words = words[:250], words[250:]
+            page.insert_textbox(fitz.Rect(72, 90, 520, 780), " ".join(chunk), fontsize=10, fontname="helv")
+            first = False
+    if outline:
+        doc.set_toc(toc)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(path)
+    doc.close()
+    return path
