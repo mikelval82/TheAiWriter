@@ -149,6 +149,34 @@ def test_evidence_search_stays_in_the_collections_and_cites_by_key(library):
     assert engine.reference("green2022speech")["en_colecciones_del_documento"] is False
 
 
+def write_sections(library, paper_id, sections):
+    """Processed sections of a paper, as ``{name: content}`` files like the PDF processor writes."""
+    folder = library.processed_dir / "papers" / paper_id / "sections"
+    folder.mkdir(parents=True, exist_ok=True)
+    for number, (name, content) in enumerate(sections.items(), 1):
+        data = {"section_name": name, "section_number": number, "content": content}
+        (folder / f"{number:02d}_{name}.json").write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_passage_returns_the_full_section_of_a_work_within_the_documents_papers(library):
+    write_sections(library, "paper-emotion", {"Introduction": "Texto completo de la introducción.", "Results": "Resultados."})
+    write_sections(library, "paper-speech", {"Introduction": "Habla."})
+    library.save_collection("Robots", library.find_papers(["emotion models", "crowded"]))
+    engine = EvidenceEngine(library, library.paper_ids(["Robots"]))
+
+    assert engine.passage("smith2020emotion", "Introduction") == "Texto completo de la introducción."
+    assert engine.passage("smith2020emotion", "  introduction ") == "Texto completo de la introducción."
+    assert engine.passage("smith2020emotion", "Discussion") is None
+    assert engine.passage("smith2020emotion", "") is None
+    assert engine.passage("made2020up", "Introduction") is None
+    # green2022speech has the section but is not in the document's papers
+    assert engine.passage("green2022speech", "Introduction") is None
+    assert EvidenceEngine(library).passage("green2022speech", "Introduction") == "Habla."
+    # the duplicate of a work counts only when it belongs to the document
+    only_copy = EvidenceEngine(library, {"paper-emotion-copy"})
+    assert only_copy.passage("smith2020emotion", "Introduction") is None
+
+
 def test_topics_cover_only_the_documents_papers(library):
     library.save_collection("Robots", library.find_papers(["emotion models", "crowded"]))
     engine = EvidenceEngine(library, library.paper_ids(["Robots"]))

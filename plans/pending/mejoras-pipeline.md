@@ -158,3 +158,40 @@ Mismos dos ensayos, vueltos a medir:
 - Una sola ejecución de cada ensayo; falta repetir para tener margen de error.
 - El juez no es estable: entre la primera medida y la segunda, 12 de 56 veredictos del ensayo anterior y 12 de 65 del nuevo cambiaron entre «apoyada» y «parcial». Falta medir su consistencia juzgando dos veces el mismo borrador con la misma evidencia.
 - Con más evidencia, el juez detectó en el ensayo anterior frases que dicen lo contrario que la obra citada (festor2026human: el ensayo afirma que la empatía percibida depende del encuadre; el paper concluye que no depende de la etiqueta de autoría).
+
+## Experimento: ¿aporta algo frente a darle los papers a Claude? (2026-11-14)
+
+Mismo resumen, mismos 12 papers, mismo modelo. Juez común: cada frase citada frente al texto completo del paper citado. Una ejecución de cada versión.
+
+| | A. Pipeline (párrafo a párrafo) | B. Claude directo (1 llamada, 12 papers enteros) | C. Consulta a demanda (`demand_run.py`) |
+|---|---|---|---|
+| Palabras | 3.854 | 4.168 | 3.769 |
+| Frases con cita | 65 | 94 | 71 |
+| Apoyadas | 24 (37 %) | 62 (66 %) | 47 (66 %) |
+| Parciales / no apoyadas | 37 / 4 | 32 / 0 | 22 / 2 |
+| Obras citadas (de 12) | 12 | 12 | 11 |
+| Revisión crítica a ciegas | 6/10 | 6/10 | 6/10 |
+
+- Con 12 papers, Claude directo iguala o supera a la herramienta en fidelidad de citas, con una sola llamada.
+- La consulta a demanda iguala a Claude directo (66 %) leyendo solo lo que consulta, y casi dobla al pipeline (37 %) con el mismo plan y la misma biblioteca.
+- La revisión crítica no distingue entre las tres.
+- Pendiente: repetir para tener margen de error, y probar con una biblioteca que no quepa en una llamada, que es donde C debería aportar y B no puede.
+
+## Experimento: índice de ideas frente a trozos sin procesar (2026-11-14)
+
+Versión D: misma escritura con consulta a demanda y mismo plan que C, pero el índice son trozos de ~180 palabras de los mismos tramos, sin ninguna llamada al modelo (270 trozos, índice en 43 s). Mismo juez (frase frente al texto completo del paper).
+
+| | C. Índice de ideas | D. Índice de trozos |
+|---|---|---|
+| Frases con cita | 71 | 61 |
+| Apoyadas | 47 (66 %) | 33 (54 %) |
+| Parciales / no apoyadas | 22 / 2 | 24 / 4 |
+| Obras citadas (de 12) | 11 | 10 |
+| Búsquedas distintas | 23 | 15 |
+| Llamadas / coste equivalente | 27 / 1,21 $ | 23 / 1,36 $ |
+| Coste de preparar la biblioteca | 142 llamadas, 30 min | 0 llamadas, 43 s |
+
+- Los trozos sin procesar ya superan con claridad al pipeline por párrafos (54 % frente a 37 %).
+- Las ideas salen 12 puntos por encima de los trozos, pero con una ejecución de cada una y 60–70 frases la diferencia no es concluyente.
+- Arreglo de paso: `EvidenceEngine._candidates` fallaba con un índice vacío (biblioteca sin claims).
+- Pendiente: repetir C y D para saber si los 12 puntos son reales; de eso depende si el procesado merece su coste.

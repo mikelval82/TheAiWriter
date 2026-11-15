@@ -4,6 +4,7 @@ Every result carries the stable citation key of its paper, so whatever is writte
 from it can be checked against the library afterwards.
 """
 
+import json
 import math
 import re
 from collections import Counter
@@ -137,6 +138,8 @@ class EvidenceEngine:
     def _candidates(self, index: EmbeddingIndex, embedding, n, topic, keys=None):
         if topic is None and keys is None:
             return index.search_by_embedding(embedding, top_k=n * 8)
+        if index._embeddings_matrix is None or not index.items:  # e.g. a library with no claims
+            return []
         scores = index._cosine_similarity(embedding, index._embeddings_matrix)
         if topic is not None:
             self.topics()
@@ -177,6 +180,27 @@ class EvidenceEngine:
             result["confianza"] = item.get("confidence")
             result["origen"] = _origin(item)
         return result
+
+    def passage(self, key: str, section: str) -> str | None:
+        """The full text of ``section`` of a work, from its processed sections.
+
+        Looks only in the work's papers that belong to the document; an exact name
+        wins over a case-insensitive one. ``None`` if the work or the section is not found.
+        """
+        citable = self.citations.citables().get(key)
+        if citable is None or not section:
+            return None
+        ids = set(citable.paper_ids)
+        if self.paper_ids is not None:
+            ids &= self.paper_ids
+        sections = []
+        for paper_id in sorted(ids):
+            for path in sorted((self.library.processed_dir / "papers" / paper_id / "sections").glob("*.json")):
+                data = json.loads(path.read_text(encoding="utf-8"))
+                sections.append((data.get("section_name", ""), data.get("content", "")))
+        wanted = section.strip().lower()
+        exact = next((content for name, content in sections if name == section), None)
+        return exact or next((content for name, content in sections if name.strip().lower() == wanted), None)
 
     # Topics
 
