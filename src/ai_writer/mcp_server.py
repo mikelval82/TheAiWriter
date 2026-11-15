@@ -187,22 +187,150 @@ def procesar_pdfs() -> dict:
 
 @tool
 def crear_documento(
-    tipo: str, titulo: str, idioma: str = "es", colecciones: list[str] | None = None
+    tipo: str, titulo: str, idioma: str = "es", colecciones: list[str] | None = None,
+    fuente: str = "biblioteca",
 ) -> dict:
     """Convierte la carpeta actual en un documento de TheAIWriter: crea `proyecto.yaml` y las
     carpetas materiales/, borrador/, revision/ y exportacion/. `tipo` es perspectiva,
-    resultados o convocatoria; sin colecciones, el documento usa toda la biblioteca."""
+    resultados o convocatoria. `fuente`: «zotero» para citar desde colecciones de Zotero
+    (nombres de `colecciones_zotero`) o «biblioteca» para la biblioteca propia; sin
+    colecciones, el documento usa todas las obras."""
     folder = _document_folder()
     try:
         project = Project.create(
-            folder, tipo=tipo, titulo=titulo, idioma=idioma, colecciones=colecciones or []
+            folder, tipo=tipo, titulo=titulo, idioma=idioma, colecciones=colecciones or [],
+            fuente=fuente,
         )
+        if project.fuente == "zotero":
+            from ai_writer.consulta import open_index, scope
+
+            index = open_index()
+            return {"documento": str(folder / PROJECT_FILE), **index.status(scope(project, index))}
         papers = len(project.paper_ids())
     except LibraryError as error:
         return _error(error)
     except ValueError as error:
         return {"error": f"Datos no válidos: {error}"}
     return {"documento": str(folder / PROJECT_FILE), "papers_disponibles": papers}
+
+
+# Zotero: passages to consult while writing
+
+
+def _zotero_document() -> tuple:
+    """(passage index, the open document or None, item keys it may cite or None for all)."""
+    from ai_writer.consulta import open_index, scope
+
+    folder = _document_folder()
+    project = Project.load(folder) if (folder / PROJECT_FILE).exists() else None
+    index = open_index()
+    return index, project, scope(project, index)
+
+
+@tool
+def colecciones_zotero() -> dict:
+    """Lista las colecciones de Zotero de este ordenador, con cuántas obras tiene cada una
+    y cuántas traen PDF. Solo las obras con PDF se pueden consultar por pasajes."""
+    from ai_writer.consulta import open_index
+
+    try:
+        zotero = open_index().zotero
+    except LibraryError as error:
+        return _error(error)
+    return {
+        "carpeta": str(zotero.root),
+        "obras": len(zotero.works()),
+        "colecciones": [
+            {"ruta": c.path, "obras": len(keys := zotero.item_keys([c.key])),
+             "con_pdf": sum(bool(zotero.work(key).pdfs) for key in keys)}
+            for c in zotero.collections()
+        ],
+    }
+
+
+@tool
+def estado_indice(actualizar: bool = False) -> dict:
+    """Cuántas obras del documento (o de todo Zotero, fuera de un documento) tienen PDF y
+    están indexadas. Con `actualizar`, indexa las pendientes: no gasta llamadas a Claude,
+    pero la primera vez descarga el modelo de búsqueda y tarda unos segundos por PDF."""
+    try:
+        index, _, allowed = _zotero_document()
+        done = index.update(allowed) if actualizar else None
+        status = index.status(allowed)
+    except LibraryError as error:
+        return _error(error)
+    works = [w for w in index.zotero.works() if allowed is None or w.item_key in allowed]
+    status["obras_sin_pdf"] = [f"{w.title} ({w.year or 's. f.'})" for w in works if not w.pdfs][:50]
+    if done is not None:
+        status["actualizacion"] = done
+    return status
+
+
+@tool
+def buscar_pasajes(
+    consulta: str, n: int = 8, claves: list[str] | None = None, por_obra: int = 3
+) -> dict:
+    """Busca pasajes en los PDF de las obras que el documento puede citar. Combina
+    significado y palabras: funciona mejor en el idioma de los papers y con los términos
+    que usarían. Cada resultado trae `id` (para `leer_pasaje`), la `clave` con la que se
+    cita, `[@clave]`, la sección, las páginas y el texto literal. `claves` limita la
+    búsqueda a esas obras; `por_obra` es el máximo de pasajes de una misma obra.
+    Cita solo lo que hayas leído aquí o en `leer_pasaje`."""
+    try:
+        index, project, allowed = _zotero_document()
+        indexed = index.update(allowed) if index.pending(allowed) else None
+        if claves:
+            wanted = {index.work_of(key.lstrip("@")) for key in claves} - {None}
+            allowed = {w.item_key for w in wanted if allowed is None or w.item_key in allowed}
+        results = index.search(consulta, n=n, item_keys=allowed, max_per_work=por_obra)
+    except LibraryError as error:
+        return _error(error)
+    if project is not None:
+        from ai_writer.consulta import record
+
+        record(_document_folder(), consulta, [r["id"] for r in results])
+    answer = {"consulta": consulta, "resultados": results}
+    if indexed:
+        answer["indexadas_ahora"] = len(indexed["indexadas"])
+    return answer
+
+
+@tool
+def leer_pasaje(id: str, alcance: str = "vecinos") -> dict:
+    """Lee alrededor de un pasaje de `buscar_pasajes`. `alcance`: «vecinos» (el anterior,
+    él y el siguiente) o «seccion» (la sección entera). Úsala antes de citar un dato
+    concreto, para ver su contexto."""
+    try:
+        index, project, _ = _zotero_document()
+        passages = index.read(id, "seccion" if alcance.lower().startswith("sec") else "vecinos")
+    except LibraryError as error:
+        return _error(error)
+    if not passages:
+        return {"error": f"No existe el pasaje «{id}»."}
+    if project is not None:
+        from ai_writer.consulta import record
+
+        record(_document_folder(), None, [p["id"] for p in passages])
+    return {"clave": passages[0]["clave"], "titulo": passages[0]["titulo"], "pasajes": passages}
+
+
+@tool
+def leer_paginas(clave: str, desde: int, hasta: int | None = None) -> dict:
+    """Lee los pasajes de una obra que caen en esas páginas del PDF (como mucho 6 páginas
+    por llamada)."""
+    try:
+        index, project, _ = _zotero_document()
+        last = min(hasta or desde, desde + 5)
+        passages = index.pages(clave.lstrip("@"), desde, last)
+    except LibraryError as error:
+        return _error(error)
+    if not passages:
+        return {"error": f"No hay texto de «{clave}» en las páginas {desde}-{last}."}
+    if project is not None:
+        from ai_writer.consulta import record
+
+        record(_document_folder(), None, [p["id"] for p in passages])
+    return {"clave": passages[0]["clave"], "titulo": passages[0]["titulo"], "pasajes": passages}
 
 
 # Evidence and citations
@@ -274,6 +402,12 @@ def referencia(clave: str) -> dict:
     """Datos completos de una obra citable: título, autores, año, revista, DOI, entrada
     BibTeX, cuánta evidencia tiene y si está en las colecciones del documento."""
     library, project = _current_library()
+    if project is not None and project.fuente == "zotero":
+        from ai_writer.consulta import reference
+
+        index, _, allowed = _zotero_document()
+        found = reference(index, clave.lstrip("@"), allowed)
+        return found or {"error": f"La clave «{clave}» no existe en Zotero."}
     reference = _engine(library, project).reference(clave.lstrip("@"))
     if reference is None:
         return {"error": f"La clave «{clave}» no existe en la biblioteca."}

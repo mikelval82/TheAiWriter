@@ -362,6 +362,9 @@ class Project(BaseModel):
     perfil: str | None = Field(
         default=None, description="Estructura de secciones; vacío: la del tipo de documento"
     )
+    fuente: Literal["biblioteca", "zotero"] = Field(
+        default="biblioteca", description="De dónde salen las obras: la biblioteca propia o Zotero"
+    )
     colecciones: list[str] = Field(
         default_factory=list, description="Vacío: toda la biblioteca"
     )
@@ -397,7 +400,12 @@ class Project(BaseModel):
         if (folder / PROJECT_FILE).exists():
             raise LibraryError(f"{folder} ya tiene un {PROJECT_FILE}.")
         project = cls(**fields)
-        project.paper_ids()
+        if project.fuente == "zotero":
+            from ai_writer.zotero import Zotero
+
+            Zotero().item_keys(project.colecciones)
+        else:
+            project.paper_ids()
         for sub in ("materiales", "borrador", "revision", "exportacion"):
             (folder / sub).mkdir(parents=True, exist_ok=True)
         project.save(folder)

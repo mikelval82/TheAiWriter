@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ai_writer.embeddings.bm25 import BM25, fuse, tokenize
+from ai_writer.embeddings.bm25 import BM25, tokenize
 
 
 def test_exact_term_outranks_unrelated_text() -> None:
@@ -42,16 +42,3 @@ def test_scores_follow_bm25_formula() -> None:
     expected = np.log(2.0) * 2 * 2.5 / (2 + 1.5)
     np.testing.assert_allclose(index.scores("term"), [expected, 0.0])
 
-
-def test_fuse_rewards_high_ranks_in_both_rankings() -> None:
-    scores = fuse([np.array([3.0, 2.0, 0.0]), np.array([0.0, 2.0, 3.0])])
-    assert scores.dtype == np.float32
-    assert scores[1] > scores[0]
-    assert scores[1] > scores[2]
-    np.testing.assert_allclose(scores, [1 / 61, 2 / 62, 1 / 61])
-
-
-def test_fuse_ignores_non_positive_scores() -> None:
-    np.testing.assert_allclose(fuse([np.array([0.0, -1.0, 4.0])], k=2), [0, 0, 1 / 3])
-    assert fuse([]).shape == (0,)
-    assert fuse([np.array([])]).shape == (0,)

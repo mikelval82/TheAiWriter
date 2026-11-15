@@ -1,4 +1,4 @@
-"""Sparse lexical retrieval and reciprocal rank fusion."""
+"""Sparse lexical retrieval."""
 
 import re
 import unicodedata
@@ -55,12 +55,3 @@ class BM25:
             )
         return scores
 
-
-def fuse(rankings: list[np.ndarray], k: int = 60) -> np.ndarray:
-    """Fuse descending score rankings, excluding items with non-positive scores."""
-    fused = np.zeros(len(rankings[0]) if rankings else 0, dtype=np.float32)
-    for scores in rankings:
-        positive = np.flatnonzero(scores > 0)
-        order = positive[np.argsort(-scores[positive], kind="stable")]
-        fused[order] += 1.0 / (k + np.arange(1, len(order) + 1))
-    return fused

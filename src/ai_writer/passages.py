@@ -22,7 +22,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 import numpy as np
 
-from ai_writer.embeddings.bm25 import BM25, fuse
+from ai_writer.embeddings.bm25 import BM25
 from ai_writer.embeddings.embedder import Embedder, get_embedder
 from ai_writer.library import documents_dir
 from ai_writer.processors.segmentation import _find_headings, segment
@@ -34,6 +34,7 @@ MIN_WORDS, MAX_WORDS = 150, 300  # 300 words fit the embedding model's window
 MIN_PASSAGE_WORDS = 80  # shorter pieces of a section are joined to a neighbour
 MIN_HEADINGS = 3  # fewer headings found in the text: that source of names is not trusted
 ID_SEPARATOR = "#"
+LEXICAL_WEIGHT = 0.5  # share of the word match in the blended score
 
 _PART = re.compile(r" \(\d+/\d+\)$")
 _CAPTION = re.compile(r"^(?:fig(?:ure|\.)?|table|tabla|algorithm|listing|box)\b", re.I)
@@ -294,13 +295,13 @@ class PassageIndex:
 
     def search(self, query: str, n: int = 8, item_keys: set[str] | None = None,
                max_per_work: int = 3, lexical: bool = True) -> list[dict]:
-        """The passages closest to ``query``: by meaning, fused with word matches if ``lexical``."""
+        """The passages closest to ``query``: by meaning, blended with word matches if ``lexical``."""
         rows, matrix, bm25 = self._load()
         if not rows or not query.strip():
             return []
         vector = _normalize(self.embedder.embed([query], kind="query"))[0]
         semantic = matrix @ vector
-        scores = fuse([semantic - semantic.min() + 1e-6, bm25.scores(query)]) if lexical else semantic
+        scores = _blend(semantic, bm25.scores(query)) if lexical else semantic
         results, per_work = [], Counter()
         for row in np.argsort(-scores):
             work, passage = rows[row]
@@ -371,3 +372,11 @@ def _normalize(vectors: np.ndarray) -> np.ndarray:
     vectors = np.asarray(vectors, dtype=np.float32)
     norms = np.linalg.norm(vectors, axis=1, keepdims=True)
     return vectors / np.where(norms == 0, 1, norms)
+
+
+def _blend(semantic: np.ndarray, lexical: np.ndarray) -> np.ndarray:
+    """Weighted sum of both scores, each standardized; meaning alone when no word matches."""
+    if not lexical.any():  # e.g. a query in Spanish over papers in English
+        return semantic
+    standard = lambda x: (x - x.mean()) / (x.std() + 1e-9)
+    return (1 - LEXICAL_WEIGHT) * standard(semantic) + LEXICAL_WEIGHT * standard(lexical)
