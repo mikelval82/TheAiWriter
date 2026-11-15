@@ -56,12 +56,22 @@ def _error(error: LibraryError) -> dict:
 @tool
 def diagnostico() -> dict:
     """Informa de dónde corre el plugin: sistema, Python, carpetas y si `claude` está disponible."""
+    from ai_writer.zotero import Zotero, default_index_dir
+
     library, project = _current_library()
+    try:
+        zotero = Zotero()
+        found = {"carpeta": str(zotero.root), "obras": len(zotero.works()),
+                 "con_pdf": sum(bool(w.pdfs) for w in zotero.works())}
+    except LibraryError as error:
+        found = {"error": str(error)}
     return {
         "sistema": platform.platform(),
         "python": sys.version.split()[0],
         "carpeta_del_documento": str(_document_folder()),
         "es_un_documento": project is not None,
+        "zotero": found,
+        "indice_de_pasajes": str(default_index_dir()),
         "biblioteca": str(library.root),
         "claude_en_path": shutil.which("claude"),
     }
@@ -423,6 +433,13 @@ def validar_citas(texto: str) -> dict:
     from ai_writer.validation import check_text
 
     library, project = _current_library()
+    if project is not None and project.fuente == "zotero":
+        from ai_writer.verificacion import check_citations as check_zotero
+
+        index, _, allowed = _zotero_document()
+        report = check_zotero(texto, index, allowed)
+        bad = report["desconocidas"] + report["fuera_de_las_colecciones"] + report["mal_formadas"]
+        return {"correcto": not bad, **report}
     if project is not None:
         report = check_text(texto, _document_folder())
     else:

@@ -3,14 +3,15 @@ description: Convierte la carpeta actual en un documento nuevo de TheAIWriter
 argument-hint: "[título o idea del documento]"
 ---
 
-Prepara un documento nuevo de TheAIWriter en la carpeta actual. Responde siempre en español.
+Prepara un documento nuevo de TheAIWriter en la carpeta actual, con las obras de Zotero. Responde siempre en español.
 
 Idea del usuario: $ARGUMENTS
 
-1. Llama a `estado_biblioteca`. Si la carpeta ya es un documento, dilo y para. Si la biblioteca no existe o no tiene papers, explica que primero hay que añadir PDFs con `/theaiwriter:biblioteca` y para.
+1. Llama a `colecciones_zotero`. Si devuelve `error`, explica que hace falta tener Zotero instalado en este ordenador con los PDF dentro, y para. Si la carpeta ya tiene un `proyecto.yaml`, dilo y para.
 2. Pregunta, en un solo mensaje y con tu propuesta para cada punto, lo que falte:
-   - Tipo: `perspectiva` (paper de perspectiva o revisión a partir de la biblioteca), `resultados` (paper con resultados de un análisis propio) o `convocatoria` (memoria de una convocatoria).
    - Título de trabajo.
    - Idioma del documento (por defecto, español).
-   - Colecciones de la biblioteca que usa; ninguna significa toda la biblioteca.
-3. Con sus respuestas, llama a `crear_documento` y resume lo creado: el `proyecto.yaml`, cuántos papers puede citar y qué poner en `materiales/` (por ejemplo, el abstract en `materiales/abstract.md`).
+   - Colecciones de Zotero que usa, mostrando las que hay con sus obras y cuántas traen PDF. Una colección incluye sus subcolecciones; ninguna significa todo Zotero.
+3. Con sus respuestas, llama a `crear_documento` con `tipo` «perspectiva» y `fuente` «zotero».
+4. Llama a `estado_indice` con `actualizar` a verdadero. Avisa antes de que no gasta llamadas a Claude y de que la primera vez tarda unos segundos por PDF.
+5. Resume lo creado: cuántas obras puede citar el documento, cuántas tienen PDF y están indexadas, y cuáles no tienen PDF (esas no se pueden consultar ni comprobar: conviene adjuntar el PDF en Zotero). Indica que el siguiente paso es poner la idea y la tesis en `materiales/abstract.md` y lanzar `/theaiwriter:escribir`.

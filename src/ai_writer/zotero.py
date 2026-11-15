@@ -20,9 +20,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_writer.citations import make_key
-from ai_writer.library import LibraryError
+from ai_writer.library import LibraryError, documents_dir
 
 ZOTERO_ENV = "THEAIWRITER_ZOTERO"
+INDEX_ENV = "THEAIWRITER_INDICE"
+KEYS_FILE = "claves.json"
 DATABASE = "zotero.sqlite"
 PATH_SEPARATOR = " / "
 
@@ -98,6 +100,12 @@ def data_dir() -> Path:
     """``THEAIWRITER_ZOTERO`` if set, else the folder Zotero is configured with, else ``~/Zotero``."""
     configured = os.getenv(ZOTERO_ENV) or _pref("dataDir")
     return Path(configured).expanduser() if configured else Path.home() / "Zotero"
+
+
+def default_index_dir() -> Path:
+    """``THEAIWRITER_INDICE`` if set, else ``<documents>/TheAIWriter/indice``."""
+    configured = os.getenv(INDEX_ENV)
+    return Path(configured).expanduser() if configured else documents_dir() / "TheAIWriter" / "indice"
 
 
 class Zotero:
@@ -310,3 +318,14 @@ def assign_keys(works: list[Work], stored: dict[str, str]) -> dict[str, str]:
         keys[work.item_key] = key
         taken.add(key)
     return keys
+
+
+def citable_keys(collections: list[str], index_root: Path | None = None) -> tuple[set[str], set[str]]:
+    """(every citation key, those of ``collections``), without loading the passage index."""
+    import json
+
+    zotero = Zotero()
+    stored_file = (index_root or default_index_dir()) / KEYS_FILE
+    stored = json.loads(stored_file.read_text(encoding="utf-8")) if stored_file.exists() else {}
+    keys = assign_keys(zotero.works(), stored)
+    return set(keys.values()), {keys[item] for item in zotero.item_keys(collections)}

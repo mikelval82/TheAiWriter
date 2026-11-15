@@ -1,14 +1,10 @@
 ---
-description: Muestra cómo va la escritura del documento, aprueba el plan o la detiene
-argument-hint: "[«aprobar», «detener» o nada]"
+description: Muestra cómo va el documento: el índice, el borrador y la verificación de las citas
 ---
 
-Gestiona la escritura automática del documento de la carpeta actual. Responde siempre en español y de forma breve.
+Informa del estado del documento de la carpeta actual. Responde siempre en español y de forma breve.
 
-Petición del usuario: $ARGUMENTS
-
-- Sin petición: llama a `estado_escritura` y resume el estado, la fase, los párrafos escritos frente al total, las secciones terminadas y el coste estimado. Si hay `error`, explícalo con sus palabras usando las últimas líneas del registro y propone reanudar con `/theaiwriter:escribir`. Si está `interrumpido` o `detenido`, di que se puede reanudar con `/theaiwriter:escribir`.
-- Si está `esperando_aprobacion`: resume el plan de `borrador/plan.md` (tesis y secciones con sus ideas clave) y pregunta si lo aprueba o qué quiere cambiar. Los cambios se hacen en `borrador/plan.json`, conservando su estructura. Cuando el usuario apruebe, llama a `aprobar_plan`.
-- «aprobar»: llama a `aprobar_plan`.
-- «detener»: llama a `detener_escritura` y explica que se parará al terminar el párrafo en curso y que se reanuda con `/theaiwriter:escribir`.
-- Si está `terminado`: indica dónde está el resultado (`borrador/documento.md`, `revision/validacion.md`, `revision/revision_critica.md` y, si existe, `revision/citas_corregidas.md`) y resume en una línea la validación.
+1. Llama a `estado_indice`: obras del documento, cuántas tienen PDF y cuántas están indexadas.
+2. Mira si existen `materiales/abstract.md`, `borrador/plan.md` y `borrador/documento.md`, y di cuántas palabras tiene el borrador.
+3. Llama a `estado_verificacion`. Si todavía no se ha verificado, dilo y sugiere `/theaiwriter:validar`. Si el juez está `en_curso`, di cuántos párrafos lleva. Si está `limite_de_uso` o `interrumpido`, explica que se reanuda donde se quedó con `/theaiwriter:validar`. Si está `terminado`, resume cuántas frases están apoyadas y cuántas hay que revisar.
+4. Termina con el siguiente paso útil.

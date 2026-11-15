@@ -13,7 +13,6 @@ Only new or changed PDFs are read again.
 """
 
 import json
-import os
 import re
 from bisect import bisect_right
 from collections import Counter
@@ -24,11 +23,9 @@ import numpy as np
 
 from ai_writer.embeddings.bm25 import BM25
 from ai_writer.embeddings.embedder import Embedder, get_embedder
-from ai_writer.library import documents_dir
 from ai_writer.processors.segmentation import _find_headings, segment
-from ai_writer.zotero import Work, Zotero, assign_keys
+from ai_writer.zotero import INDEX_ENV, KEYS_FILE, Work, Zotero, assign_keys, default_index_dir  # noqa: F401
 
-INDEX_ENV = "THEAIWRITER_INDICE"
 CUT_VERSION = 1  # bump when the cutting changes, so every work is cut again
 MIN_WORDS, MAX_WORDS = 150, 300  # 300 words fit the embedding model's window
 MIN_PASSAGE_WORDS = 80  # shorter pieces of a section are joined to a neighbour
@@ -46,12 +43,6 @@ _KNOWN = re.compile(
 )
 _GLUED_NUMBER = re.compile(r"^((?:\d+(?:\.\d+)*|[IVX]+)\.)(?=[^\s\d])")
 _BOLD = 16  # PyMuPDF span flag
-
-
-def default_index_dir() -> Path:
-    """``THEAIWRITER_INDICE`` if set, else ``<documents>/TheAIWriter/indice``."""
-    configured = os.getenv(INDEX_ENV)
-    return Path(configured).expanduser() if configured else documents_dir() / "TheAIWriter" / "indice"
 
 
 # -- cutting a PDF ----------------------------------------------------------
@@ -189,7 +180,7 @@ class PassageIndex:
         self.embedder = embedder or get_embedder()
         (self.root / "obras").mkdir(parents=True, exist_ok=True)
         (self.root / "vectores").mkdir(parents=True, exist_ok=True)
-        self._keys_file = self.root / "claves.json"
+        self._keys_file = self.root / KEYS_FILE
         stored = json.loads(self._keys_file.read_text(encoding="utf-8")) if self._keys_file.exists() else {}
         self.keys = assign_keys(zotero.works(), stored)  # item key -> citation key
         if self.keys != stored:

@@ -80,3 +80,31 @@ def test_reference_and_bibliography_come_from_zotero(document):
     index = consulta.open_index()
     path = consulta.write_bibliography(document, index, ["lee2021robots", "smith2020empathy", "nadie"])
     assert path.read_text(encoding="utf-8").count("@article{") == 2
+
+
+def test_hook_blocks_citations_that_are_not_in_the_collections(document):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    mcp_server.crear_documento("perspectiva", "T", colecciones=["Empatía"], fuente="zotero")
+    draft = document / "borrador" / "documento.md"
+
+    def run_hook():
+        event = json.dumps({"tool_input": {"file_path": str(draft)}})
+        hook = Path(__file__).resolve().parent.parent / "hooks" / "validar.py"
+        done = subprocess.run([sys.executable, str(hook)], input=event, capture_output=True,
+                              text=True, env=os.environ.copy(), check=True)
+        return json.loads(done.stdout) if done.stdout.strip() else None
+
+    draft.write_text("Bien citado [@smith2020empathy] y un hueco [@?].", encoding="utf-8")
+    assert run_hook() is None
+    draft.write_text("Mal [@lee2021robots] y peor [@inventado2020].", encoding="utf-8")
+    blocked = run_hook()
+    assert blocked["decision"] == "block"
+    assert "No existen en Zotero: inventado2020" in blocked["reason"]
+    assert "Fuera de las colecciones del documento: lee2021robots" in blocked["reason"]
+    assert mcp_server.validar_citas("x [@inventado2020]")["correcto"] is False
+    assert mcp_server.validar_citas("x [@smith2020empathy]")["correcto"] is True
+    assert mcp_server.diagnostico()["zotero"]["obras"] == 3

@@ -1,17 +1,41 @@
 ---
-description: Escribe el documento automáticamente, en segundo plano, con evidencia de tu biblioteca
-argument-hint: "[«con pausa» para revisar el plan antes de escribir]"
+description: Planifica y escribe el documento consultando los PDF de Zotero, y verifica las citas
+argument-hint: "[«con pausa» para aprobar el plan antes de escribir, o la sección que quieres escribir]"
 ---
 
-Lanza la escritura automática del documento de la carpeta actual con TheAIWriter. Responde siempre en español.
+Escribe el documento de la carpeta actual apoyándote en los PDF de sus colecciones de Zotero, con las herramientas del servidor MCP `theaiwriter`. Tú planificas y escribes; las herramientas te dan los pasajes. Responde al usuario siempre en español.
 
 Petición del usuario: $ARGUMENTS
 
-1. Llama a `estado_escritura`. Si la carpeta no es un documento, explica que primero hay que crearlo con `/theaiwriter:nuevo` y para.
-   - Si hay una escritura `en_curso`, muestra el progreso y para.
-   - Si está `esperando_aprobacion`, recuerda que el plan está en `borrador/plan.md` y que se aprueba con `/theaiwriter:estado`, y para.
-   - Si está `terminado`, dilo y sugiere `/theaiwriter:validar` y revisar `borrador/documento.md`.
-2. Comprueba que existe `materiales/abstract.md` con contenido. Si no existe, pide al usuario la idea y la tesis del documento, propón un abstract de 150-250 palabras, escríbelo ahí cuando lo confirme y sigue.
-3. Antes de lanzar, avisa en una línea: la escritura hace del orden de 40 a 80 llamadas a Claude con su cuenta, tarda entre 30 y 90 minutos y puede seguir usando el chat mientras tanto.
-4. Llama a `escribir_documento`, con `pausar_tras_plan` a verdadero si el usuario pide revisar el plan antes de escribir. Si el documento estaba `detenido`, `interrumpido` o en `error`, la misma llamada lo continúa donde se quedó.
-5. Di qué se ha lanzado y que el progreso se consulta con `/theaiwriter:estado`.
+## Antes de empezar
+
+1. Lee `proyecto.yaml`. Si no existe, o su `fuente` no es «zotero», explica que primero hay que crear el documento con `/theaiwriter:nuevo` y para.
+2. Lee `materiales/abstract.md`. Si no existe o está vacío, pide al usuario la idea y la tesis, propón un abstract de 150 a 250 palabras, escríbelo ahí cuando lo confirme y sigue.
+3. Llama a `estado_indice` con `actualizar` a verdadero. Si hay obras sin PDF, dilo en una línea.
+
+## Plan
+
+4. Explora antes de planificar: haz entre 6 y 12 llamadas a `buscar_pasajes` sobre los temas del abstract. Busca en el idioma de los papers y con los términos que usarían.
+5. Escribe `borrador/plan.md`: la tesis, las secciones y, para cada sección, qué va a sostener y qué obras lo apoyan. Si algo del abstract no tiene apoyo en las colecciones, dilo en el plan en vez de taparlo.
+6. Si el usuario pidió «con pausa», enséñale el plan y espera a que lo apruebe. Si no, sigue.
+
+## Escritura
+
+7. Escribe `borrador/documento.md` sección a sección, en el idioma del documento. Para cada sección:
+   - Vuelve a buscar con consultas concretas de esa sección; no escribas solo con lo que encontraste al planificar.
+   - Antes de citar un dato, un resultado o una cifra, lee su contexto con `leer_pasaje`.
+   - Cita con `[@clave]`, usando solo claves que hayan salido en `buscar_pasajes`, `leer_pasaje` o `leer_paginas`.
+8. Reglas de las citas, sin excepciones:
+   - Cada frase con cita dice lo que dice el pasaje que leíste, con el mismo alcance. No generalices un resultado de un estudio a «los estudios muestran».
+   - Si la obra recoge la afirmación de otra obra, dilo así («según recogen…») o no la cites como hallazgo suyo.
+   - Ninguna cifra, muestra o tamaño de efecto que no hayas leído en un pasaje.
+   - Nada de tu memoria: si lo sabes pero no está en los pasajes, no lleva cita de estas colecciones.
+   - Una cita literal va entre «», copiada tal cual y en el idioma original del paper.
+   - Si a una afirmación le falta fuente, márcala con `[@?]` en lugar de forzar una cita.
+
+## Verificación
+
+9. Al terminar, llama a `verificar_documento`. Corrige en el momento las claves que no existan o estén fuera de las colecciones y las citas literales que no coincidan.
+10. El juez de apoyo corre en segundo plano y hace una llamada a Claude por cada párrafo con citas. Avisa al usuario y consulta el resultado con `estado_verificacion` cuando lo pida o al cabo de unos minutos.
+11. Con el resultado del juez: para cada frase «tergiversada» o «no apoyada», vuelve a leer la obra con `leer_pasaje` y corrige la frase para que diga lo que dice el pasaje, cambia la cita o márcala con `[@?]`. Las «parciales», revísalas y ajusta el alcance. Después vuelve a llamar a `verificar_documento` una vez.
+12. Resume al usuario: dónde está el borrador, cuántas frases citadas están apoyadas y cuáles quedan por revisar a mano, con el informe en `revision/verificacion.md` y la bibliografía en `borrador/referencias.bib`.

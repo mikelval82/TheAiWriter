@@ -2,4 +2,4 @@
 description: Comprueba que el plugin TheAIWriter funciona en este ordenador
 ---
 
-Llama a las herramientas `diagnostico` y `probar_claude` del servidor MCP `theaiwriter` y resume en español, en una tabla corta, el sistema, la versión de Python, la carpeta de la biblioteca, si la carpeta actual es un documento, si `claude` está disponible y si respondió.
+Llama a las herramientas `diagnostico` y `probar_claude` del servidor MCP `theaiwriter` y resume en español, en una tabla corta, el sistema, la versión de Python, la carpeta de Zotero con cuántas obras y PDF tiene, la carpeta del índice de pasajes, si la carpeta actual es un documento, si `claude` está disponible y si respondió.

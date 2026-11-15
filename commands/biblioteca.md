@@ -1,15 +1,16 @@
 ---
-description: Muestra la biblioteca de papers, añade PDFs y gestiona colecciones
-argument-hint: "[qué quieres hacer, p. ej. «añade ~/Descargas/papers» o «crea la colección Emoción»]"
+description: Muestra las colecciones de Zotero que puede usar TheAIWriter y el estado de su índice de pasajes
+argument-hint: "[qué quieres ver, p. ej. «qué obras no tienen PDF» o «actualiza el índice»]"
 ---
 
-Gestiona la biblioteca de TheAIWriter con las herramientas del servidor MCP `theaiwriter`. Responde siempre en español.
+Muestra la biblioteca de Zotero tal como la ve TheAIWriter, con las herramientas del servidor MCP `theaiwriter`. Responde siempre en español.
 
 Petición del usuario: $ARGUMENTS
 
-- Sin petición: llama a `estado_biblioteca` y resume en pocas líneas la carpeta, cuántos papers hay, las colecciones con su número de papers, los PDFs pendientes y el estado del último procesado. Si la carpeta actual es un documento, di qué colecciones usa. Termina sugiriendo el siguiente paso útil.
-- Añadir PDFs: usa `anadir_pdfs` con las rutas que indique. Después pregunta si quiere procesarlos ahora y avisa de que cada paper son unas 6 a 10 llamadas a Claude con su cuenta. Si dice que sí, llama a `procesar_pdfs`: corre en segundo plano y puede seguir trabajando mientras; el progreso se ve con `/theaiwriter:biblioteca`.
-- Crear o cambiar una colección: si no sabe qué papers incluir, llama a `listar_papers` y propón una selección por tema; luego `guardar_coleccion`. Muestra los títulos guardados.
-- Borrar una colección: confirma antes con el usuario y usa `borrar_coleccion`. Los papers no se borran.
+- Sin petición: llama a `colecciones_zotero` y a `estado_indice`, y resume en pocas líneas cuántas obras hay, las colecciones con sus obras y cuántas traen PDF, y cuántas están indexadas o pendientes. Si la carpeta actual es un documento, di qué colecciones usa.
+- Actualizar el índice: llama a `estado_indice` con `actualizar` a verdadero. No gasta llamadas a Claude. Di cuántas obras se han indexado y cuáles no dieron texto (PDF escaneados) o fallaron.
+- Obras sin PDF: enuméralas y explica que no se pueden consultar ni comprobar hasta que tengan el PDF adjunto en Zotero.
 
-Si una herramienta devuelve `error`, explícalo con sus palabras y propón cómo resolverlo. No edites a mano `colecciones.yaml` ni los ficheros de la biblioteca.
+La biblioteca se gestiona en Zotero: para añadir un paper, crear una colección o corregir un título, hazlo allí. TheAIWriter solo lee Zotero, nunca escribe en él, y recoge los cambios la siguiente vez que busca.
+
+Si una herramienta devuelve `error`, explícalo con sus palabras y propón cómo resolverlo.
