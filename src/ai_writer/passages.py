@@ -23,8 +23,15 @@ import numpy as np
 
 from ai_writer.embeddings.bm25 import BM25
 from ai_writer.embeddings.embedder import Embedder, get_embedder
-from ai_writer.processors.segmentation import _find_headings, segment
-from ai_writer.zotero import INDEX_ENV, KEYS_FILE, Work, Zotero, assign_keys, default_index_dir  # noqa: F401
+from ai_writer.segmentation import _find_headings, segment
+from ai_writer.zotero import (  # noqa: F401
+    INDEX_ENV,
+    KEYS_FILE,
+    Work,
+    Zotero,
+    assign_keys,
+    default_index_dir,
+)
 
 CUT_VERSION = 1  # bump when the cutting changes, so every work is cut again
 MIN_WORDS, MAX_WORDS = 150, 300  # 300 words fit the embedding model's window
@@ -86,8 +93,9 @@ def _font_names(doc) -> list[str]:
         pages_with[text] += 1
 
     # Title, authors and affiliations come before the first standard heading of page 1
-    first_known = next((i for i, (page, text, _, _) in enumerate(lines)
-                        if page == 0 and _KNOWN.match(text)), 0)
+    first_known = next(
+        (i for i, (page, text, _, _) in enumerate(lines) if page == 0 and _KNOWN.match(text)), 0
+    )
     names = []
     for page, text, size, bold in lines[first_known:]:
         words = text.split()
@@ -129,7 +137,7 @@ def _tidy(content: str) -> str:
 
 
 def cut_pdf(path: Path) -> dict:
-    """Passages of a PDF: ``{"paginas", "secciones_por", "pasajes": [{seccion, paginas, texto}]}``."""
+    """PDF pages, section source and passages with section names, pages and text."""
     with fitz.open(path) as doc:
         pages = _page_texts(doc)
         text = "\n\n".join(pages)
@@ -138,7 +146,9 @@ def cut_pdf(path: Path) -> dict:
     for page in pages:
         starts.append(offset)
         offset += len(page) + 2
-    page_of = lambda position: max(1, bisect_right(starts, position))
+
+    def page_of(position: int) -> int:
+        return max(1, bisect_right(starts, position))
 
     passages = []
     for piece in segment(text, names, MIN_WORDS, MAX_WORDS):
@@ -156,7 +166,10 @@ def cut_pdf(path: Path) -> dict:
         passages.append({"seccion": section, "paginas": pages_span, "texto": content})
     for i, passage in enumerate(passages[:-1]):  # ... or the one after it, when it opens a section
         after = passages[i + 1]
-        if len(passage["texto"].split()) < MIN_PASSAGE_WORDS and after["seccion"] == passage["seccion"]:
+        if (
+            len(passage["texto"].split()) < MIN_PASSAGE_WORDS
+            and after["seccion"] == passage["seccion"]
+        ):
             after["texto"] = passage["texto"] + "\n\n" + after["texto"]
             after["paginas"][0] = passage["paginas"][0]
             passage["texto"] = ""
@@ -174,14 +187,20 @@ def _fingerprint(work: Work) -> list:
 class PassageIndex:
     """Passages of the works in a Zotero library, kept up to date and searchable."""
 
-    def __init__(self, zotero: Zotero, root: Path | None = None, embedder: Embedder | None = None) -> None:
+    def __init__(
+        self, zotero: Zotero, root: Path | None = None, embedder: Embedder | None = None
+    ) -> None:
         self.zotero = zotero
         self.root = Path(root) if root else default_index_dir()
         self.embedder = embedder or get_embedder()
         (self.root / "obras").mkdir(parents=True, exist_ok=True)
         (self.root / "vectores").mkdir(parents=True, exist_ok=True)
         self._keys_file = self.root / KEYS_FILE
-        stored = json.loads(self._keys_file.read_text(encoding="utf-8")) if self._keys_file.exists() else {}
+        stored = (
+            json.loads(self._keys_file.read_text(encoding="utf-8"))
+            if self._keys_file.exists()
+            else {}
+        )
         self.keys = assign_keys(zotero.works(), stored)  # item key -> citation key
         if self.keys != stored:
             self._write(self._keys_file, {**stored, **self.keys})
@@ -234,9 +253,13 @@ class PassageIndex:
                     cut = cut_pdf(pdf)
                     pages += cut["paginas"]
                     for passage in cut["pasajes"]:
-                        passages.append({**passage, "archivo": pdf.name, "secciones_por": cut["secciones_por"]})
+                        passages.append(
+                            {**passage, "archivo": pdf.name, "secciones_por": cut["secciones_por"]}
+                        )
             except Exception as error:  # a damaged PDF must not stop the rest
-                failed.append({"clave": self.keys[work.item_key], "titulo": work.title, "error": str(error)})
+                failed.append(
+                    {"clave": self.keys[work.item_key], "titulo": work.title, "error": str(error)}
+                )
                 continue
             for number, passage in enumerate(passages, 1):
                 passage["n"] = number
@@ -245,8 +268,10 @@ class PassageIndex:
                 texts = [f"{work.title}. {p['seccion']}. {p['texto']}" for p in passages]
                 vectors = _normalize(self.embedder.embed(texts, kind="passage"))
             np.save(self.root / "vectores" / f"{work.item_key}.npy", vectors)
-            self._write(self.root / "obras" / f"{work.item_key}.json",
-                        {"huella": _fingerprint(work), "paginas": pages, "pasajes": passages})
+            self._write(
+                self.root / "obras" / f"{work.item_key}.json",
+                {"huella": _fingerprint(work), "paginas": pages, "pasajes": passages},
+            )
             (done if passages else empty).append(self.keys[work.item_key])
         self._loaded = None
         return {"indexadas": done, "sin_texto": empty, "fallidas": failed}
@@ -284,9 +309,15 @@ class PassageIndex:
             result["relevancia"] = round(float(score), 4)
         return result
 
-    def search(self, query: str, n: int = 8, item_keys: set[str] | None = None,
-               max_per_work: int = 3, lexical: bool = True) -> list[dict]:
-        """The passages closest to ``query``: by meaning, blended with word matches if ``lexical``."""
+    def search(
+        self,
+        query: str,
+        n: int = 8,
+        item_keys: set[str] | None = None,
+        max_per_work: int = 3,
+        lexical: bool = True,
+    ) -> list[dict]:
+        """Rank passages by meaning, blended with word matches if ``lexical``."""
         rows, matrix, bm25 = self._load()
         if not rows or not query.strip():
             return []
@@ -330,8 +361,8 @@ class PassageIndex:
                 first -= 1
             while last + 1 < len(passages) and passages[last + 1]["seccion"] == section:
                 last += 1
-            return passages[first:last + 1]
-        return passages[max(0, position - 1):position + 2]
+            return passages[first : last + 1]
+        return passages[max(0, position - 1) : position + 2]
 
     def pages(self, cite_key: str, first: int, last: int) -> list[dict]:
         """The passages of a work that touch pages ``first``..``last``."""
@@ -369,5 +400,8 @@ def _blend(semantic: np.ndarray, lexical: np.ndarray) -> np.ndarray:
     """Weighted sum of both scores, each standardized; meaning alone when no word matches."""
     if not lexical.any():  # e.g. a query in Spanish over papers in English
         return semantic
-    standard = lambda x: (x - x.mean()) / (x.std() + 1e-9)
+
+    def standard(x: np.ndarray) -> np.ndarray:
+        return (x - x.mean()) / (x.std() + 1e-9)
+
     return (1 - LEXICAL_WEIGHT) * standard(semantic) + LEXICAL_WEIGHT * standard(lexical)

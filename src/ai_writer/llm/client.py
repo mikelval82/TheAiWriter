@@ -232,7 +232,7 @@ _client: LLMClient | None = None
 
 
 def get_llm_client() -> LLMClient:
-    """Return the client shared by every agent, creating it on first use."""
+    """Return the shared judge client, creating it on first use."""
     global _client
     if _client is None:
         _client = LLMClient(build_backend())

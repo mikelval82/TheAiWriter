@@ -50,8 +50,5 @@ class BM25:
                 continue
             ids, frequencies = posting
             idf = np.log1p((len(scores) - len(ids) + 0.5) / (len(ids) + 0.5))
-            scores[ids] += idf * frequencies * (self.k1 + 1.0) / (
-                frequencies + self._norm[ids]
-            )
+            scores[ids] += idf * frequencies * (self.k1 + 1.0) / (frequencies + self._norm[ids])
         return scores
-

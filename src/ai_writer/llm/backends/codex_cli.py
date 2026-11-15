@@ -27,25 +27,39 @@ class CodexBackend:
         with tempfile.TemporaryDirectory(prefix="ai-writer-") as workdir:
             answer = os.path.join(workdir, "answer.txt")
             command = [
-                self.executable, "exec",
-                "--skip-git-repo-check", "--ephemeral",
-                "--sandbox", "read-only",
-                "--model", request.model,
-                "-c", f'model_reasoning_effort="{settings.ai.codex_effort}"',
-                "--output-last-message", answer,
+                self.executable,
+                "exec",
+                "--skip-git-repo-check",
+                "--ephemeral",
+                "--sandbox",
+                "read-only",
+                "--model",
+                request.model,
+                "-c",
+                f'model_reasoning_effort="{settings.ai.codex_effort}"',
+                "--output-last-message",
+                answer,
                 "-",
             ]
             try:
                 completed = subprocess.run(
-                    command, input=f"{system}\n\n{request.user}", capture_output=True, text=True,
-                    encoding="utf-8", timeout=request.timeout, cwd=workdir,
+                    command,
+                    input=f"{system}\n\n{request.user}",
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=request.timeout,
+                    cwd=workdir,
                 )
             except FileNotFoundError as error:
                 raise LLMError(
-                    f"Codex CLI not found ({self.executable!r}). Install it or set CODEX_BIN to its path."
+                    f"Codex CLI not found ({self.executable!r}). "
+                    "Install it or set CODEX_BIN to its path."
                 ) from error
             except subprocess.TimeoutExpired as error:
-                raise LLMError(f"Codex CLI timed out after {request.timeout}s", retryable=True) from error
+                raise LLMError(
+                    f"Codex CLI timed out after {request.timeout}s", retryable=True
+                ) from error
             text = ""
             if os.path.exists(answer):
                 with open(answer, encoding="utf-8") as f:
@@ -54,6 +68,10 @@ class CodexBackend:
         if completed.returncode != 0 or not text:
             detail = (completed.stderr or completed.stdout).strip()[-500:]
             if any(mark in detail.lower() for mark in _LIMIT_MARKS):
-                raise UsageLimitError(f"Límite de uso de la cuenta de Codex alcanzado: {detail[-300:]}")
-            raise LLMError(f"Codex CLI exited with code {completed.returncode}: {detail}", retryable=True)
+                raise UsageLimitError(
+                    f"Límite de uso de la cuenta de Codex alcanzado: {detail[-300:]}"
+                )
+            raise LLMError(
+                f"Codex CLI exited with code {completed.returncode}: {detail}", retryable=True
+            )
         return LLMResponse(text=text)

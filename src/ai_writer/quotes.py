@@ -112,11 +112,10 @@ class QuoteChecker:
                 lo = start + shift
                 if lo < first_word or lo >= len(self._words):
                     continue
-                kept, end_idx = [], lo
+                kept = []
                 for idx in range(lo, min(lo + len(words) + _MAX_SKIPPED + 2, len(self._words))):
                     if not self._words[idx].isdigit():
                         kept.append(self._words[idx])
-                        end_idx = idx
                     if len(kept) >= len(words) + 2:
                         break
                 for size in (0, -1, 1, 2, -2):
@@ -124,9 +123,11 @@ class QuoteChecker:
                     if n < 1 or n > len(kept):
                         continue
                     matcher.set_seq1(" ".join(kept[:n]))
-                    if (matcher.real_quick_ratio() >= MIN_SIMILARITY
-                            and matcher.quick_ratio() >= MIN_SIMILARITY
-                            and matcher.ratio() >= MIN_SIMILARITY):
+                    if (
+                        matcher.real_quick_ratio() >= MIN_SIMILARITY
+                        and matcher.quick_ratio() >= MIN_SIMILARITY
+                        and matcher.ratio() >= MIN_SIMILARITY
+                    ):
                         return self._end_of(lo, n)
         return None
 
@@ -203,11 +204,13 @@ def explain_mismatch(quote: str, text: str) -> dict | None:
     differences = []
     for tag, i, j, lo, hi in matcher.get_opcodes():
         if tag != "equal":
-            differences.append({
-                "cita": " ".join(span.group() for span in quote_spans[i:j]),
-                "texto": " ".join(span.group() for span in passage_spans[lo:hi]),
-            })
-    passage = text[passage_spans[0].start():passage_spans[-1].end()]
+            differences.append(
+                {
+                    "cita": " ".join(span.group() for span in quote_spans[i:j]),
+                    "texto": " ".join(span.group() for span in passage_spans[lo:hi]),
+                }
+            )
+    passage = text[passage_spans[0].start() : passage_spans[-1].end()]
     return {
         "pasaje": " ".join(passage.split()),
         "parecido": round(matcher.ratio(), 2),

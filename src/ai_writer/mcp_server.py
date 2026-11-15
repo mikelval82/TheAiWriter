@@ -1,8 +1,7 @@
 """MCP tools for Claude to write with Zotero PDF passages and verify citations.
 
 Exposes diagnostics, document setup, Zotero collections and passage consultation,
-references, citation checks and document verification. References and citation
-checks also support documents using the legacy library source.
+references, citation checks and document verification.
 
 Claude Code starts it with ``uv run`` from the plugin folder; its working directory
 is the folder where the student opened Claude, which is the document folder.
@@ -17,19 +16,17 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import asdict
 from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
-from ai_writer.library import PROJECT_FILE, Library, LibraryError, Project
+from ai_writer.library import PROJECT_FILE, LibraryError, Project
 
 server = MCPServer("theaiwriter")
 
 
 def tool(function):
-    """Register a tool. Its prints (the indices report progress with rich) go to
-    stderr: stdout carries the MCP protocol."""
+    """Register a tool, routing its prints to stderr to preserve the MCP protocol."""
 
     @functools.wraps(function)
     def quiet(*args, **kwargs):
@@ -44,15 +41,6 @@ def _document_folder() -> Path:
     return Path(os.getenv("CLAUDE_PROJECT_DIR") or os.getcwd())
 
 
-def _current_library() -> tuple[Library, Project | None]:
-    """The open document's library, or the default one outside a document."""
-    folder = _document_folder()
-    if (folder / PROJECT_FILE).exists():
-        project = Project.load(folder)
-        return project.library(), project
-    return Library(), None
-
-
 def _error(error: LibraryError) -> dict:
     return {"error": str(error)}
 
@@ -62,21 +50,23 @@ def diagnostico() -> dict:
     """Informa de dónde corre el plugin: sistema, Python, carpetas y si `claude` está disponible."""
     from ai_writer.zotero import Zotero, default_index_dir
 
-    library, project = _current_library()
+    is_document = (_document_folder() / PROJECT_FILE).exists()
     try:
         zotero = Zotero()
-        found = {"carpeta": str(zotero.root), "obras": len(zotero.works()),
-                 "con_pdf": sum(bool(w.pdfs) for w in zotero.works())}
+        found = {
+            "carpeta": str(zotero.root),
+            "obras": len(zotero.works()),
+            "con_pdf": sum(bool(w.pdfs) for w in zotero.works()),
+        }
     except LibraryError as error:
         found = {"error": str(error)}
     return {
         "sistema": platform.platform(),
         "python": sys.version.split()[0],
         "carpeta_del_documento": str(_document_folder()),
-        "es_un_documento": project is not None,
+        "es_un_documento": is_document,
         "zotero": found,
         "indice_de_pasajes": str(default_index_dir()),
-        "biblioteca": str(library.root),
         "claude_en_path": shutil.which("claude"),
     }
 
@@ -89,9 +79,22 @@ def probar_claude() -> dict:
         return {"ok": False, "error": "claude no está en el PATH del servidor"}
     start = time.monotonic()
     completed = subprocess.run(
-        [claude, "-p", "Responde solo: ok", "--model", "haiku", "--output-format", "json",
-         "--tools", "", "--no-session-persistence"],
-        capture_output=True, text=True, encoding="utf-8", timeout=120,
+        [
+            claude,
+            "-p",
+            "Responde solo: ok",
+            "--model",
+            "haiku",
+            "--output-format",
+            "json",
+            "--tools",
+            "",
+            "--no-session-persistence",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
         stdin=subprocess.DEVNULL,
     )
     try:
@@ -107,31 +110,31 @@ def probar_claude() -> dict:
 
 @tool
 def crear_documento(
-    tipo: str, titulo: str, idioma: str = "es", colecciones: list[str] | None = None,
-    fuente: str = "zotero",
+    tipo: str,
+    titulo: str,
+    idioma: str = "es",
+    colecciones: list[str] | None = None,
 ) -> dict:
-    """Convierte la carpeta actual en un documento de TheAIWriter: crea `proyecto.yaml` y las
-    carpetas materiales/, borrador/, revision/ y exportacion/. `tipo` es perspectiva,
-    resultados o convocatoria. `fuente`: «zotero» (por defecto) para citar desde colecciones de Zotero
-    (nombres de `colecciones_zotero`) o «biblioteca» para la biblioteca propia; sin
-    colecciones, el documento usa todas las obras."""
+    """Crea `proyecto.yaml` y las carpetas materiales/, borrador/, revision/ y exportacion/.
+    `tipo` solo acepta «perspectiva». Las colecciones se validan contra Zotero;
+    sin colecciones, el documento usa todas las obras."""
+    from ai_writer.consulta import open_index, scope
+
     folder = _document_folder()
     try:
         project = Project.create(
-            folder, tipo=tipo, titulo=titulo, idioma=idioma, colecciones=colecciones or [],
-            fuente=fuente,
+            folder,
+            tipo=tipo,
+            titulo=titulo,
+            idioma=idioma,
+            colecciones=colecciones or [],
         )
-        if project.fuente == "zotero":
-            from ai_writer.consulta import open_index, scope
-
-            index = open_index()
-            return {"documento": str(folder / PROJECT_FILE), **index.status(scope(project, index))}
-        papers = len(project.paper_ids())
+        index = open_index()
+        return {"documento": str(folder / PROJECT_FILE), **index.status(scope(project, index))}
     except LibraryError as error:
         return _error(error)
     except ValueError as error:
         return {"error": f"Datos no válidos: {error}"}
-    return {"documento": str(folder / PROJECT_FILE), "papers_disponibles": papers}
 
 
 # Zotero: passages to consult while writing
@@ -161,8 +164,11 @@ def colecciones_zotero() -> dict:
         "carpeta": str(zotero.root),
         "obras": len(zotero.works()),
         "colecciones": [
-            {"ruta": c.path, "obras": len(keys := zotero.item_keys([c.key])),
-             "con_pdf": sum(bool(zotero.work(key).pdfs) for key in keys)}
+            {
+                "ruta": c.path,
+                "obras": len(keys := zotero.item_keys([c.key])),
+                "con_pdf": sum(bool(zotero.work(key).pdfs) for key in keys),
+            }
             for c in zotero.collections()
         ],
     }
@@ -253,66 +259,36 @@ def leer_paginas(clave: str, desde: int, hasta: int | None = None) -> dict:
     return {"clave": passages[0]["clave"], "titulo": passages[0]["titulo"], "pasajes": passages}
 
 
-# Evidence and citations
-
-
-# Evidence engines are slow to build (indices, model); one is kept per document state
-_engines: dict[tuple, object] = {}
-
-
-def _engine(library: Library, project: Project | None):
-    """An evidence engine for the open document, reused while its vectors do not change."""
-    from ai_writer.evidence import EvidenceEngine
-
-    paper_ids = project.paper_ids() if project else None
-    vectors = library.embeddings_dir / "ideas_index.npz"
-    stamp = vectors.stat().st_mtime if vectors.exists() else 0
-    cache_key = (str(library.root), frozenset(paper_ids) if paper_ids else None, stamp)
-    if cache_key not in _engines:
-        _engines.clear()
-        _engines[cache_key] = EvidenceEngine(library, paper_ids)
-    return _engines[cache_key]
+# References and citation checks
 
 
 @tool
 def referencia(clave: str) -> dict:
-    """Datos completos de una obra citable: título, autores, año, revista, DOI, entrada
-    BibTeX, cuánta evidencia tiene y si está en las colecciones del documento."""
-    library, project = _current_library()
-    if project is not None and project.fuente == "zotero":
-        from ai_writer.consulta import reference
+    """Datos de una obra de Zotero: título, autores, año, revista, DOI, BibTeX,
+    pasajes disponibles y si está en las colecciones del documento."""
+    from ai_writer.consulta import reference
 
+    try:
         index, _, allowed = _zotero_document()
         found = reference(index, clave.lstrip("@"), allowed)
-        return found or {"error": f"La clave «{clave}» no existe en Zotero."}
-    reference = _engine(library, project).reference(clave.lstrip("@"))
-    if reference is None:
-        return {"error": f"La clave «{clave}» no existe en la biblioteca."}
-    return reference
+    except LibraryError as error:
+        return _error(error)
+    return found or {"error": f"La clave «{clave}» no existe en Zotero."}
 
 
 @tool
 def validar_citas(texto: str) -> dict:
-    """Comprueba que cada `[@clave]` exista en Zotero o en la biblioteca, según la fuente
-    del documento, y esté en sus colecciones. En la biblioteca también informa de citas
-    que no hayan salido en las búsquedas de evidencia registradas.
-    Úsala antes de dar por bueno cualquier texto con citas."""
-    from ai_writer.citations import CitationIndex, check_citations
-    from ai_writer.validation import check_text
+    """Comprueba que cada `[@clave]` exista en Zotero y esté en las colecciones del
+    documento. Úsala antes de dar por bueno cualquier texto con citas."""
+    from ai_writer.verificacion import check_citations
 
-    library, project = _current_library()
-    if project is not None and project.fuente == "zotero":
-        from ai_writer.verificacion import check_citations as check_zotero
-
+    try:
         index, _, allowed = _zotero_document()
-        report = check_zotero(texto, index, allowed)
-        bad = report["desconocidas"] + report["fuera_de_las_colecciones"] + report["mal_formadas"]
-        return {"correcto": not bad, **report}
-    if project is not None:
-        report = check_text(texto, _document_folder())
-    else:
-        report = check_citations(texto, CitationIndex.load(library))
-    return {"correcto": report.ok, "informe": report.summary(), **asdict(report)}
+        report = check_citations(texto, index, allowed)
+    except LibraryError as error:
+        return _error(error)
+    bad = report["desconocidas"] + report["fuera_de_las_colecciones"] + report["mal_formadas"]
+    return {"correcto": not bad, **report}
 
 
 @tool

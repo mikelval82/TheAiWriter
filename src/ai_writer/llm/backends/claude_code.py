@@ -45,10 +45,14 @@ class ClaudeCodeBackend:
             command = [
                 self.executable,
                 "-p",
-                "--output-format", "json",
-                "--model", request.model,
-                "--system-prompt-file", system_path,
-                "--tools", "",
+                "--output-format",
+                "json",
+                "--model",
+                request.model,
+                "--system-prompt-file",
+                system_path,
+                "--tools",
+                "",
                 "--strict-mcp-config",
                 "--no-session-persistence",
             ]
@@ -87,11 +91,11 @@ class ClaudeCodeBackend:
         result = payload.get("result") or ""
         if payload.get("is_error"):
             if "not logged in" in result.lower():
-                raise LLMError(
-                    "Claude Code CLI is not logged in. Run `claude` and use /login."
-                )
+                raise LLMError("Claude Code CLI is not logged in. Run `claude` and use /login.")
             if "hit your" in result.lower() and "limit" in result.lower():
-                raise UsageLimitError(f"Límite de uso de la cuenta de Claude alcanzado: {result[:300]}")
+                raise UsageLimitError(
+                    f"Límite de uso de la cuenta de Claude alcanzado: {result[:300]}"
+                )
             raise LLMError(f"Claude Code CLI error: {result[:500]}", retryable=True)
 
         usage = payload.get("usage") or {}

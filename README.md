@@ -1,252 +1,133 @@
 # TheAIWriter
 
-🤖 AI-powered academic writing system specialized in **perspective papers**. Uses a 3-phase architecture with semantic search over curated reference embeddings.
+TheAIWriter es un plugin de Claude Code para escribir documentos científicos con los PDF de tu
+Zotero. Claude planifica y escribe; el plugin le permite buscar y leer pasajes de los artículos y
+verifica las citas del borrador.
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+## Requisitos
 
-## 🎯 Overview
+- Claude Code, en la aplicación de escritorio o en la terminal, con tu propia cuenta.
+- Zotero instalado en el mismo ordenador, con los PDF adjuntos a las obras.
+- `uv` instalado y disponible en el sistema.
 
-TheAIWriter generates high-quality perspective papers by:
-1. **Analyzing** your reference corpus through semantic clustering
-2. **Planning** a detailed outline with paragraph-level ideas
-3. **Writing** each paragraph with targeted semantic search for evidence
+Zotero no necesita estar abierto. El plugin solo lee sus datos: no escribe en Zotero.
 
-## 🏗️ Architecture
+## Instalación
 
-```mermaid
-flowchart TB
-    subgraph Input["📥 Input Layer"]
-        PDFs[("📄 PDFs")]
-        Abstract["📝 Abstract"]
-    end
+En Claude Code:
 
-    subgraph Processing["⚙️ Processing Pipeline"]
-        Reader["PyMuPDF\nPDF→Texto"]
-        Extractor["Idea/Claim\nExtractor"]
-        Embedder["Local\nEmbeddings"]
-        PDFs --> Reader --> Extractor --> Embedder
-    end
-
-    subgraph Storage["💾 Vector Storage"]
-        Ideas[("💡 Ideas\n3,733")]
-        Claims[("📌 Claims\n3,839")]
-        Refs[("📚 References\n1,200+")]
-        Embedder --> Ideas & Claims & Refs
-    end
-
-    subgraph Generation["🚀 3-Phase Generation"]
-        direction TB
-        P1["🔬 Phase 1\nCluster Analysis"]
-        P2["📋 Phase 2\nPlanning"]
-        P3["✍️ Phase 3\nWriting"]
-        P1 --> P2 --> P3
-    end
-
-    subgraph Agents["🤖 Agent System"]
-        Planner["PlannerAgent\nOutline Generation"]
-        Writer["WriterAgent\nParagraph Writing"]
-        Reviewer["ReviewerAgent\nRAG-Enhanced Review"]
-        Memory["📝 Section Memory\nShort-term Context"]
-    end
-
-    subgraph Output["📤 Output"]
-        Paper["📄 Perspective Paper"]
-        Review["📋 Critical Review"]
-    end
-
-    Abstract --> P1
-    Ideas --> P1
-    P1 -->|Topics| Planner
-    Planner -->|Outline| P2
-    P2 -->|Refined Outline| Writer
-    Ideas & Claims & Refs --> Writer
-    Writer --> Memory
-    Memory --> Reviewer
-    Reviewer --> P3
-    P3 --> Paper & Review
+```text
+/plugin marketplace add mikelval82/TheAiWriter
+/plugin install theaiwriter@theaiwriter
 ```
 
-## ✨ Features
+La primera vez que se indexan o buscan pasajes se descarga el modelo de búsqueda, que ocupa unos
+cientos de MB. Después se calcula la búsqueda en el ordenador.
 
-- **🔬 Semantic Clustering**: Extracts main topics from embedding space using KMeans
-- **📋 Intelligent Planning**: Generates detailed outlines with paragraph-level key ideas
-- **✍️ Targeted Writing**: Each paragraph gets context from semantic search on its specific idea
-- **🔄 RAG-Enhanced Review**: Reviewer searches for supporting/counter evidence
-- **📝 Section Memory**: Maintains coherence across sections with summaries
-- **📊 Pipeline Logging**: Full traceability of generation process
+## Uso
 
-## 📦 Installation
+Abre Claude Code en la carpeta donde vas a escribir el documento.
+
+1. Ejecuta `/theaiwriter:diagnostico`. Comprueba que se encuentra Zotero y que Claude responde con
+   tu cuenta. No crea archivos del documento.
+2. Ejecuta `/theaiwriter:nuevo`. Indica el título, el idioma y las colecciones de Zotero que vas a
+   usar. Una colección incluye sus subcolecciones; si no eliges ninguna, se usa todo Zotero. Crea
+   `proyecto.yaml` y las carpetas `materiales/`, `borrador/`, `revision/` y `exportacion/`, y prepara
+   el índice de pasajes de los PDF seleccionados.
+3. Pon tu idea y la tesis que quieres defender en `materiales/abstract.md`.
+4. Ejecuta `/theaiwriter:escribir`. Claude explora los artículos, deja el plan en `borrador/plan.md`
+   y escribe `borrador/documento.md`, consultando pasajes mientras redacta. Las búsquedas y los
+   pasajes consultados quedan en `revision/consultas.json`. Al terminar lanza la verificación,
+   que escribe `borrador/referencias.bib` y `revision/verificacion.md`.
+5. Ejecuta `/theaiwriter:validar` para volver a comprobar el borrador. Actualiza la bibliografía y
+   el informe, y lanza el juez en segundo plano. Con `/theaiwriter:validar sin juez` solo se hacen
+   las comprobaciones que no usan un modelo. Los resultados y el progreso se guardan también en
+   `revision/verificacion.json`.
+6. Ejecuta `/theaiwriter:estado` para ver cómo van el índice, el borrador y el juez, y qué frases
+   hay que revisar. Consulta los archivos existentes; no crea otro informe.
+7. Ejecuta `/theaiwriter:biblioteca` para consultar las colecciones de Zotero y el estado del
+   índice. Puedes pedirle que actualice el índice; los cambios se guardan en la carpeta del
+   índice, fuera del documento. Los artículos y las colecciones se gestionan en Zotero.
+
+Las citas del borrador usan claves como `[@smith2020empathy]`. Si falta una fuente, Claude debe
+marcarla con `[@?]`.
+
+## Qué comprueba la verificación
+
+1. Que la clave de cada cita existe en Zotero y pertenece a las colecciones del documento. También
+   señala citas mal formadas, fuentes pendientes y obras sin PDF indexado. Tras editar el borrador,
+   un hook bloquea las citas desconocidas, mal formadas o ajenas a sus colecciones.
+2. Que una cita literal entre «» aparece palabra por palabra en el PDF de alguna de las obras
+   citadas en esa frase. Se comprueban las citas de seis palabras o más; también se reconocen
+   comillas inglesas y rectas. Se normalizan diferencias de extracción del PDF, como guiones de
+   final de línea, y se permiten omisiones marcadas con puntos suspensivos. Una palabra cambiada
+   hace que la cita deje de ser literal. Una traducción no cuenta como cita literal del original.
+3. Que cada frase citada dice lo que dice la obra. Un juez compara la frase con pasajes de la obra
+   citada, incluidos los consultados al escribir, y la clasifica como **apoyada**, **parcial**,
+   **tergiversada** o **no apoyada**. Si no puede comprobarla, queda **sin juzgar**.
+
+Las dos primeras comprobaciones no usan un modelo. Por defecto, el juez hace una llamada a Claude
+por párrafo con citas que tenga pasajes para comparar, en segundo plano y con tu cuenta. Guarda el
+progreso tras cada párrafo y puede reanudar la tarea si se alcanza el límite de uso. El juez es
+automático y a veces se equivoca: revisa las frases señaladas y sus fuentes.
+
+## Límites conocidos
+
+- Las obras sin PDF no se pueden consultar ni comprobar.
+- Los PDF escaneados sin texto no se indexan como pasajes; no se hace OCR.
+- Las consultas funcionan mejor en el idioma de los artículos y con sus términos.
+- Las claves de cita las asigna el plugin y quedan en su índice. Para una obra nueva puede adoptar
+  una clave existente en Zotero; una vez asignada, conserva la del índice. Usa el archivo generado
+  `borrador/referencias.bib` para que las claves coincidan.
+- Solo se admite el tipo de documento `perspectiva`.
+
+## Dónde guarda cosas
+
+El índice de pasajes se guarda en `Documentos/TheAIWriter/indice`, o en `Documents/TheAIWriter/indice`
+si esa es la carpeta de documentos del sistema. Puedes cambiarla con `THEAIWRITER_INDICE`.
+
+La carpeta de Zotero se detecta a partir de su configuración; si no se encuentra una ruta
+configurada, se busca en `~/Zotero`. Puedes indicarla con `THEAIWRITER_ZOTERO`.
+
+El documento y sus informes se guardan en la carpeta donde abriste Claude. El modelo de búsqueda
+se descarga por defecto en `~/.cache/theaiwriter/modelos`; se cambia con `EMBEDDING_CACHE_DIR`.
+
+## Desarrollo
+
+Desde el repositorio, con el entorno preparado:
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/TheAIWriter.git
-cd TheAIWriter
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
-
-# Install dependencies
-pip install -e .
-
-# Text generation uses the Claude Code CLI: install it and log in once
-claude   # then /login
-
-# Optional: override models or backends
-cp .env.example .env
-
-# After changing the embedding model, rebuild the indices
-python -m ai_writer reindex
+uv sync --extra dev
+.venv/bin/python -m pytest -q
 ```
 
-## 🚀 Usage
-
-### Command Line Interface
+La CLI conserva solo `version` y `documento verificar <carpeta>`. Este último ejecuta el juez; lo
+lanza el plugin en segundo plano.
 
 ```bash
-# Generate a perspective paper
-python -m ai_writer generate "Hacia Agentes Empáticos Fundamentales"
-
-# Generate with custom options
-python -m ai_writer generate "Paper Title" -c 30 -r 2 -o ./output/
-
-# Generate only the outline
-python -m ai_writer outline "Paper Title"
-
-# Review an existing paper
-python -m ai_writer review ./paper.md
-
-# Show configuration
-python -m ai_writer version
-
-# Process new PDFs into the index
-python -m ai_writer process --input ./new_papers/
+PYTHONPATH=src:. .venv/bin/python -m ai_writer version
+PYTHONPATH=src:. .venv/bin/python -m ai_writer documento verificar /ruta/al/documento
 ```
 
-### CLI Options
+La configuración se lee del entorno y del archivo `.env` del repositorio, si existe:
 
-| Command | Description |
-|---------|-------------|
-| `generate` | Generate a complete perspective paper |
-| `outline` | Generate only the structured outline |
-| `review` | Generate critical review of existing paper |
-| `process` | Process PDFs and build embedding indices |
-| `stats` | Show embedding index statistics |
-| `version` | Show configuration and version info |
+| Variable | Uso y valor por defecto |
+|---|---|
+| `DEFAULT_MODEL` | Modelo del juez: `sonnet` |
+| `LLM_BACKEND` | Backend del juez: `claude-code` o `codex`; por defecto, `claude-code` |
+| `CLAUDE_BIN` | Ejecutable de Claude Code: `claude` |
+| `CODEX_BIN` | Ejecutable de Codex: `codex` |
+| `CODEX_EFFORT` | Esfuerzo del backend Codex: `low` |
+| `LLM_TIMEOUT` | Tiempo máximo por llamada, en segundos: `600` |
+| `LLM_MAX_RETRIES` | Reintentos tras un fallo transitorio: `2` |
+| `EMBEDDING_BACKEND` | Backend de búsqueda: solo `local` |
+| `EMBEDDING_MODEL` | Modelo de búsqueda: `intfloat/multilingual-e5-small` |
+| `EMBEDDING_CACHE_DIR` | Carpeta de descarga del modelo |
+| `THEAIWRITER_INDICE` | Carpeta del índice de pasajes |
+| `THEAIWRITER_ZOTERO` | Carpeta que contiene `zotero.sqlite` |
 
-### Generate Options
+Al cambiar el modelo de búsqueda, la siguiente actualización reconstruye los pasajes y vectores;
+conserva las claves de cita. Para usar el juez con Codex, elige también un `DEFAULT_MODEL` disponible
+en ese backend. La planificación y la escritura las hace la sesión de Claude Code.
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `-c, --clusters` | 25 | Number of clusters for topic extraction |
-| `-r, --reviews` | 1 | Review iterations per section |
-| `-o, --output` | `data/output/final/` | Output directory |
-| `-a, --abstract` | `ABSTRACT.md` | Path to abstract file |
-| `--no-log` | False | Disable pipeline logging |
-
-## 📁 Project Structure
-
-```
-TheAIWriter/
-├── src/ai_writer/
-│   ├── agents/           # AI agents (planner, writer, reviewer)
-│   ├── orchestrators/    # 3-phase pipeline orchestration
-│   ├── embeddings/       # Embedding management
-│   ├── processors/       # PDF processing pipeline
-│   ├── readers/          # Document readers
-│   ├── writers/          # Document writers
-│   ├── models/           # Data models (Paper, Outline)
-│   └── utils/            # Cluster analysis, context manager
-├── data/
-│   ├── references/       # Source PDFs and markdown
-│   ├── processed/        # Embeddings and indices
-│   ├── logs/             # Pipeline execution logs
-│   └── output/           # Generated papers
-├── config/               # Settings and configuration
-├── docs/                 # Architecture documentation
-└── tests/                # Test suite
-```
-
-## ⚙️ Configuration
-
-No API key is needed by default. Text is generated through the Claude Code CLI
-(`claude -p`, using its own login) and embeddings are computed locally with
-`sentence-transformers`. Everything is set through environment variables or a
-`.env` file; the values below are the defaults:
-
-```env
-LLM_BACKEND=claude-code        # or "openai" (needs OPENAI_API_KEY)
-DEFAULT_MODEL=sonnet           # Writing and reviewing
-REASONING_MODEL=opus           # Outline planning
-FAST_MODEL=haiku               # Section summaries
-
-EMBEDDING_BACKEND=local        # or "openai" (needs OPENAI_API_KEY)
-EMBEDDING_MODEL=intfloat/multilingual-e5-small
-```
-
-An index remembers the embedding model it was built with and refuses to load
-under a different one. Run `python -m ai_writer reindex` after changing it; the
-previous vectors are kept in `data/processed/embeddings/previous_<model>/`.
-
-## 📊 Embedding Indices
-
-The system uses pre-built indices from processed papers:
-
-| Index | Items | Description |
-|-------|-------|-------------|
-| Ideas | 3,733 | Key ideas extracted from papers |
-| Claims | 3,839 | Specific claims with evidence |
-| References | 1,200+ | Bibliographic references |
-
-## 🔄 Pipeline Phases
-
-### Phase 1: Cluster Analysis
-- Loads embedding indices
-- Applies KMeans clustering (default: 25 clusters)
-- Extracts representative topics from each cluster
-
-### Phase 2: Planning
-- PlannerAgent generates structured outline
-- Each section has paragraphs with key ideas
-- ReviewerAgent refines outline (conservative changes)
-
-### Phase 3: Writing
-- Writes paragraph-by-paragraph
-- Each paragraph gets targeted semantic search context
-- Section summaries maintain coherence
-- RAG-enhanced review strengthens arguments
-
-## 📝 Output
-
-Generated files in `data/output/final/`:
-- `Paper_Title.md` - The perspective paper
-- `Paper_Title_critical_review.md` - Critical analysis
-
-Logs in `data/logs/run_*/`:
-- `phase1_topics.json` - Extracted cluster topics
-- `phase2_outline.json` - Generated outline
-- `outline_feedback_*.json` - Reviewer feedback
-- `run_log.json` - Execution metadata
-
-## 🧪 Development
-
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# Run linting
-ruff check src/
-```
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-Built with ❤️ using Claude and semantic embeddings.
+La [arquitectura](docs/architecture.md) describe los módulos y formatos. Licencia: **AGPL-3.0-only**.

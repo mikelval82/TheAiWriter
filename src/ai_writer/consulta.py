@@ -9,8 +9,13 @@ from ai_writer.zotero import DATABASE, Work, Zotero
 
 CONSULTED = "revision/consultas.json"
 BIBLIOGRAPHY = "borrador/referencias.bib"
-_ENTRY_TYPES = {"journalArticle": "article", "conferencePaper": "inproceedings", "book": "book",
-                "bookSection": "incollection", "thesis": "phdthesis"}
+_ENTRY_TYPES = {
+    "journalArticle": "article",
+    "conferencePaper": "inproceedings",
+    "book": "book",
+    "bookSection": "incollection",
+    "thesis": "phdthesis",
+}
 
 _indexes: dict[tuple, PassageIndex] = {}
 
@@ -41,7 +46,11 @@ def scope(project: Project | None, index: PassageIndex) -> set[str] | None:
 def record(folder: Path, query: str | None, ids: list[str]) -> None:
     """Remember the passages a search (or a read, ``query`` None) put before the writer."""
     path = Path(folder) / CONSULTED
-    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"consultas": [], "pasajes": []}
+    data = (
+        json.loads(path.read_text(encoding="utf-8"))
+        if path.exists()
+        else {"consultas": [], "pasajes": []}
+    )
     if query:
         data["consultas"].append({"consulta": query, "pasajes": ids})
     data["pasajes"] = list(dict.fromkeys(data["pasajes"] + ids))
@@ -77,8 +86,11 @@ def bibtex(work: Work, key: str) -> str:
         "author": _escape(" and ".join(work.authors)),
         "year": str(work.year) if work.year else None,
         venue_field.get(kind, "howpublished"): _escape(work.venue) if work.venue else None,
-        "volume": work.volume, "number": work.issue, "pages": work.pages,
-        "doi": work.doi, "url": None if work.doi else work.url,
+        "volume": work.volume,
+        "number": work.issue,
+        "pages": work.pages,
+        "doi": work.doi,
+        "url": None if work.doi else work.url,
     }
     lines = [f"  {name} = {{{value}}}" for name, value in fields.items() if value]
     return f"@{kind}{{{key},\n" + ",\n".join(lines) + "\n}"
@@ -90,9 +102,16 @@ def reference(index: PassageIndex, key: str, allowed: set[str] | None) -> dict |
     if work is None:
         return None
     return {
-        "clave": key, "cita": f"[@{key}]", "titulo": work.title, "autores": list(work.authors),
-        "año": work.year, "revista": work.venue, "doi": work.doi, "url": work.url,
-        "bibtex": bibtex(work, key), "tiene_pdf": bool(work.pdfs),
+        "clave": key,
+        "cita": f"[@{key}]",
+        "titulo": work.title,
+        "autores": list(work.authors),
+        "año": work.year,
+        "revista": work.venue,
+        "doi": work.doi,
+        "url": work.url,
+        "bibtex": bibtex(work, key),
+        "tiene_pdf": bool(work.pdfs),
         "pasajes": len(index.passages_of(key)),
         "en_el_documento": allowed is None or work.item_key in allowed,
     }

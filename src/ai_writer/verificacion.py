@@ -21,10 +21,10 @@ from ai_writer.consulta import consulted, open_index, scope, write_bibliography
 from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 from ai_writer.passages import PassageIndex
-from ai_writer.processors.quotes import explain_mismatch, fragments, normalize
-from ai_writer.support import _query, cited_paragraphs
-from ai_writer.validation import DRAFT
+from ai_writer.quotes import explain_mismatch, fragments, normalize
+from ai_writer.sentences import cited_paragraphs, sentence_query
 
+DRAFT = Path("borrador") / "documento.md"
 RESULT = "revision/verificacion.json"
 REPORT = "revision/verificacion.md"
 LOG = "revision/verificacion.log"
@@ -60,10 +60,16 @@ con un veredicto por cada número recibido."""
 
 
 def check_citations(text: str, index: PassageIndex, allowed: set[str] | None) -> dict:
-    """Citation keys of ``text`` sorted into valid, unknown, outside the collections and without PDF."""
+    """Sort citation keys into valid, unknown, outside collections and without PDF."""
     keys, malformed, pending = find_citations(text)
-    report = {"validas": [], "desconocidas": [], "fuera_de_las_colecciones": [], "sin_pdf": [],
-              "mal_formadas": malformed, "pendientes": pending}
+    report = {
+        "validas": [],
+        "desconocidas": [],
+        "fuera_de_las_colecciones": [],
+        "sin_pdf": [],
+        "mal_formadas": malformed,
+        "pendientes": pending,
+    }
     for key in dict.fromkeys(keys):
         work = index.work_of(key)
         if work is None:
@@ -81,7 +87,7 @@ def check_citations(text: str, index: PassageIndex, allowed: set[str] | None) ->
 
 
 def check_quotes(text: str, index: PassageIndex) -> list[dict]:
-    """Every quotation of ``MIN_QUOTE_WORDS`` or more in a cited sentence, looked up in the cited works."""
+    """Look up quotations of at least ``MIN_QUOTE_WORDS`` in the works cited with them."""
     texts: dict[str, str] = {}
 
     def full_text(key: str) -> str:
@@ -96,8 +102,13 @@ def check_quotes(text: str, index: PassageIndex) -> list[dict]:
                 quote = next(group for group in match.groups() if group).strip()
                 if len(quote.split()) < MIN_QUOTE_WORDS:
                     continue
-                entry = {"seccion": paragraph["seccion"], "cita_literal": quote, "claves": keys,
-                         "encontrada_en": None, "mas_parecido": None}
+                entry = {
+                    "seccion": paragraph["seccion"],
+                    "cita_literal": quote,
+                    "claves": keys,
+                    "encontrada_en": None,
+                    "mas_parecido": None,
+                }
                 near = []
                 for key in (key for key in keys if full_text(key)):
                     verbatim, closest = _verbatim(quote, full_text(key))
@@ -136,10 +147,14 @@ def _verbatim(quote: str, text: str) -> tuple[bool, dict | None]:
 # -- 3. support ------------------------------------------------------------
 
 
-def _evidence(index: PassageIndex, sentence: str, key: str, seen: dict[str, list[int]]) -> list[dict]:
+def _judge_passages(
+    index: PassageIndex, sentence: str, key: str, seen: dict[str, list[int]]
+) -> list[dict]:
     """Passages of ``key`` for the judge: the closest to the sentence, then consulted ones."""
     work = index.work_of(key)
-    ranked = index.search(_query(sentence), n=10_000, item_keys={work.item_key}, max_per_work=10_000)
+    ranked = index.search(
+        sentence_query(sentence), n=10_000, item_keys={work.item_key}, max_per_work=10_000
+    )
     chosen = ranked[:CLOSEST_PASSAGES]
     wanted = {f"{key}#{number}" for number in seen.get(key, [])}
     chosen += [p for p in ranked[CLOSEST_PASSAGES:] if p["id"] in wanted][:CONSULTED_PASSAGES]
@@ -150,10 +165,13 @@ def _judge_prompt(pairs: list[dict]) -> str:
     blocks = []
     for pair in pairs:
         passages = "\n".join(
-            f"  [{p['id']}] ({p['seccion']}, p. {p['paginas']}) {p['texto']}" for p in pair["pasajes"]
+            f"  [{p['id']}] ({p['seccion']}, p. {p['paginas']}) {p['texto']}"
+            for p in pair["pasajes"]
         )
-        blocks.append(f"[{pair['n']}] Frase: {pair['frase']}\nObra citada: {pair['clave']} — "
-                      f"{pair['titulo']}\nPasajes de la obra:\n{passages}")
+        blocks.append(
+            f"[{pair['n']}] Frase: {pair['frase']}\nObra citada: {pair['clave']} — "
+            f"{pair['titulo']}\nPasajes de la obra:\n{passages}"
+        )
     return "Juzga cada una de estas afirmaciones.\n\n" + "\n\n".join(blocks)
 
 
@@ -181,13 +199,21 @@ def _apply_verdicts(llm, pairs: list[dict]) -> None:
             row["veredicto"], row["motivo"], passage = found[pair["n"]]
             shown = {p["id"]: p for p in pair["pasajes"]}
             if passage in shown:
-                row["pasaje"] = {k: shown[passage][k] for k in ("id", "seccion", "paginas", "texto")}
+                row["pasaje"] = {
+                    k: shown[passage][k] for k in ("id", "seccion", "paginas", "texto")
+                }
         else:
             row["motivo"] = failure
 
 
-def judge_support(text: str, index: PassageIndex, seen: dict[str, list[int]], llm=None,
-                  previous: list[dict] | None = None, on_progress=None) -> list[dict]:
+def judge_support(
+    text: str,
+    index: PassageIndex,
+    seen: dict[str, list[int]],
+    llm=None,
+    previous: list[dict] | None = None,
+    on_progress=None,
+) -> list[dict]:
     """Judge every (sentence, cited work) of ``text``. ``previous`` verdicts are kept, so a
     run cut short by the usage limit resumes where it stopped. ``UsageLimitError`` propagates
     after ``on_progress`` has received what was judged."""
@@ -202,17 +228,34 @@ def judge_support(text: str, index: PassageIndex, seen: dict[str, list[int]], ll
                 if (sentence, key) in known:
                     rows.append(known[(sentence, key)])
                     continue
-                row = {"seccion": paragraph["seccion"], "frase": sentence, "clave": key,
-                       "veredicto": "sin_juzgar", "motivo": "", "pasaje": None}
+                row = {
+                    "seccion": paragraph["seccion"],
+                    "frase": sentence,
+                    "clave": key,
+                    "veredicto": "sin_juzgar",
+                    "motivo": "",
+                    "pasaje": None,
+                }
                 rows.append(row)
                 work = index.work_of(key)
-                passages = _evidence(index, sentence, key, seen) if work else []
+                passages = _judge_passages(index, sentence, key, seen) if work else []
                 if not passages:
-                    row["motivo"] = ("La clave no existe en Zotero" if work is None
-                                     else "La obra no tiene PDF indexado: no se puede comprobar")
+                    row["motivo"] = (
+                        "La clave no existe en Zotero"
+                        if work is None
+                        else "La obra no tiene PDF indexado: no se puede comprobar"
+                    )
                     continue
-                to_judge.append({"n": len(to_judge) + 1, "frase": sentence, "clave": key,
-                                 "titulo": work.title, "pasajes": passages, "row": row})
+                to_judge.append(
+                    {
+                        "n": len(to_judge) + 1,
+                        "frase": sentence,
+                        "clave": key,
+                        "titulo": work.title,
+                        "pasajes": passages,
+                        "row": row,
+                    }
+                )
         if to_judge:
             try:
                 _apply_verdicts(llm, to_judge)
@@ -252,8 +295,6 @@ def _save(folder: Path, data: dict) -> None:
 def _open(folder: Path) -> tuple[str, PassageIndex, set[str] | None]:
     folder = Path(folder)
     project = Project.load(folder)
-    if project.fuente != "zotero":
-        raise LibraryError("Este documento no toma sus obras de Zotero: no se puede verificar así.")
     if not (folder / DRAFT).exists():
         raise LibraryError(f"Todavía no hay borrador en {DRAFT}.")
     index = open_index()
@@ -314,7 +355,9 @@ def run_judge(folder: Path, llm=None) -> dict:
 
     judge.update(estado="en_curso", error=None)
     try:
-        data["apoyo"] = judge_support(text, index, consulted(folder), llm, data.get("apoyo"), progress)
+        data["apoyo"] = judge_support(
+            text, index, consulted(folder), llm, data.get("apoyo"), progress
+        )
         judge.update(estado="terminado", fin=now())
     except UsageLimitError as error:
         judge.update(estado="limite_de_uso", error=str(error))
@@ -341,20 +384,32 @@ def overview(data: dict) -> dict:
     """What a tool returns: counts, and the entries that need the student's attention."""
     citations = data["citas"]
     quotes = data["citas_literales"]
-    worst = [e for e in data.get("apoyo", []) if e["veredicto"] in ("tergiversada", "no_apoyada", "parcial")]
+    worst = [
+        e
+        for e in data.get("apoyo", [])
+        if e["veredicto"] in ("tergiversada", "no_apoyada", "parcial")
+    ]
     order = {"tergiversada": 0, "no_apoyada": 1, "parcial": 2}
     worst.sort(key=lambda e: order[e["veredicto"]])
     return {
-        "citas": {name: (len(value) if isinstance(value, list) else value) for name, value in citations.items()},
-        "claves_con_problemas": {name: citations[name] for name in
-                                 ("desconocidas", "fuera_de_las_colecciones", "sin_pdf", "mal_formadas")
-                                 if citations[name]},
-        "citas_literales": {"total": len(quotes),
-                            "no_encontradas": [q for q in quotes if not q["encontrada_en"]]},
+        "citas": {
+            name: (len(value) if isinstance(value, list) else value)
+            for name, value in citations.items()
+        },
+        "claves_con_problemas": {
+            name: citations[name]
+            for name in ("desconocidas", "fuera_de_las_colecciones", "sin_pdf", "mal_formadas")
+            if citations[name]
+        },
+        "citas_literales": {
+            "total": len(quotes),
+            "no_encontradas": [q for q in quotes if not q["encontrada_en"]],
+        },
         "juez": data.get("juez", {}),
         "apoyo": summary(data.get("apoyo", [])),
         "frases_a_revisar": [
-            {k: e[k] for k in ("seccion", "frase", "clave", "veredicto", "motivo")} for e in worst[:25]
+            {k: e[k] for k in ("seccion", "frase", "clave", "veredicto", "motivo")}
+            for e in worst[:25]
         ],
         "informe": REPORT,
         "bibliografia": data.get("bibliografia"),
@@ -364,9 +419,16 @@ def overview(data: dict) -> dict:
 def markdown(data: dict) -> str:
     """The report for the student, problems first."""
     citations, quotes, entries = data["citas"], data["citas_literales"], data.get("apoyo", [])
-    lines = ["# Verificación del borrador", "", f"Comprobado: {data.get('comprobado', '')}", "",
-             "## Citas", "",
-             f"{len(citations['validas'])} obras citadas existen y están en las colecciones del documento."]
+    lines = [
+        "# Verificación del borrador",
+        "",
+        f"Comprobado: {data.get('comprobado', '')}",
+        "",
+        "## Citas",
+        "",
+        f"{len(citations['validas'])} obras citadas existen "
+        "y están en las colecciones del documento.",
+    ]
     labels = {
         "desconocidas": "No existen en Zotero",
         "fuera_de_las_colecciones": "Existen pero no están en las colecciones del documento",
@@ -381,24 +443,36 @@ def markdown(data: dict) -> str:
 
     lines += ["", "## Citas literales", ""]
     missing = [q for q in quotes if not q["encontrada_en"]]
-    lines.append(f"{len(quotes) - len(missing)} de {len(quotes)} citas literales están tal cual en el PDF."
-                 if quotes else "El borrador no tiene citas literales de 6 palabras o más.")
+    lines.append(
+        f"{len(quotes) - len(missing)} de {len(quotes)} citas literales están tal cual en el PDF."
+        if quotes
+        else "El borrador no tiene citas literales de 6 palabras o más."
+    )
     for quote in missing:
-        lines.append(f"- **No está en el PDF** ({', '.join(quote['claves'])}): «{quote['cita_literal']}»")
+        lines.append(
+            f"- **No está en el PDF** ({', '.join(quote['claves'])}): «{quote['cita_literal']}»"
+        )
         near = quote["mas_parecido"]
         if near:
             lines.append(f"  - Lo más parecido, en {near['clave']}: «{near['pasaje']}»")
             for change in near["diferencias"]:
-                lines.append(f"  - El borrador dice «{change['cita']}» y el PDF dice «{change['texto']}»")
+                lines.append(
+                    f"  - El borrador dice «{change['cita']}» y el PDF dice «{change['texto']}»"
+                )
         else:
-            lines.append("  - No hay nada parecido en las obras citadas. Si está traducida, déjala en "
-                         "el idioma original o quita las comillas.")
+            lines.append(
+                "  - No hay nada parecido en las obras citadas. Si está traducida, déjala en "
+                "el idioma original o quita las comillas."
+            )
 
     lines += ["", "## Apoyo de las frases citadas", ""]
     judge = data.get("juez", {})
     if not entries:
-        lines.append("El juez de apoyo no se ha lanzado todavía." if judge.get("estado") == "sin_lanzar"
-                     else f"Juez: {judge.get('estado')}.")
+        lines.append(
+            "El juez de apoyo no se ha lanzado todavía."
+            if judge.get("estado") == "sin_lanzar"
+            else f"Juez: {judge.get('estado')}."
+        )
         return "\n".join(lines) + "\n"
     stats = summary(entries)
     apoyo = "sin datos" if stats["apoyo"] is None else f"{stats['apoyo']:.0%}"
@@ -407,17 +481,27 @@ def markdown(data: dict) -> str:
         f"{stats['tergiversada']} tergiversadas, {stats['no_apoyada']} no apoyadas, "
         f"{stats['sin_juzgar']} sin juzgar). Estado del juez: {judge.get('estado')}.",
         "Un juez automático compara cada frase con pasajes de la obra citada. Se equivoca a veces: "
-        "revisa a mano las peores.", "",
+        "revisa a mano las peores.",
+        "",
     ]
-    names = {"tergiversada": "Tergiversada", "no_apoyada": "No apoyada", "parcial": "Parcial",
-             "sin_juzgar": "Sin juzgar"}
+    names = {
+        "tergiversada": "Tergiversada",
+        "no_apoyada": "No apoyada",
+        "parcial": "Parcial",
+        "sin_juzgar": "Sin juzgar",
+    }
     for verdict, name in names.items():
         for entry in (e for e in entries if e["veredicto"] == verdict):
-            lines.append(f"- **{name}** [@{entry['clave']}] ({entry['seccion'] or 'sin sección'}): «{entry['frase']}»")
+            lines.append(
+                f"- **{name}** [@{entry['clave']}] "
+                f"({entry['seccion'] or 'sin sección'}): «{entry['frase']}»"
+            )
             if entry["motivo"]:
                 lines.append(f"  - Motivo: {entry['motivo']}")
             if entry.get("pasaje"):
                 passage = entry["pasaje"]
-                lines.append(f"  - La obra dice ({passage['seccion']}, p. {passage['paginas']}): "
-                             f"«{passage['texto'][:600]}»")
+                lines.append(
+                    f"  - La obra dice ({passage['seccion']}, p. {passage['paginas']}): "
+                    f"«{passage['texto'][:600]}»"
+                )
     return "\n".join(lines) + "\n"

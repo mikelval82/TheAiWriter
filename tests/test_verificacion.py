@@ -8,7 +8,8 @@ from ai_writer import mcp_server, verificacion
 from ai_writer.consulta import open_index
 from ai_writer.library import LibraryError
 from ai_writer.llm import LLMError, UsageLimitError
-from ai_writer.validation import DRAFT
+from ai_writer.sentences import cited_paragraphs, split_sentences
+from ai_writer.verificacion import DRAFT
 from tests.test_passages import library  # noqa: F401  (fixture)
 from tests.test_zotero_tools import document  # noqa: F401  (fixture)
 
@@ -44,7 +45,7 @@ class Judge:
 
 @pytest.fixture
 def draft(document):  # noqa: F811
-    mcp_server.crear_documento("perspectiva", "T", colecciones=["Empatía"], fuente="zotero")
+    mcp_server.crear_documento("perspectiva", "T", colecciones=["Empatía"])
     (document / DRAFT).write_text(DRAFT_TEXT, encoding="utf-8")
     return document
 
@@ -129,3 +130,61 @@ def test_tools_report_and_refuse_other_documents(draft, monkeypatch):
     assert "no hay borrador" in mcp_server.verificar_documento(juez=False)["error"]
     with pytest.raises(LibraryError):
         verificacion.status(draft.parent)
+
+
+def test_sentences_are_not_split_inside_citations_or_on_abbreviations():
+    text = ("Smith et al. mostraron un 3.5 % más [@a2020x; @b2021y, p. 4]. "
+            "Otros, e.g. Lee, lo niegan [@c2022z]. Es decir, i.e. así. Fin!")
+
+    assert split_sentences(text) == [
+        "Smith et al. mostraron un 3.5 % más [@a2020x; @b2021y, p. 4].",
+        "Otros, e.g. Lee, lo niegan [@c2022z].",
+        "Es decir, i.e. así.",
+        "Fin!",
+    ]
+
+
+def test_a_citation_after_the_full_stop_stays_with_its_sentence():
+    assert split_sentences("Sienten. [@a2020x] Otra cosa.") == ["Sienten. [@a2020x]", "Otra cosa."]
+
+
+def test_one_entry_per_sentence_and_key_and_gaps_are_ignored():
+    text = ("# T\n\n## Intro\nUna [@smith2020emotion; @brown2021navigation]. Hueco [@?]. "
+            "Sin cita.\n\nOtra más [@smith2020emotion].\n\n## Fin\nNada.\n")
+
+    paragraphs = cited_paragraphs(text)
+
+    assert [(p["seccion"], [(s, k) for s, k in p["frases"]]) for p in paragraphs] == [
+        ("Intro", [("Una [@smith2020emotion; @brown2021navigation].",
+                    ["smith2020emotion", "brown2021navigation"])]),
+        ("Intro", [("Otra más [@smith2020emotion].", ["smith2020emotion"])]),
+    ]
+
+
+def test_background_judge_keeps_the_cli_invocation(draft, monkeypatch):
+    calls = []
+
+    def spawn(args, log):
+        calls.append((args, log))
+        return 12345
+
+    monkeypatch.setattr(verificacion, "spawn_cli", spawn)
+    verificacion.start_judge(draft)
+    assert calls == [
+        (["documento", "verificar", str(draft.resolve())], draft / verificacion.LOG)
+    ]
+
+
+def test_cli_dispatches_document_verification(tmp_path, monkeypatch, capsys):
+    from ai_writer.main import main
+
+    calls = []
+
+    def judge(folder):
+        calls.append(folder)
+        return {"apoyo": []}
+
+    monkeypatch.setattr(verificacion, "run_judge", judge)
+    main(["documento", "verificar", str(tmp_path)])
+    assert calls == [tmp_path]
+    assert "'apoyo': None" in capsys.readouterr().out

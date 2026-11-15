@@ -30,8 +30,20 @@ PATH_SEPARATOR = " / "
 
 _NOT_WORKS = ("attachment", "note", "annotation")
 _FIELDS = (
-    "title", "date", "DOI", "url", "publicationTitle", "proceedingsTitle", "bookTitle",
-    "repository", "publisher", "volume", "issue", "pages", "citationKey", "extra",
+    "title",
+    "date",
+    "DOI",
+    "url",
+    "publicationTitle",
+    "proceedingsTitle",
+    "bookTitle",
+    "repository",
+    "publisher",
+    "volume",
+    "issue",
+    "pages",
+    "citationKey",
+    "extra",
 )
 _VENUE_FIELDS = ("publicationTitle", "proceedingsTitle", "bookTitle", "repository", "publisher")
 _STORED, _LINKED_FILE = (0, 1), 2  # Zotero's linkMode values
@@ -78,7 +90,12 @@ def _profile_dirs() -> list[Path]:
     if sys.platform == "darwin":
         roots = [home / "Library" / "Application Support" / "Zotero" / "Profiles"]
     elif sys.platform.startswith("win"):
-        roots = [Path(os.getenv("APPDATA", home / "AppData" / "Roaming")) / "Zotero" / "Zotero" / "Profiles"]
+        roots = [
+            Path(os.getenv("APPDATA", home / "AppData" / "Roaming"))
+            / "Zotero"
+            / "Zotero"
+            / "Profiles"
+        ]
     else:
         roots = [home / ".zotero" / "zotero"]
     return [p for root in roots if root.is_dir() for p in sorted(root.iterdir()) if p.is_dir()]
@@ -97,7 +114,7 @@ def _pref(name: str) -> str | None:
 
 
 def data_dir() -> Path:
-    """``THEAIWRITER_ZOTERO`` if set, else the folder Zotero is configured with, else ``~/Zotero``."""
+    """Use ``THEAIWRITER_ZOTERO``, Zotero's configured folder, or ``~/Zotero``."""
     configured = os.getenv(ZOTERO_ENV) or _pref("dataDir")
     return Path(configured).expanduser() if configured else Path.home() / "Zotero"
 
@@ -105,7 +122,9 @@ def data_dir() -> Path:
 def default_index_dir() -> Path:
     """``THEAIWRITER_INDICE`` if set, else ``<documents>/TheAIWriter/indice``."""
     configured = os.getenv(INDEX_ENV)
-    return Path(configured).expanduser() if configured else documents_dir() / "TheAIWriter" / "indice"
+    return (
+        Path(configured).expanduser() if configured else documents_dir() / "TheAIWriter" / "indice"
+    )
 
 
 class Zotero:
@@ -115,7 +134,8 @@ class Zotero:
         self.root = Path(root) if root else data_dir()
         if not (self.root / DATABASE).exists():
             raise ZoteroError(
-                f"No encuentro la biblioteca de Zotero en {self.root}. Abre Zotero una vez para que "
+                f"No encuentro la biblioteca de Zotero en {self.root}. "
+                "Abre Zotero una vez para que "
                 f"la cree o indica su carpeta en la variable {ZOTERO_ENV}."
             )
         self._works: dict[str, Work] = {}
@@ -139,27 +159,35 @@ class Zotero:
                 try:
                     self._read(copy)
                 except sqlite3.DatabaseError as error:
-                    raise ZoteroError(f"No puedo leer la base de datos de Zotero ({error}).") from error
+                    raise ZoteroError(
+                        f"No puedo leer la base de datos de Zotero ({error})."
+                    ) from error
 
     def _read(self, path: Path) -> None:
         db = sqlite3.connect(path)
         try:
             library = db.execute("SELECT libraryID FROM libraries WHERE type = 'user'").fetchone()
             library_id = library[0] if library else 1
-            tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+            tables = {
+                row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+            }
             deleted = {row[0] for row in db.execute("SELECT itemID FROM deletedItems")}
 
             rows = db.execute(
-                "SELECT i.itemID, i.key, t.typeName FROM items i JOIN itemTypes t USING (itemTypeID) "
-                "WHERE i.libraryID = ?", (library_id,),
+                "SELECT i.itemID, i.key, t.typeName FROM items "
+                "i JOIN itemTypes t USING (itemTypeID) "
+                "WHERE i.libraryID = ?",
+                (library_id,),
             ).fetchall()
             kinds = {item_id: (key, kind) for item_id, key, kind in rows if item_id not in deleted}
 
             fields: dict[int, dict[str, str]] = {}
             marks = ",".join("?" * len(_FIELDS))
             for item_id, name, value in db.execute(
-                "SELECT d.itemID, f.fieldName, v.value FROM itemData d JOIN fields f USING (fieldID) "
-                f"JOIN itemDataValues v USING (valueID) WHERE f.fieldName IN ({marks})", _FIELDS,
+                "SELECT d.itemID, f.fieldName, v.value FROM itemData "
+                "d JOIN fields f USING (fieldID) "
+                f"JOIN itemDataValues v USING (valueID) WHERE f.fieldName IN ({marks})",
+                _FIELDS,
             ):
                 fields.setdefault(item_id, {})[name] = str(value).strip()
 
@@ -189,8 +217,13 @@ class Zotero:
                 standalone_pdf = kind == "attachment" and item_id in pdfs
                 if kind in _NOT_WORKS and not standalone_pdf:
                     continue
-                self._works[key] = self._work(key, kind, fields.get(item_id, {}),
-                                              creators.get(item_id, []), pdfs.get(item_id, []))
+                self._works[key] = self._work(
+                    key,
+                    kind,
+                    fields.get(item_id, {}),
+                    creators.get(item_id, []),
+                    pdfs.get(item_id, []),
+                )
 
             gone = set()
             if "deletedCollections" in tables:
@@ -199,7 +232,8 @@ class Zotero:
                 cid: (key, name, parent)
                 for cid, key, name, parent in db.execute(
                     "SELECT collectionID, key, collectionName, parentCollectionID FROM collections "
-                    "WHERE libraryID = ?", (library_id,),
+                    "WHERE libraryID = ?",
+                    (library_id,),
                 )
                 if cid not in gone
             }
@@ -219,14 +253,21 @@ class Zotero:
                 return PATH_SEPARATOR.join(reversed(names))
 
             self._collections = {
-                key: Collection(key, name, path_of(cid), raw[parent][0] if parent in raw else None,
-                                tuple(members.get(cid, [])))
+                key: Collection(
+                    key,
+                    name,
+                    path_of(cid),
+                    raw[parent][0] if parent in raw else None,
+                    tuple(members.get(cid, [])),
+                )
                 for cid, (key, name, parent) in raw.items()
             }
         finally:
             db.close()
 
-    def _attachment_file(self, attachment_key: str, link_mode: int, stored: str | None) -> Path | None:
+    def _attachment_file(
+        self, attachment_key: str, link_mode: int, stored: str | None
+    ) -> Path | None:
         if not stored:
             return None
         if link_mode in _STORED:
@@ -240,7 +281,9 @@ class Zotero:
 
     @staticmethod
     def _work(key: str, kind: str, fields: dict, creators: list, pdfs: list[Path]) -> Work:
-        authors = [name for role, name in creators if role == "author"] or [name for _, name in creators]
+        authors = [name for role, name in creators if role == "author"] or [
+            name for _, name in creators
+        ]
         year = re.search(r"\d{4}", fields.get("date", ""))
         cite_key = fields.get("citationKey") or None
         if not cite_key:
@@ -248,12 +291,19 @@ class Zotero:
             cite_key = extra.group(1) if extra else None
         title = fields.get("title") or (pdfs[0].stem if pdfs else "")
         return Work(
-            item_key=key, kind=kind, title=title, authors=tuple(authors),
+            item_key=key,
+            kind=kind,
+            title=title,
+            authors=tuple(authors),
             year=int(year.group()) if year else None,
             venue=next((fields[f] for f in _VENUE_FIELDS if fields.get(f)), None),
-            doi=fields.get("DOI") or None, url=fields.get("url") or None,
-            volume=fields.get("volume") or None, issue=fields.get("issue") or None,
-            pages=fields.get("pages") or None, zotero_cite_key=cite_key, pdfs=tuple(pdfs),
+            doi=fields.get("DOI") or None,
+            url=fields.get("url") or None,
+            volume=fields.get("volume") or None,
+            issue=fields.get("issue") or None,
+            pages=fields.get("pages") or None,
+            zotero_cite_key=cite_key,
+            pdfs=tuple(pdfs),
         )
 
     # -- queries ---------------------------------------------------------
@@ -273,11 +323,13 @@ class Zotero:
             raise ZoteroError(f"No hay ninguna colección de Zotero llamada «{name}».")
         if len(found) > 1:
             paths = "; ".join(sorted(c.path for c in found))
-            raise ZoteroError(f"Hay varias colecciones llamadas «{name}»: {paths}. Indica la ruta completa.")
+            raise ZoteroError(
+                f"Hay varias colecciones llamadas «{name}»: {paths}. Indica la ruta completa."
+            )
         return found[0]
 
     def item_keys(self, collections: list[str] | None = None) -> set[str]:
-        """Works of these collections and their subcollections; of the whole library if none given."""
+        """Works of these collections and descendants, or the whole library if none given."""
         if not collections:
             return set(self._works)
         children: dict[str, list[str]] = {}
@@ -320,7 +372,9 @@ def assign_keys(works: list[Work], stored: dict[str, str]) -> dict[str, str]:
     return keys
 
 
-def citable_keys(collections: list[str], index_root: Path | None = None) -> tuple[set[str], set[str]]:
+def citable_keys(
+    collections: list[str], index_root: Path | None = None
+) -> tuple[set[str], set[str]]:
     """(every citation key, those of ``collections``), without loading the passage index."""
     import json
 

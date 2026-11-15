@@ -1,4 +1,4 @@
-from ai_writer.processors.quotes import QuoteChecker, explain_mismatch, find_quote, normalize
+from ai_writer.quotes import QuoteChecker, explain_mismatch, find_quote, normalize
 
 TEXT = (
     "Empathy is a multidimensional construct that involves both affective sharing and\n"

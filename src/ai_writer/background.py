@@ -1,4 +1,4 @@
-"""Processes that outlive the tool call that starts them (PDF processing, writing a document)."""
+"""Run the citation judge in a process that outlives the tool call that starts it."""
 
 import os
 import subprocess
@@ -12,7 +12,7 @@ def now() -> str:
 
 
 def spawn_cli(args: list[str], log_file: Path) -> int:
-    """Run ``python -m ai_writer <args>`` detached, with its output in ``log_file``; return its pid."""
+    """Run ``python -m ai_writer <args>`` detached; log its output and return its pid."""
     options = {}
     if os.name == "nt":
         options["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -22,8 +22,11 @@ def spawn_cli(args: list[str], log_file: Path) -> int:
     with open(log_file, "w", encoding="utf-8") as log:
         process = subprocess.Popen(
             [sys.executable, "-m", "ai_writer", *args],
-            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-            env=os.environ | {"PYTHONIOENCODING": "utf-8"}, **options,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            env=os.environ | {"PYTHONIOENCODING": "utf-8"},
+            **options,
         )
     return process.pid
 

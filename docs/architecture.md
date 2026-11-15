@@ -1,555 +1,220 @@
-# TheAIWriter - Arquitectura del Sistema
+# Arquitectura
 
-> Sistema de escritura académica asistida por IA especializado en **papers de perspectivas**.  
-> Versión: 1.0.0 | Última actualización: Enero 2026
+Claude Code planifica y escribe el documento siguiendo las instrucciones de `commands/`. El
+servidor MCP proporciona acceso a los PDF del Zotero local y comprueba las citas. El código Python
+no planifica ni redacta el documento.
 
-## 📋 Índice
+## Módulos
 
-1. [Visión General](#-visión-general)
-2. [Arquitectura de Alto Nivel](#-arquitectura-de-alto-nivel)
-3. [Pipeline de 3 Fases](#-pipeline-de-3-fases)
-4. [Sistema de Agentes](#-sistema-de-agentes)
-5. [Sistema RAG](#-sistema-rag)
-6. [Modelos de Datos](#-modelos-de-datos)
-7. [Estructura del Proyecto](#-estructura-del-proyecto)
-8. [CLI y Uso](#-cli-y-uso)
+Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otra raíz.
 
----
+| Módulo | Responsabilidad |
+|---|---|
+| `__init__.py` | Declara la versión del paquete. |
+| `__main__.py` | Permite ejecutar la CLI con `python -m ai_writer`. |
+| `main.py` | CLI con `version` y `documento verificar <carpeta>`. |
+| `mcp_server.py` | Registra las herramientas de diagnóstico, proyecto, consulta y verificación. |
+| `library.py` | `Project`, `LibraryError`, `PROJECT_FILE` y localización de la carpeta de documentos. |
+| `zotero.py` | Lee obras, colecciones y adjuntos desde una copia temporal de la base de Zotero; asigna claves. |
+| `passages.py` | Extrae y segmenta PDF, mantiene el índice incremental y busca o lee pasajes. |
+| `segmentation.py` | Localiza títulos, elimina bibliografía y secciones administrativas, une y divide tramos. |
+| `quotes.py` | Normaliza citas, busca fragmentos literales y explica diferencias con el texto más cercano. |
+| `citations.py` | Genera claves, normaliza títulos y analiza citas Pandoc y marcas `[@?]`. |
+| `sentences.py` | Separa frases, agrupa párrafos citados y elimina marcas de cita de la consulta del juez. |
+| `consulta.py` | Abre el índice, aplica las colecciones del proyecto, registra consultas y genera BibTeX. |
+| `verificacion.py` | Comprueba claves y citas literales, ejecuta el juez y guarda progreso e informes. |
+| `background.py` | Lanza la CLI como proceso independiente y consulta si sigue vivo. |
+| `embeddings/__init__.py` | Declara el paquete de búsqueda local. |
+| `embeddings/embedder.py` | Interfaz de embeddings y backend local con fastembed, cargado bajo demanda. |
+| `embeddings/bm25.py` | Tokenización y puntuación léxica BM25 con listas de documentos por término. |
+| `llm/__init__.py` | Exporta el cliente, los tipos y los errores de generación. |
+| `llm/client.py` | Cliente común: selección de backend, reintentos, JSON y contabilidad de uso. |
+| `llm/backends/__init__.py` | Declara el paquete de backends del juez. |
+| `llm/backends/claude_code.py` | Ejecuta `claude -p` con la sesión del usuario, sin herramientas ni servidores MCP. |
+| `llm/backends/codex_cli.py` | Ejecuta `codex exec` con la sesión del usuario en un directorio temporal. |
+| `config/__init__.py` | Exporta la configuración. |
+| `config/settings.py` | Lee las opciones de modelos, ejecutables y caché del entorno y de `.env`. |
+| `hooks/validar.py` | Tras una edición del borrador, bloquea claves desconocidas, mal formadas o fuera de las colecciones. |
 
-## 🎯 Visión General
+El MCP expone `diagnostico`, `probar_claude`, `crear_documento`, `colecciones_zotero`, `estado_indice`,
+`buscar_pasajes`, `leer_pasaje`, `leer_paginas`, `referencia`, `validar_citas`, `verificar_documento`
+y `estado_verificacion`. La carpeta del documento se obtiene de `CLAUDE_PROJECT_DIR` o del directorio
+actual. Fuera de un documento, las consultas abarcan todo Zotero.
 
-TheAIWriter genera papers académicos de perspectiva utilizando:
-
-- **Análisis de Clusters**: Extrae temas principales del espacio de embeddings
-- **Planificación Inteligente**: Genera outlines detallados párrafo por párrafo
-- **RAG-Enhanced Writing**: Cada párrafo busca evidencia específica
-- **Revisión Iterativa**: ReviewerAgent fortalece argumentos con evidencia adicional
-- **Memoria de Sección**: Mantiene coherencia entre secciones
-
-### Métricas del Sistema
-
-| Recurso | Cantidad |
-|---------|----------|
-| Ideas indexadas | 3,733 |
-| Claims indexados | 3,839 |
-| Referencias indexadas | 1,200+ |
-| Papers procesados | 41 |
-| Dimensiones embedding | 1,536 |
-
----
-
-## 🏗️ Arquitectura de Alto Nivel
-
-```mermaid
-flowchart TB
-    subgraph Input["📥 Entrada"]
-        Abstract["📝 ABSTRACT.md"]
-        PDFs["📄 PDFs de Referencia"]
-    end
-
-    subgraph Processing["⚙️ Procesamiento Offline"]
-        Reader["PyMuPDF\nPDF → Texto"]
-        Extractor["PDFExtractionAgent\nIdeas, Claims, Referencias"]
-        Embedder["Embeddings locales\nsentence-transformers"]
-        
-        PDFs --> Reader --> Extractor --> Embedder
-    end
-
-    subgraph Storage["💾 Almacenamiento"]
-        direction LR
-        Ideas[("💡 Ideas\nideas_index.npz")]
-        Claims[("📌 Claims\nclaims_index.npz")]
-        Refs[("📚 Referencias\nreferences_index.npz")]
-        
-        Embedder --> Ideas & Claims & Refs
-    end
-
-    subgraph Generation["🚀 Generación (3 Fases)"]
-        Phase1["🔬 Fase 1\nCluster Analysis"]
-        Phase2["📋 Fase 2\nPlanning"]
-        Phase3["✍️ Fase 3\nWriting"]
-        
-        Phase1 --> Phase2 --> Phase3
-    end
-
-    subgraph Output["📤 Salida"]
-        Paper["📄 Paper.md"]
-        Review["📋 Critical Review.md"]
-    end
-
-    Abstract --> Phase1
-    Ideas --> Phase1
-    Ideas & Claims & Refs --> Phase3
-    Phase3 --> Paper & Review
-
-    style Input fill:#e3f2fd
-    style Processing fill:#fff3e0
-    style Storage fill:#f3e5f5
-    style Generation fill:#e8f5e9
-    style Output fill:#fce4ec
-```
-
----
-
-## 🔬 Pipeline de 3 Fases
-
-### Diagrama Detallado del Pipeline
+## Flujo de datos
 
 ```mermaid
 flowchart TD
-    subgraph Phase1["🔬 FASE 1: Análisis de Clusters"]
-        A1["📝 Cargar Abstract"] --> A2["📊 Cargar Embeddings\n(ideas_index.npz)"]
-        A2 --> A3["🎯 KMeans Clustering\n(n_clusters=25)"]
-        A3 --> A4["📈 TF-IDF por Cluster"]
-        A4 --> A5["🏷️ Generar ClusterTopics\n• label\n• keywords\n• centroid\n• size"]
-    end
-
-    subgraph Phase2["📋 FASE 2: Planificación"]
-        B1["📑 Definir Secciones"] --> B2["🔗 Mapear Secciones → Topics"]
-        B2 --> B3["🔍 Buscar Ideas por Centroide\n~8 ideas/sección"]
-        B3 --> B4["📝 Construir Prompt\n• Abstract\n• Topics\n• Ideas reales"]
-        B4 --> B5["🤖 PlannerAgent\n→ PaperOutline"]
-        B5 --> B6["👀 ReviewerAgent\nreview_outline()"]
-        B6 --> B7{¿Cambios?}
-        B7 -->|Sí| B8["✏️ Refinar Outline"]
-        B8 --> B6
-        B7 -->|No| B9["✅ Outline Final"]
-    end
-
-    subgraph Phase3["✍️ FASE 3: Escritura"]
-        C1["📑 Por cada Sección"] --> C2["¶ Por cada Párrafo"]
-        C2 --> C3["🔍 paragraph.to_query()\n= key_idea + points"]
-        C3 --> C4["📚 get_context_for_idea()\nBúsqueda semántica"]
-        C4 --> C5["✍️ WriterAgent\nwrite_paragraph()"]
-        C5 --> C6["📝 Añadir a Sección"]
-        C6 --> C7{¿Más párrafos?}
-        C7 -->|Sí| C2
-        C7 -->|No| C8["💾 Generar Summary"]
-        C8 --> C9["📋 Actualizar Memory"]
-        C9 --> C10["👀 ReviewerAgent\nreview_section()"]
-        C10 --> C11{¿Más secciones?}
-        C11 -->|Sí| C1
-        C11 -->|No| C12["📄 Paper Completo"]
-    end
-
-    A5 --> B1
-    B9 --> C1
-    C12 --> D1["📄 Guardar Paper.md"]
-    C12 --> D2["📋 Generar Critical Review"]
-
-    style Phase1 fill:#fff3e0
-    style Phase2 fill:#f3e5f5
-    style Phase3 fill:#e8f5e9
+    Z[Zotero local: base y PDF adjuntos] --> C[Copia temporal de la base]
+    C --> O[Obras, colecciones y claves]
+    Z --> P[Texto y secciones del PDF]
+    O --> I[Índice de pasajes y vectores locales]
+    P --> I
+    I --> B[Búsqueda semántica y BM25]
+    B --> L[Claude consulta pasajes y contexto]
+    A[materiales/abstract.md] --> L
+    L --> D[borrador/plan.md y documento.md]
+    L --> Q[revision/consultas.json]
+    D --> V[Comprobación de claves y citas literales]
+    I --> V
+    V --> R[referencias.bib y verificacion.json y .md]
+    D --> J[Juez en segundo plano por párrafo]
+    I --> J
+    Q --> J
+    J --> R
 ```
 
-### Descripción de Fases
+Zotero se lee desde una copia temporal de `zotero.sqlite` y, si existe, su WAL. Si la copia es
+inconsistente porque Zotero escribió durante la copia, se intenta leer solo la base principal.
+No se escribe en la carpeta de Zotero. Se incluyen las obras de la biblioteca personal y los PDF
+adjuntos disponibles, tanto almacenados como enlazados. Una colección seleccionada incluye sus
+subcolecciones.
 
-#### Fase 1: Cluster Analysis
-1. Carga embeddings de ideas (3,733 vectores × 1,536 dims)
-2. Aplica KMeans con `n_clusters=25`
-3. Extrae keywords con TF-IDF por cluster
-4. Genera `ClusterTopic` con label, keywords, centroid y tamaño
+`consulta.open_index` reutiliza el índice mientras no cambien las fechas de modificación de la
+base y del WAL. La búsqueda actualiza antes las obras pendientes del ámbito del documento. La
+lectura puede devolver el pasaje y sus vecinos, la sección completa o los pasajes que tocan un
+intervalo de páginas, con un máximo de seis páginas solicitadas por llamada MCP.
 
-#### Fase 2: Planning
-1. Define 8 secciones estándar de paper de perspectivas
-2. Mapea cada sección a topics relevantes
-3. Busca ideas cercanas a centroids (`cosine_similarity`)
-4. PlannerAgent genera outline estructurado
-5. ReviewerAgent valida (cambios conservadores)
+## Formatos en disco
 
-#### Fase 3: Writing
-1. Para cada párrafo del outline:
-   - Genera query semántico desde `key_idea + supporting_points`
-   - Busca contexto específico (NO usa abstract genérico)
-   - WriterAgent escribe párrafo fundamentado
-2. Genera summary de sección para memoria
-3. ReviewerAgent revisa sección completa
+El índice está fuera de Zotero y del documento, por defecto en la carpeta de documentos del
+usuario, bajo `TheAIWriter/indice`. `THEAIWRITER_INDICE` cambia esta ruta y `THEAIWRITER_ZOTERO`
+permite indicar la carpeta de Zotero.
 
----
-
-## 🤖 Sistema de Agentes
-
-### Diagrama de Clases
-
-```mermaid
-classDiagram
-    class BaseAgent {
-        <<abstract>>
-        +llm: LLMClient
-        +model: str
-        +_call_api(system_prompt, user_prompt) str
-        +_call_api_json(system_prompt, user_prompt) dict
-    }
-    
-    class PlannerAgent {
-        +generate_outline(title, abstract, topics) PaperOutline
-        +refine_outline(outline, feedback) PaperOutline
-        -_build_prompt(title, abstract, topics, ideas) str
-    }
-    
-    class WriterAgent {
-        +abstract_context: str
-        +write_section(name, previous, context) Section
-        +write_paragraph(outline, context, memory) str
-        -_get_section_instructions(name) str
-    }
-    
-    class ReviewerAgent {
-        +abstract_context: str
-        +context_manager: EnhancedContextManager
-        +review_outline(outline) tuple[str, bool]
-        +review_section(section, memory) Section
-        +review_full_paper(paper) Paper
-        +generate_critical_review(paper) str
-        -_strengthen_with_rag(content) str
-    }
-
-    BaseAgent <|-- PlannerAgent
-    BaseAgent <|-- WriterAgent
-    BaseAgent <|-- ReviewerAgent
+```text
+indice/
+    claves.json
+    modelo.json
+    obras/<ITEM_KEY>.json
+    vectores/<ITEM_KEY>.npy
 ```
 
-### Flujo de Interacción
+- `claves.json`: objeto que asocia la clave de ítem de Zotero con la clave de cita. Las claves ya
+  asignadas se conservan. Para obras nuevas se adopta la clave de Zotero si existe y está libre;
+  en otro caso se genera con apellido, año y una palabra del título, y se resuelven colisiones.
+- `modelo.json`: objeto con `modelo` y `corte`, que identifican el modelo y la versión del corte.
+- `obras/<ITEM_KEY>.json`: `huella` de los PDF (ruta, tamaño y fecha de modificación), número total
+  de `paginas` y lista de `pasajes`. Cada pasaje incluye `n`, `seccion`, rango de `paginas`, `texto`,
+  `archivo` y origen de las secciones en `secciones_por`.
+- `vectores/<ITEM_KEY>.npy`: matriz NumPy con una fila normalizada por pasaje. Para obras sin texto
+  se guarda una matriz vacía y se informa de ellas como `sin_texto`.
 
-```mermaid
-sequenceDiagram
-    participant O as Orchestrator
-    participant P as PlannerAgent
-    participant W as WriterAgent
-    participant R as ReviewerAgent
-    participant CM as ContextManager
-    participant M as SectionMemory
+El identificador que reciben las herramientas es `<clave_de_cita>#<n>`. Solo se vuelven a leer los
+PDF nuevos o modificados. Cambiar el modelo o la versión del corte invalida los pasajes y vectores
+almacenados: la actualización los elimina y reconstruye las obras solicitadas. Conserva las claves.
+Un PDF dañado se informa como fallido y no impide procesar los demás.
 
-    Note over O: Fase 1: Cluster Analysis
-    O->>O: phase1_analyze_topics()
-    
-    Note over O: Fase 2: Planning
-    O->>P: generate_outline(title, abstract, topics)
-    P-->>O: PaperOutline
-    
-    loop outline_review_iterations
-        O->>R: review_outline(outline)
-        R-->>O: (feedback, requires_changes)
-        alt requires_changes
-            O->>P: refine_outline(outline, feedback)
-            P-->>O: refined_outline
-        end
-    end
-    
-    Note over O: Fase 3: Writing
-    loop cada sección
-        loop cada párrafo
-            O->>CM: get_context_for_idea(paragraph.to_query())
-            CM-->>O: evidence[]
-            O->>W: write_paragraph(paragraph, evidence, memory)
-            W-->>O: content
-        end
-        O->>M: generate_summary(section)
-        M-->>O: summary
-        
-        loop review_iterations
-            O->>R: review_section(section, memory)
-            R->>CM: search_for_evidence(4 query types)
-            CM-->>R: supporting evidence
-            R-->>O: improved_section
-        end
-    end
-    
-    O->>R: generate_critical_review(paper)
-    R-->>O: critical_review.md
+El documento tiene esta estructura:
+
+```text
+documento/
+    proyecto.yaml
+    materiales/
+        abstract.md
+    borrador/
+        plan.md
+        documento.md
+        referencias.bib
+    revision/
+        consultas.json
+        verificacion.json
+        verificacion.md
+        verificacion.log
+    exportacion/
 ```
 
----
+`Project.create` crea el YAML y las cuatro carpetas. Valida las colecciones contra Zotero antes
+de guardar. Solo tiene los campos `tipo` (literal `perspectiva`), `titulo`, `idioma` (por defecto
+`es`) y `colecciones` (lista vacía: todo Zotero). Al cargar se ignoran campos adicionales de
+proyectos antiguos, incluido `fuente`.
 
-## 🔍 Sistema RAG
+Claude escribe `abstract.md`, `plan.md` y `documento.md` siguiendo los comandos. El plugin escribe
+`referencias.bib` al verificar, con las obras citadas válidas y sus claves del índice.
+`exportacion/` se crea vacía; no hay un exportador en el código.
 
-### Arquitectura de Búsqueda
+`consultas.json` contiene `consultas` (texto de cada búsqueda y los identificadores devueltos) y
+`pasajes` (identificadores consultados sin duplicados). Las lecturas añaden pasajes a esta segunda
+lista. El juez usa este registro para incluir contexto que vio Claude.
 
-```mermaid
-flowchart LR
-    subgraph Query["🔎 Generación de Query"]
-        Q1["Párrafo actual"] --> Q2["key_idea +\nsupporting_points"]
-        Q2 --> Q3["Query semántico"]
-    end
-    
-    subgraph Indices["📊 Índices"]
-        I1[("💡 Ideas\n3,733")]
-        I2[("📌 Claims\n3,839")]
-        I3[("📚 Refs\n1,200+")]
-    end
-    
-    subgraph Search["🎯 Búsqueda"]
-        S1["Embedding Query\nmodelo local"]
-        S2["Cosine Similarity"]
-        S3["Ranking por Score"]
-        S4["Filtro Confianza"]
-        S5["Diversificación\nmax_per_paper"]
-    end
-    
-    subgraph Output["📝 Contexto"]
-        O1["Ideas relevantes"]
-        O2["Claims con evidencia"]
-        O3["Referencias citables"]
-    end
-    
-    Q3 --> S1
-    I1 & I2 & I3 --> S2
-    S1 --> S2 --> S3 --> S4 --> S5
-    S5 --> O1 & O2 & O3
+`verificacion.json` contiene la fecha `comprobado`, el resultado de `citas`, las `citas_literales`,
+la ruta de la `bibliografia`, el estado y progreso de `juez` y las entradas de `apoyo` por frase y
+obra. `verificacion.md` presenta estos datos al usuario; `verificacion.log` recoge la salida del
+proceso independiente.
 
-    style Query fill:#e3f2fd
-    style Indices fill:#f3e5f5
-    style Search fill:#fff3e0
-    style Output fill:#e8f5e9
-```
+## Secciones sin modelo
 
-### RAG en ReviewerAgent
+PyMuPDF extrae los bloques de texto de cada página. Se intenta reconocer secciones en este orden:
 
-El ReviewerAgent usa 4 tipos de queries para fortalecer argumentos:
+1. Títulos de los niveles uno y dos del índice interno del PDF.
+2. Líneas que parecen títulos por su tamaño o negrita respecto al cuerpo, con reglas para excluir
+   pies de figura, cabeceras repetidas, autores y el título del artículo. También se reconocen
+   nombres habituales de secciones.
+3. Corte por tamaño si ninguna de las fuentes anteriores localiza al menos tres títulos en orden.
 
-```mermaid
-flowchart TD
-    Section["📄 Sección a revisar"] --> Analysis["🔍 Analizar contenido"]
-    
-    Analysis --> Q1["🛡️ Query 1: SUPPORT\nEvidencia que respalde"]
-    Analysis --> Q2["⚔️ Query 2: COUNTER\nContraargumentos"]
-    Analysis --> Q3["📊 Query 3: EXAMPLES\nEjemplos concretos"]
-    Analysis --> Q4["🔗 Query 4: CONNECTIONS\nConexiones interdisciplinarias"]
-    
-    Q1 --> RAG["RAG Search"]
-    Q2 --> RAG
-    Q3 --> RAG
-    Q4 --> RAG
-    
-    RAG --> Evidence["📚 Evidencia consolidada"]
-    Evidence --> Strengthen["✨ Fortalecer sección"]
+`segmentation.segment` busca los títulos en el texto, descarta entradas de tablas de contenido,
+secciones administrativas y bibliografía; los apéndices reconocidos después de las referencias
+pueden reanudar el cuerpo. Une secciones pequeñas y divide las grandes por párrafos, después por
+frases y, si hace falta, por palabras. Los nombres de secciones unidas se concatenan.
 
-    style Q1 fill:#c8e6c9
-    style Q2 fill:#ffcdd2
-    style Q3 fill:#fff9c4
-    style Q4 fill:#b3e5fc
-```
+`passages.cut_pdf` usa objetivos de 150 a 300 palabras y conserva los rangos de páginas mediante
+los desplazamientos en el texto. Une fragmentos de menos de 80 palabras con un vecino de la misma
+sección resultante; por ello el tamaño final puede superar 300 palabras. Junta líneas y deshace
+los guiones de final de línea. No usa un modelo ni hace OCR.
 
----
+## Búsqueda por significado y palabras
 
-## 📦 Modelos de Datos
+El backend local usa fastembed y, por defecto, `intfloat/multilingual-e5-small`. Los textos que se
+vectorizan incluyen título de la obra, sección y pasaje. Los modelos E5 reciben los prefijos
+`passage:` y `query:`. El modelo se carga y descarga de la red solo cuando se necesita por primera
+vez; después se reutiliza la caché local.
 
-### Estructura del Outline
+La puntuación semántica es el producto escalar de vectores normalizados. BM25 calcula la
+coincidencia de palabras sobre el texto del pasaje, con tokens en minúsculas, sin tildes y de al
+menos dos caracteres. Visita las listas de documentos de los términos de la consulta.
 
-```mermaid
-erDiagram
-    PaperOutline ||--o{ SectionOutline : contiene
-    SectionOutline ||--o{ ParagraphOutline : contiene
-    
-    PaperOutline {
-        string title
-        string abstract
-        string thesis_statement
-    }
-    
-    SectionOutline {
-        string section_name
-        string section_purpose
-    }
-    
-    ParagraphOutline {
-        string key_idea
-        list supporting_points
-        list suggested_sources
-    }
-```
+Cuando hay coincidencias léxicas, se estandarizan ambas puntuaciones restando su media y
+dividiendo por su desviación típica, y se suman con peso 0,5 para cada una. Si no hay coincidencias
+léxicas, se usa solo la puntuación semántica. Los resultados se ordenan por puntuación y se filtran
+por colecciones y por el máximo de pasajes por obra: ocho resultados y tres por obra por defecto.
+Cada resultado lleva identificador, clave, título, año, sección, páginas y texto literal.
 
-### Datos Extraídos
+## Las tres comprobaciones
 
-```mermaid
-erDiagram
-    ProcessedPaper ||--o{ Idea : contiene
-    ProcessedPaper ||--o{ Claim : contiene
-    ProcessedPaper ||--o{ Reference : cita
-    
-    Idea {
-        uuid id
-        uuid paper_id
-        string paper_title
-        string section
-        string idea
-        string context
-        string importance
-        list keywords
-    }
-    
-    Claim {
-        uuid id
-        uuid paper_id
-        string claim
-        string evidence
-        string evidence_type
-        string confidence
-        list cited_references
-    }
-    
-    Reference {
-        uuid id
-        string formatted
-        list authors
-        int year
-        string title
-        string venue
-    }
-```
+**Claves y ámbito.** `find_citations` acepta `[@clave]`, grupos `[@a; @b]` y localizadores como
+`[@clave, p. 4]`. Cuenta `[@?]` como pendiente y devuelve los grupos mal formados. La verificación
+separa claves válidas, desconocidas, fuera de las colecciones y sin pasajes indexados. El hook
+hace solo el control de claves y ámbito, sin cargar embeddings. Sus dependencias de script son
+`pydantic` y `pyyaml`. Permanece silencioso cuando no hay citas incorrectas, incluso con `[@?]`.
 
----
+**Citas literales.** Se buscan comillas angulares, inglesas y rectas en las frases con citas. Las
+citas de seis palabras o más se comparan con el texto indexado de las obras citadas. Se normalizan
+caracteres, puntuación, mayúsculas y guiones de final de línea; se toleran palabras separadas o
+unidas por la extracción y números de notas. Los fragmentos separados por omisiones deben aparecer
+en orden. Una palabra añadida, quitada o cambiada no se acepta como literal; se busca el texto más
+cercano para mostrar las diferencias. Estas dos comprobaciones no llaman a ningún modelo.
 
-## 📁 Estructura del Proyecto
+**Apoyo de cada frase.** `sentences.py` divide párrafos sin cortar citas, abreviaturas comunes ni
+decimales. Por cada pareja frase–obra se seleccionan hasta cuatro pasajes cercanos a la frase y
+hasta dos consultados al escribir que no estén ya entre esos cuatro. El juez solo recibe esos
+pasajes y devuelve `apoyada`, `parcial`, `tergiversada` o `no_apoyada`, un motivo y, si lo indica,
+un pasaje mostrado. Una clave desconocida, una obra sin pasajes o una respuesta ilegible quedan
+`sin_juzgar`.
 
-```
-TheAIWriter/
-├── src/ai_writer/
-│   ├── main.py                    # CLI con Typer
-│   ├── __main__.py                # Entry point
-│   │
-│   ├── agents/                    # 🤖 Agentes de IA
-│   │   ├── base_agent.py          # Clase base abstracta
-│   │   ├── planner_agent.py       # Generación de outlines
-│   │   ├── writer_agent.py        # Escritura de contenido
-│   │   └── reviewer_agent.py      # Revisión RAG-enhanced
-│   │
-│   ├── orchestrators/             # 🎼 Orquestación
-│   │   └── advanced_orchestrator.py  # Pipeline 3 fases
-│   │
-│   ├── embeddings/                # 🧮 Sistema de embeddings
-│   │   ├── embedding_index.py     # Índice NPZ genérico
-│   │   └── rag_system.py          # Sistema RAG
-│   │
-│   ├── processors/                # ⚙️ Procesamiento
-│   │   ├── batch_processor.py     # Procesamiento en lote
-│   │   ├── pdf_processor.py       # Procesador individual
-│   │   ├── extraction_agent.py    # Extractor de ideas/claims
-│   │   └── models.py              # Modelos Pydantic
-│   │
-│   ├── utils/                     # 🔧 Utilidades
-│   │   ├── cluster_analyzer.py    # Análisis de clusters
-│   │   ├── enhanced_context_manager.py  # Contexto RAG
-│   │   └── pipeline_logger.py     # Logging del pipeline
-│   │
-│   ├── models/                    # 📋 Modelos de datos
-│   │   ├── paper.py               # Paper, Section
-│   │   └── outline.py             # PaperOutline
-│   │
-│   ├── readers/                   # 📖 Lectores
-│   │   ├── markdown_reader.py
-│   │   └── pdf_reader.py
-│   │
-│   ├── writers/                   # ✍️ Escritores
-│   │   ├── markdown_writer.py
-│   │   └── pdf_writer.py
-│   │
-│   └── scripts/                   # 📜 Scripts
-│       └── run_advanced_paper.py
-│
-├── config/
-│   └── settings.py                # Configuración Pydantic
-│
-├── docs/
-│   └── architecture.md            # Este documento
-│
-├── data/                          # ⚠️ No tracked en git
-│   ├── references/
-│   │   ├── markdown/ABSTRACT.md   # Abstract del paper
-│   │   └── pdfs/                  # PDFs de referencia
-│   ├── processed/
-│   │   ├── embeddings/            # Índices NPZ
-│   │   └── indices/               # JSONL files
-│   ├── logs/                      # Logs del pipeline
-│   └── output/
-│       ├── drafts/                # Outlines
-│       └── final/                 # Papers generados
-│
-└── pyproject.toml
-```
+Se agrupan las parejas de un párrafo en una llamada al backend, por defecto `claude -p`. Solo se
+llama si hay parejas con pasajes para comparar. `start_judge` lanza
+`python -m ai_writer documento verificar <carpeta>` mediante `background.spawn_cli`. Guarda el
+progreso tras cada párrafo. Conserva los veredictos previos de la misma frase y clave y reanuda
+tras un límite de uso; el estado también distingue procesos interrumpidos y errores. El porcentaje
+de apoyo cuenta entradas apoyadas entre las juzgadas, excluyendo las que quedan sin juzgar.
+El juez es automático, puede equivocarse y no sustituye la revisión del artículo.
 
----
+## Decisiones y mediciones
 
-## 💻 CLI y Uso
+Con 12 artículos, el nuevo flujo obtuvo un 90 % y un 86 % de frases apoyadas, frente al 66 % de las
+mejores versiones anteriores.
 
-### Comandos Disponibles
+Con 50 artículos, los pasajes obtuvieron un 85 % y el índice de ideas extraídas con un LLM un
+89 %, en una ejecución por condición: un empate dentro del ruido. El índice de ideas costó
+660 llamadas a un LLM y el de pasajes ninguna. Por eso se retiró la extracción de ideas.
 
-```bash
-# Generar paper completo
-python -m ai_writer generate "Título del Paper"
-
-# Con opciones
-python -m ai_writer generate "Título" \
-    --clusters 25 \
-    --reviews 1 \
-    --output ./output/
-
-# Solo generar outline
-python -m ai_writer outline "Título"
-
-# Revisar paper existente
-python -m ai_writer review ./paper.md
-
-# Procesar nuevos PDFs
-python -m ai_writer process --input ./pdfs/
-
-# Ver configuración
-python -m ai_writer version
-```
-
-### Configuración
-
-Por defecto no hace falta ninguna API key. El texto se genera con el CLI de
-Claude Code (`claude -p`, con su propia sesión) y los embeddings se calculan en
-local. Todas las llamadas pasan por `ai_writer.llm.LLMClient` y
-`ai_writer.embeddings.embedder`, que eligen el backend según la configuración:
-
-```python
-# config/settings.py (variables de entorno o .env)
-llm_backend = "claude-code"    # o "openai" (requiere OPENAI_API_KEY)
-default_model = "sonnet"       # Escritura y revisión
-reasoning_model = "opus"       # Planificación del outline
-fast_model = "haiku"           # Resúmenes de sección
-embedding_backend = "local"    # o "openai" (requiere OPENAI_API_KEY)
-embedding_model = "intfloat/multilingual-e5-small"
-
-# Parámetros del pipeline
-n_clusters = 25                # Clusters para análisis
-review_iterations = 1          # Iteraciones de revisión por sección
-outline_review_iterations = 1  # Iteraciones de refinamiento del outline
-```
-
----
-
-## 📝 Notas de Implementación
-
-### Memoria de Sección
-
-El sistema mantiene coherencia entre secciones usando un diccionario de summaries:
-
-```python
-section_memory = {
-    "Introducción": "Resumen de 3-5 oraciones...",
-    "Estado del Arte": "Resumen de 3-5 oraciones...",
-    # ...
-}
-```
-
-Cada agente recibe este contexto para mantener continuidad argumentativa.
-
-### Logging del Pipeline
-
-Todos los pasos se registran en `data/logs/run_{title}/`:
-
-- `phase1_topics.json`: Topics extraídos
-- `phase2_outline.json`: Outline generado
-- `outline_feedback_{n}.json`: Feedback del reviewer
-- `outline_refined_{n}.json`: Outline refinado
-- `run_log.json`: Metadata de ejecución
-
-### Refinamiento Conservador
-
-El ReviewerAgent aplica cambios conservadores al outline:
-- Solo fusiona párrafos si hay **redundancia evidente**
-- Valora la profundidad y exhaustividad
-- Preserva la estructura original cuando es posible
+Los detalles están en [herramienta-zotero-pasajes.md](../plans/pending/herramienta-zotero-pasajes.md).

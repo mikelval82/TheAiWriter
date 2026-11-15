@@ -1,4 +1,4 @@
-"""Cut a paper's text into non-overlapping segments, one per LLM pass.
+"""Cut a paper's text into non-overlapping segments.
 
 Pure and deterministic (no LLM): headings are located in order, administrative
 sections and the bibliography are dropped (headings that follow it, such as appendices,
@@ -175,8 +175,11 @@ def _split(piece: _Piece, max_words: int) -> list[_Piece]:
     starts: list[int] = [0]
     for parts in range(ceil(total / max_words), len(units) + 1):
         limit = next(
-            (lim for lim in range(ceil(total / parts), max_words + 1)
-             if len(_pack(sizes, lim)) <= parts),
+            (
+                lim
+                for lim in range(ceil(total / parts), max_words + 1)
+                if len(_pack(sizes, lim)) <= parts
+            ),
             None,
         )
         if limit:

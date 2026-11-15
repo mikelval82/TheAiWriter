@@ -1,14 +1,14 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "theaiwriter",
-  "description": "Escritura científica apoyada en tu propia biblioteca de artículos",
+  "description": "Escribe documentos científicos consultando los PDF de tu Zotero y verifica que cada cita dice lo que dice el paper",
   "owner": {
     "name": "mikelval82"
   },
   "plugins": [
     {
       "name": "theaiwriter",
-      "description": "Escribe papers de perspectiva y memorias de convocatoria con citas verificadas contra tu biblioteca",
+      "description": "Claude escribe consultando pasajes de los PDF de tu Zotero, con citas verificadas",
       "source": "./"
     },
     {

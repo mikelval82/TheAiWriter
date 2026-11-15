@@ -12,6 +12,6 @@ Idea del usuario: $ARGUMENTS
    - Título de trabajo.
    - Idioma del documento (por defecto, español).
    - Colecciones de Zotero que usa, mostrando las que hay con sus obras y cuántas traen PDF. Una colección incluye sus subcolecciones; ninguna significa todo Zotero.
-3. Con sus respuestas, llama a `crear_documento` con `tipo` «perspectiva» y `fuente` «zotero».
+3. Con sus respuestas, llama a `crear_documento` con `tipo` «perspectiva».
 4. Llama a `estado_indice` con `actualizar` a verdadero. Avisa antes de que no gasta llamadas a Claude y de que la primera vez tarda unos segundos por PDF.
 5. Resume lo creado: cuántas obras puede citar el documento, cuántas tienen PDF y están indexadas, y cuáles no tienen PDF (esas no se pueden consultar ni comprobar: conviene adjuntar el PDF en Zotero). Indica que el siguiente paso es poner la idea y la tesis en `materiales/abstract.md` y lanzar `/theaiwriter:escribir`.

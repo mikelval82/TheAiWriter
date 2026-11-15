@@ -9,7 +9,7 @@ Petición del usuario: $ARGUMENTS
 
 ## Antes de empezar
 
-1. Lee `proyecto.yaml`. Si no existe, o su `fuente` no es «zotero», explica que primero hay que crear el documento con `/theaiwriter:nuevo` y para.
+1. Lee `proyecto.yaml`. Si no existe, explica que primero hay que crear el documento con `/theaiwriter:nuevo` y para.
 2. Lee `materiales/abstract.md`. Si no existe o está vacío, pide al usuario la idea y la tesis, propón un abstract de 150 a 250 palabras, escríbelo ahí cuando lo confirme y sigue.
 3. Llama a `estado_indice` con `actualizar` a verdadero. Si hay obras sin PDF, dilo en una línea.
 

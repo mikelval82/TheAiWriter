@@ -2,6 +2,7 @@
 
 import pytest
 
+from ai_writer.citations import find_citations, make_key
 from ai_writer.zotero import ZOTERO_ENV, Zotero, ZoteroError, assign_keys, data_dir
 from tests.fake_zotero import FakeZotero
 
@@ -117,3 +118,35 @@ def test_keys_are_stable_once_assigned(fake):
     assert again["BBBB2222"] == "antigua"  # a Zotero key that appears later does not rename the work
     assert again["DDDD4444"] == "smith2020empathyb"
     assert again["EEEE5555"] == "leesflater"  # its Zotero key was already taken
+
+
+def test_keys_are_bibtex_style_and_unique():
+    taken = set()
+    first = make_key(["Ana Smith"], 2020, "The Emotion Models", taken)
+    taken.add(first)
+
+    assert first == "smith2020emotion"
+    assert make_key(["Smith, Ana"], 2020, "Emotion again", taken) == "smith2020emotionb"
+    assert make_key([], None, "Á la carte", set()) == "anonimosfcarte"
+
+
+def test_find_citations_accepts_pandoc_syntax_and_flags_the_old_format():
+    keys, malformed, pending = find_citations(
+        "A [@smith2020emotion]. B [@a2020x; @b2021y, p. 4]. C [@Brown et al., 2020]. D [@?]."
+    )
+
+    assert keys == ["smith2020emotion", "a2020x", "b2021y"]
+    assert malformed == ["[@Brown et al., 2020]"]
+    assert pending == 1
+
+
+def test_documents_dir_uses_the_localized_documents_folder(tmp_path, monkeypatch):
+    from ai_writer.library import documents_dir
+
+    monkeypatch.setattr("sys.platform", "linux")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    (tmp_path / "user-dirs.dirs").write_text(
+        'XDG_DOCUMENTS_DIR="$HOME/Documentos"\n', encoding="utf-8"
+    )
+    assert documents_dir() == tmp_path / "Documentos"

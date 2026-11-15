@@ -6,10 +6,6 @@ import numpy as np
 
 from config.settings import settings
 
-# Model that built the indices created before the model name was recorded
-# (OpenAI's, no longer supported: such indices need `ai-writer reindex`).
-LEGACY_EMBEDDING_MODEL = "text-embedding-3-small"
-
 TextKind = Literal["passage", "query"]
 
 

@@ -2,7 +2,7 @@
 
 import random
 
-from ai_writer.processors.segmentation import segment
+from ai_writer.segmentation import segment
 
 
 def words(n: int, tag: str = "w") -> str:

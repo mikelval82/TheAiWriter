@@ -104,7 +104,9 @@ class ClusterAnalyzer:
             mmr_diversity: Weight of diversity (0-1) when choosing representatives.
 
         Raises:
-            ValueError: If ``n_clusters`` is not an integer >= 2 (bools rejected).
+            ValueError: If ``n_clusters`` is not an integer >= 2,
+                ``n_representatives`` is not an integer >= 1, or
+                ``mmr_diversity`` is not a number in [0, 1] (bools rejected).
         """
         if (
             isinstance(n_clusters, bool)
@@ -113,6 +115,22 @@ class ClusterAnalyzer:
         ):
             raise ValueError(
                 f"n_clusters must be an integer >= 2, got {n_clusters!r}"
+            )
+        if (
+            isinstance(n_representatives, bool)
+            or not isinstance(n_representatives, int)
+            or n_representatives < 1
+        ):
+            raise ValueError(
+                f"n_representatives must be an integer >= 1, got {n_representatives!r}"
+            )
+        if (
+            isinstance(mmr_diversity, bool)
+            or not isinstance(mmr_diversity, (int, float))
+            or not 0 <= mmr_diversity <= 1  # also rejects NaN
+        ):
+            raise ValueError(
+                f"mmr_diversity must be a number between 0 and 1, got {mmr_diversity!r}"
             )
 
         self.embeddings_dir = embeddings_dir or settings.paths.embeddings_dir
