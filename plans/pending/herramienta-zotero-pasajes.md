@@ -187,7 +187,7 @@ Verificada cuando: hay una medición de pasajes frente a pasajes más ideas, con
 | 5. Flujo guiado | Hecha |
 | 6. Medición | Hecha |
 | 7. Retirada del código antiguo | Hecha: de 17.550 a 7.671 líneas, 181 pruebas en verde |
-| 8. Ideas como capa opcional | Pendiente de decisión: E ya da 88 % sin ideas |
+| 8. Ideas como capa opcional | Medida con 50 papers: empate (85 % pasajes, 89 % ideas). Código de ideas conservado |
 
 ## Registro de ejecución (2026-11-15)
 
@@ -231,3 +231,26 @@ Lo que esta medición no separa:
 - E1 cita las 12 obras y E2 solo 10.
 - La única frase «no apoyada» (E2, prueba de significación en `chen2024mixed`) es un error del juez de medición, que lee el paper solo hasta las referencias. El dato está en un apéndice posterior (p. 10, pasaje `chen2024mixed#22`): «the scores of ground truth are significantly higher than all model-generated results». El índice de pasajes sí llega a los apéndices.
 - Los 7 + 6 veredictos «parcial» son casi todos inferencias del ensayo colgadas de una cita, no datos inventados.
+
+## Fase 8: ideas frente a pasajes con 50 papers (2026-11-15)
+
+Los 50 PDF de la colección «TheAIWriter – Empatía en agentes» se procesaron en ideas con modelos baratos, repartidos entre dos cuentas, y se indexaron también por pasajes. Datos en `Documentos/TheAIWriter/ideas-empatia` (fuera del repositorio).
+
+| Procesado | Haiku (Claude) | gpt-6-luna (Codex) |
+|---|---|---|
+| Papers / páginas | 24 / 445 | 26 / 448 |
+| Llamadas | 258 | 402 |
+| Ideas (con cita verificada) | 1.231 (99,5 %) | 1.837 (98,4 %) |
+| Claims (con cita verificada) | 1.078 (99,4 %) | 2.006 (97,4 %) |
+
+Un ensayo por condición, mismo flujo (Claude Sonnet en sesión), mismo resumen y mismas reglas; solo cambia la herramienta de consulta. Juez común sobre el texto completo de cada paper, apéndices incluidos.
+
+| | Pasajes | Ideas |
+|---|---|---|
+| Coste del índice | 5 min, 0 llamadas | 660 llamadas, 1 h 33 min con dos cuentas |
+| Búsquedas / lecturas de contexto | 9 / 1 | 12 / 5 |
+| Obras citadas | 23 de 50 | 19 de 50 |
+| Frases apoyadas | 52/61 (85 %) | 54/61 (89 %) |
+| Parciales / no apoyadas | 9 / 0 | 7 / 0 |
+
+Lectura: empate dentro del ruido (dos frases de diferencia, una ejecución por condición). Con 50 papers las ideas no mejoran de forma apreciable a los pasajes, y los pasajes no se degradan respecto a los 12 papers (88 %). No se probó la condición con las dos herramientas a la vez ni bibliotecas de cientos de papers.
