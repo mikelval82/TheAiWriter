@@ -67,6 +67,18 @@ def test_citations_quotes_and_bibliography_without_llm(draft):
     assert "El juez de apoyo no se ha lanzado" in report
 
 
+def test_a_single_changed_word_is_not_verbatim():
+    text = ("But empathy is a broad concept that refers to the cognitive and emotional reactions of an "
+            "individual to the observed experiences of another [3]. It involves co-\nregulation too.")
+    assert verificacion._verbatim("empathy is a broad concept that refers to the cognitive", text) == (True, None)
+    assert verificacion._verbatim("experiences of another. It involves co-regulation too", text)[0]  # footnote, hyphen
+    assert verificacion._verbatim("empathy is a broad concept … reactions of an individual", text)[0]
+    verbatim, closest = verificacion._verbatim(
+        "empathy is a narrow concept that refers to the cognitive and emotional reactions of an individual", text)
+    assert not verbatim and closest["diferencias"] == [{"cita": "narrow", "texto": "broad"}]
+    assert verificacion._verbatim("nothing here resembles the paper in any way at all", text) == (False, None)
+
+
 def test_judge_sees_passages_of_the_cited_work(draft):
     mcp_server.buscar_pasajes("survey conditions", claves=["smith2020empathy"], n=1)
     judge = Judge("tergiversada")

@@ -21,7 +21,7 @@ from ai_writer.consulta import consulted, open_index, scope, write_bibliography
 from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 from ai_writer.passages import PassageIndex
-from ai_writer.processors.quotes import QuoteChecker, explain_mismatch
+from ai_writer.processors.quotes import explain_mismatch, fragments, normalize
 from ai_writer.support import _query, cited_paragraphs
 from ai_writer.validation import DRAFT
 
@@ -98,18 +98,39 @@ def check_quotes(text: str, index: PassageIndex) -> list[dict]:
                     continue
                 entry = {"seccion": paragraph["seccion"], "cita_literal": quote, "claves": keys,
                          "encontrada_en": None, "mas_parecido": None}
-                with_text = [key for key in keys if full_text(key)]
-                entry["encontrada_en"] = next(
-                    (key for key in with_text if QuoteChecker(full_text(key)).has(quote)), None
-                )
-                if entry["encontrada_en"] is None:
-                    near = [(explain_mismatch(quote, full_text(key)), key) for key in with_text]
-                    near = [(found, key) for found, key in near if found]
-                    if near:
-                        found, key = max(near, key=lambda pair: pair[0]["parecido"])
-                        entry["mas_parecido"] = {"clave": key, **found}
+                near = []
+                for key in (key for key in keys if full_text(key)):
+                    verbatim, closest = _verbatim(quote, full_text(key))
+                    if verbatim:
+                        entry["encontrada_en"] = key
+                        break
+                    if closest:
+                        near.append((closest, key))
+                if entry["encontrada_en"] is None and near:
+                    found, key = max(near, key=lambda pair: pair[0]["parecido"])
+                    entry["mas_parecido"] = {"clave": key, **found}
                 entries.append(entry)
     return entries
+
+
+def _verbatim(quote: str, text: str) -> tuple[bool, dict | None]:
+    """Is ``quote`` in ``text`` word for word? If not, the closest passage and what differs.
+
+    Words the PDF splits or joins and footnote numbers in the paper are not differences;
+    a changed, added or dropped word is, however similar the rest.
+    """
+    words = normalize(text).split()
+    for haystack in ("".join(words), "".join(w for w in words if not w.isdigit())):
+        position = 0
+        for piece in fragments(quote):
+            needle = piece.replace(" ", "")
+            position = haystack.find(needle, position)
+            if position < 0:
+                break
+            position += len(needle)
+        else:
+            return True, None
+    return False, explain_mismatch(quote, text)
 
 
 # -- 3. support ------------------------------------------------------------
