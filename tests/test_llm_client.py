@@ -233,6 +233,39 @@ def test_extract_json_accepts_common_shapes(text):
     assert extract_json(text) == {"a": 1}
 
 
+def test_codex_backend_reads_the_last_message_and_runs_read_only(monkeypatch):
+    from ai_writer.llm.backends import codex_cli
+
+    calls = {}
+
+    def run(command, **kwargs):
+        calls.update(command=command, **kwargs)
+        with open(command[command.index("--output-last-message") + 1], "w", encoding="utf-8") as f:
+            f.write('{"ok": true}\n')
+        return subprocess.CompletedProcess(command, 0, "noise", "")
+
+    monkeypatch.setattr(codex_cli.subprocess, "run", run)
+    response = codex_cli.CodexBackend().complete(_request(model="gpt-cheap", json_mode=True))
+    assert response.text == '{"ok": true}'
+    assert calls["command"][calls["command"].index("--model") + 1] == "gpt-cheap"
+    assert calls["command"][calls["command"].index("--sandbox") + 1] == "read-only"
+    assert calls["input"].startswith("SYSTEM") and calls["input"].endswith("USER")
+    assert "single valid JSON" in calls["input"]
+    assert isinstance(build_backend("codex"), codex_cli.CodexBackend)
+
+
+@pytest.mark.parametrize("stderr, error", [("You have hit your usage limit", UsageLimitError),
+                                           ("stream disconnected", LLMError)])
+def test_codex_backend_failures(monkeypatch, stderr, error):
+    from ai_writer.llm.backends import codex_cli
+
+    monkeypatch.setattr(codex_cli.subprocess, "run",
+                        lambda command, **kwargs: subprocess.CompletedProcess(command, 1, "", stderr))
+    with pytest.raises(error) as raised:
+        codex_cli.CodexBackend().complete(_request())
+    assert type(raised.value) is error
+
+
 def test_unknown_backend_is_rejected():
     with pytest.raises(ValueError, match="LLM_BACKEND"):
         build_backend("gemini")

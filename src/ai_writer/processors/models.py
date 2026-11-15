@@ -20,7 +20,8 @@ class PaperMetadata(BaseModel):
     processed_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     total_pages: int = 0
     sections_found: list[str] = Field(default_factory=list)
-    procesado: dict[str, int | float] = Field(default_factory=dict)  # metodo, llamadas, segundos, tramos
+    # metodo, llamadas, segundos, tramos, motor, modelo
+    procesado: dict[str, int | float | str] = Field(default_factory=dict)
 
 
 class SectionData(BaseModel):

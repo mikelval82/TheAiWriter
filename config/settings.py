@@ -20,9 +20,11 @@ OUTPUT_DIR = DATA_DIR / "output"
 class AISettings(BaseModel):
     """AI model configuration settings."""
 
-    # Text generation: "claude-code" (the Claude Code CLI) is the only backend
+    # Text generation: "claude-code" (the Claude Code CLI) or "codex" (the Codex CLI)
     llm_backend: str = Field(default_factory=lambda: os.getenv("LLM_BACKEND", "claude-code"))
     claude_bin: str = Field(default_factory=lambda: os.getenv("CLAUDE_BIN", "claude"))
+    codex_bin: str = Field(default_factory=lambda: os.getenv("CODEX_BIN", "codex"))
+    codex_effort: str = Field(default_factory=lambda: os.getenv("CODEX_EFFORT", "low"))
     llm_timeout: int = Field(default_factory=lambda: int(os.getenv("LLM_TIMEOUT", "600")))
     llm_max_retries: int = Field(default_factory=lambda: int(os.getenv("LLM_MAX_RETRIES", "2")))
 

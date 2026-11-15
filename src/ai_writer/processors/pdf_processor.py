@@ -150,6 +150,8 @@ class PDFProcessor:
             "llamadas": self.extraction_agent.llm.usage.calls - calls_before,
             "segundos": round(time.monotonic() - started, 1),
             "tramos": len(sections),
+            "motor": settings.ai.llm_backend,
+            "modelo": self.extraction_agent.model,
         }
 
         # Create processed paper

@@ -221,9 +221,11 @@ def build_backend(name: str | None = None) -> LLMBackend:
         from ai_writer.llm.backends.claude_code import ClaudeCodeBackend
 
         return ClaudeCodeBackend()
-    raise ValueError(
-        f"Unknown LLM_BACKEND {name!r}; use 'claude-code' (OpenAI is no longer supported)"
-    )
+    if name == "codex":
+        from ai_writer.llm.backends.codex_cli import CodexBackend
+
+        return CodexBackend()
+    raise ValueError(f"Unknown LLM_BACKEND {name!r}; use 'claude-code' or 'codex'")
 
 
 _client: LLMClient | None = None
