@@ -608,6 +608,22 @@ def document_status(
         raise typer.Exit(1)
 
 
+@document_app.command("verificar")
+def document_verify(
+    folder: Path = typer.Argument(Path("."), help="Carpeta del documento"),
+) -> None:
+    """Juzga si cada frase citada del borrador coincide con la obra y deja el informe en revision/."""
+    from ai_writer import verificacion
+    from ai_writer.library import LibraryError
+
+    try:
+        data = verificacion.run_judge(folder)
+    except LibraryError as error:
+        console.print(f"[red]✗ {error}[/red]")
+        raise typer.Exit(1)
+    console.print(verificacion.summary(data["apoyo"]))
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     app()

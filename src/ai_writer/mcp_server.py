@@ -458,6 +458,40 @@ def validar_documento() -> dict:
 
 
 @tool
+def verificar_documento(juez: bool = True) -> dict:
+    """Verifica el borrador `borrador/documento.md` de un documento sobre Zotero. Al momento
+    y sin gastar llamadas: que cada `[@clave]` exista y esté en las colecciones, y que cada
+    cita literal entre comillas esté tal cual en el PDF; además escribe
+    `borrador/referencias.bib`. Con `juez`, lanza en segundo plano el juez de apoyo, que
+    compara cada frase citada con pasajes de la obra (una llamada a Claude por párrafo con
+    citas; el resultado se consulta con `estado_verificacion`). El informe queda en
+    `revision/verificacion.md`."""
+    from ai_writer import verificacion
+
+    folder = _document_folder()
+    try:
+        data = verificacion.check_document(folder)
+        if juez and not verificacion.judge_running(data):
+            data = verificacion.start_judge(folder)
+    except LibraryError as error:
+        return _error(error)
+    return verificacion.overview(data)
+
+
+@tool
+def estado_verificacion() -> dict:
+    """Resultado de la última verificación del borrador y cómo va el juez de apoyo: cuántas
+    frases están apoyadas, parciales, tergiversadas o no apoyadas, y las que hay que
+    revisar con el motivo."""
+    from ai_writer import verificacion
+
+    try:
+        return verificacion.overview(verificacion.status(_document_folder()))
+    except LibraryError as error:
+        return _error(error)
+
+
+@tool
 def importar_zotero(ruta: str) -> dict:
     """Importa un `.bib` exportado de Zotero (mejor con Better BibTeX): los papers de la
     biblioteca que empareja, por DOI o por título, pasan a citarse con la clave y los datos
