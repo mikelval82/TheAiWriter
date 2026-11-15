@@ -1,4 +1,8 @@
-"""MCP server of the TheAIWriter plugin: the library and the document, as tools for Claude.
+"""MCP tools for Claude to write with Zotero PDF passages and verify citations.
+
+Exposes diagnostics, document setup, Zotero collections and passage consultation,
+references, citation checks and document verification. References and citation
+checks also support documents using the legacy library source.
 
 Claude Code starts it with ``uv run`` from the plugin folder; its working directory
 is the folder where the student opened Claude, which is the document folder.
@@ -102,107 +106,13 @@ def probar_claude() -> dict:
 
 
 @tool
-def estado_biblioteca() -> dict:
-    """Resume la biblioteca: carpeta, número de papers, colecciones, PDFs pendientes y el
-    último procesado. Si la carpeta actual es un documento, indica qué colecciones usa."""
-    library, project = _current_library()
-    if not library.exists():
-        return {"biblioteca": str(library.root), "existe": False}
-    collections = library.collections()
-    status = {
-        "biblioteca": str(library.root),
-        "existe": True,
-        "papers": len(library.papers()),
-        "colecciones": {name: len(ids) for name, ids in collections.items()},
-        "pdfs_pendientes": [pdf.name for pdf in library.pending_pdfs()],
-        "ultimo_procesado": library.job(),
-    }
-    if project is not None:
-        status["documento"] = {
-            "titulo": project.titulo,
-            "tipo": project.tipo,
-            "colecciones": project.colecciones or "toda la biblioteca",
-        }
-        try:
-            status["documento"]["papers_disponibles"] = len(project.paper_ids())
-        except LibraryError as error:
-            status["documento"]["error"] = str(error)
-    return status
-
-
-@tool
-def listar_papers(coleccion: str | None = None) -> dict:
-    """Lista los papers de la biblioteca, o los de una colección: id, título, autores, año y
-    cuántas ideas, claims y referencias se extrajeron."""
-    library, _ = _current_library()
-    try:
-        ids = library.paper_ids([coleccion] if coleccion else None)
-    except LibraryError as error:
-        return _error(error)
-    papers = [asdict(paper) for paper in library.papers() if paper.id in ids]
-    return {"coleccion": coleccion, "papers": papers}
-
-
-@tool
-def guardar_coleccion(nombre: str, papers: list[str]) -> dict:
-    """Crea o reemplaza una colección. Cada paper se indica por id, nombre de fichero o una
-    parte de su título que lo identifique sin ambigüedad."""
-    library, _ = _current_library()
-    try:
-        found = library.find_papers(papers)
-        library.save_collection(nombre, found)
-    except LibraryError as error:
-        return _error(error)
-    return {"coleccion": nombre, "papers": [paper.title for paper in found]}
-
-
-@tool
-def borrar_coleccion(nombre: str) -> dict:
-    """Borra una colección. Los papers siguen en la biblioteca."""
-    library, _ = _current_library()
-    try:
-        library.delete_collection(nombre)
-    except LibraryError as error:
-        return _error(error)
-    return {"borrada": nombre}
-
-
-@tool
-def anadir_pdfs(rutas: list[str]) -> dict:
-    """Copia PDFs, o todos los PDFs de unas carpetas, a la biblioteca. No los procesa:
-    para eso está `procesar_pdfs`."""
-    library, _ = _current_library()
-    try:
-        added = library.add_pdfs([Path(path) for path in rutas])
-    except LibraryError as error:
-        return _error(error)
-    return {
-        "anadidos": [pdf.name for pdf in added],
-        "pendientes": [pdf.name for pdf in library.pending_pdfs()],
-    }
-
-
-@tool
-def procesar_pdfs() -> dict:
-    """Procesa en segundo plano los PDFs pendientes: extrae ideas, claims y referencias con
-    Claude (unas 6 a 10 llamadas por paper) y rehace los índices. Responde al momento;
-    el progreso se consulta con `estado_biblioteca`."""
-    library, _ = _current_library()
-    try:
-        job = library.start_processing()
-    except LibraryError as error:
-        return _error(error)
-    return {"lanzado": job, "registro": str(library.log_file)}
-
-
-@tool
 def crear_documento(
     tipo: str, titulo: str, idioma: str = "es", colecciones: list[str] | None = None,
-    fuente: str = "biblioteca",
+    fuente: str = "zotero",
 ) -> dict:
     """Convierte la carpeta actual en un documento de TheAIWriter: crea `proyecto.yaml` y las
     carpetas materiales/, borrador/, revision/ y exportacion/. `tipo` es perspectiva,
-    resultados o convocatoria. `fuente`: «zotero» para citar desde colecciones de Zotero
+    resultados o convocatoria. `fuente`: «zotero» (por defecto) para citar desde colecciones de Zotero
     (nombres de `colecciones_zotero`) o «biblioteca» para la biblioteca propia; sin
     colecciones, el documento usa todas las obras."""
     folder = _document_folder()
@@ -365,49 +275,6 @@ def _engine(library: Library, project: Project | None):
 
 
 @tool
-def buscar_evidencia(
-    consulta: str,
-    n: int = 8,
-    tipo: str = "todo",
-    tema: int | None = None,
-    excluir: list[str] | None = None,
-) -> dict:
-    """Busca ideas y claims en los papers que el documento puede citar (sus colecciones).
-    Cada resultado trae la clave con la que se cita, `[@clave]`, y como mucho dos
-    resultados por paper. `tipo`: ideas, claims o todo. `tema`: id de
-    `temas_del_corpus` para buscar solo en ese tema. `excluir`: claves que no se quieren,
-    por ejemplo las ya citadas. Cita solo claves que hayan salido aquí."""
-    library, project = _current_library()
-    if not library.exists():
-        return {"error": f"No hay biblioteca en {library.root}."}
-    try:
-        engine = _engine(library, project)
-        results = engine.search(consulta, n=n, kind=tipo, topic=tema, exclude_keys=set(excluir or ()))
-    except LibraryError as error:
-        return _error(error)
-    if project is not None:
-        from ai_writer.validation import record_retrieved
-
-        record_retrieved(_document_folder(), consulta, [r["clave"] for r in results])
-    return {"consulta": consulta, "resultados": results}
-
-
-@tool
-def temas_del_corpus(n_temas: int | None = None) -> dict:
-    """Agrupa por temas las ideas de los papers del documento, para planificar secciones o
-    ver qué queda sin cubrir. Cada tema trae su id (para `buscar_evidencia`), cuántas
-    ideas y papers reúne, palabras clave y tres ideas representativas con su clave."""
-    library, project = _current_library()
-    if not library.exists():
-        return {"error": f"No hay biblioteca en {library.root}."}
-    try:
-        topics = _engine(library, project).topics(n_temas)
-    except LibraryError as error:
-        return _error(error)
-    return {"temas": [asdict(topic) for topic in topics]}
-
-
-@tool
 def referencia(clave: str) -> dict:
     """Datos completos de una obra citable: título, autores, año, revista, DOI, entrada
     BibTeX, cuánta evidencia tiene y si está en las colecciones del documento."""
@@ -426,8 +293,9 @@ def referencia(clave: str) -> dict:
 
 @tool
 def validar_citas(texto: str) -> dict:
-    """Comprueba las citas de un texto: que cada `[@clave]` exista en la biblioteca, que esté
-    en las colecciones del documento y que haya salido en alguna búsqueda de evidencia.
+    """Comprueba que cada `[@clave]` exista en Zotero o en la biblioteca, según la fuente
+    del documento, y esté en sus colecciones. En la biblioteca también informa de citas
+    que no hayan salido en las búsquedas de evidencia registradas.
     Úsala antes de dar por bueno cualquier texto con citas."""
     from ai_writer.citations import CitationIndex, check_citations
     from ai_writer.validation import check_text
@@ -445,33 +313,6 @@ def validar_citas(texto: str) -> dict:
     else:
         report = check_citations(texto, CitationIndex.load(library))
     return {"correcto": report.ok, "informe": report.summary(), **asdict(report)}
-
-
-@tool
-def validar_documento() -> dict:
-    """Valida el borrador `borrador/documento.md`: citas, huecos `[[PENDIENTE]]` y palabras
-    por sección, y sugiere obras de las colecciones para cada `[@?]`. Escribe el informe
-    en `revision/validacion.md`. Las sugerencias no se aplican solas: compruébalas antes."""
-    from ai_writer.validation import DRAFT, REPORT, validate_document
-
-    library, project = _current_library()
-    folder = _document_folder()
-    if project is None:
-        return {"error": "La carpeta actual no es un documento de TheAIWriter."}
-    if not (folder / DRAFT).exists():
-        return {"error": f"Todavía no hay borrador en {DRAFT}."}
-    report = validate_document(folder, suggest=True)
-    return {
-        "correcto": report.ok,
-        "informe": report.citations.summary(),
-        "huecos": report.gaps,
-        "fuentes_posibles_para_huecos": [
-            {"frase": gap["frase"], "claves": [source["cita"] for source in gap["fuentes"]]}
-            for gap in report.gap_sources
-        ],
-        "palabras_por_seccion": report.words_per_section,
-        "fichero": str(folder / REPORT),
-    }
 
 
 @tool
@@ -506,96 +347,6 @@ def estado_verificacion() -> dict:
         return verificacion.overview(verificacion.status(_document_folder()))
     except LibraryError as error:
         return _error(error)
-
-
-@tool
-def importar_zotero(ruta: str) -> dict:
-    """Importa un `.bib` exportado de Zotero (mejor con Better BibTeX): los papers de la
-    biblioteca que empareja, por DOI o por título, pasan a citarse con la clave y los datos
-    de Zotero. Las entradas que no están en la biblioteca no se pueden citar y se listan."""
-    from ai_writer.citations import CitationIndex
-
-    library, _ = _current_library()
-    path = Path(ruta).expanduser()
-    if not path.is_file():
-        return {"error": f"No existe el fichero {path}."}
-    result = CitationIndex.load(library).import_zotero(path)
-    shutil.copy2(path, library.root / "zotero.bib")
-    return result
-
-
-# Writing the document
-
-
-def _document_project() -> tuple[Path, dict | None]:
-    folder = _document_folder()
-    if not (folder / PROJECT_FILE).exists():
-        return folder, {"error": "La carpeta actual no es un documento: créalo con /theaiwriter:nuevo."}
-    return folder, None
-
-
-@tool
-def escribir_documento(pausar_tras_plan: bool = False) -> dict:
-    """Escribe el documento entero en segundo plano: temas de sus colecciones, plan,
-    párrafo a párrafo con evidencia, revisión por sección, revisión global y validación de
-    citas. Si se cortó o se detuvo, continúa donde se quedó. Responde al momento; el
-    progreso se consulta con `estado_escritura`. Con `pausar_tras_plan` se detiene tras el
-    plan (borrador/plan.md) hasta `aprobar_plan`. Necesita materiales/abstract.md."""
-    from ai_writer.perspective_run import start_in_background
-
-    folder, error = _document_project()
-    if error:
-        return error
-    try:
-        return start_in_background(folder, pause_after_plan=pausar_tras_plan)
-    except (LibraryError, ValueError) as problem:
-        return {"error": str(problem)}
-
-
-@tool
-def estado_escritura() -> dict:
-    """Progreso de la escritura del documento: estado (en_curso, esperando_aprobacion,
-    detenido, interrumpido, error, terminado), fase, párrafos escritos, secciones terminadas,
-    llamadas al LLM, coste estimado y las últimas líneas del registro."""
-    from ai_writer.perspective_run import LOG, PerspectiveRun
-
-    folder, error = _document_project()
-    if error:
-        return error
-    status = PerspectiveRun(folder).status()
-    log = folder / LOG
-    if log.exists():
-        lines = [line for line in log.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
-        status["registro"] = lines[-8:]
-    return status
-
-
-@tool
-def aprobar_plan() -> dict:
-    """Aprueba el plan (borrador/plan.json, con los cambios que se le hayan hecho) y sigue
-    escribiendo en segundo plano."""
-    from ai_writer.perspective_run import approve_plan
-
-    folder, error = _document_project()
-    if error:
-        return error
-    try:
-        return approve_plan(folder)
-    except (LibraryError, ValueError) as problem:
-        return {"error": str(problem)}
-
-
-@tool
-def detener_escritura() -> dict:
-    """Pide a la escritura en curso que se detenga al terminar el párrafo que está
-    escribiendo. Se reanuda con `escribir_documento`."""
-    from ai_writer.perspective_run import request_stop
-
-    folder, error = _document_project()
-    if error:
-        return error
-    request_stop(folder)
-    return {"detener": "solicitado; se parará al terminar el párrafo en curso"}
 
 
 def main() -> None:

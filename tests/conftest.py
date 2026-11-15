@@ -42,39 +42,7 @@ PAPERS = [
 ]
 IDEAS_PER_PAPER = 12
 
-# Resolvable by ReferenceProcessor as "Smith et al., 2020".
-KNOWN_CITATION = "[@Smith et al., 2020]"
 KNOWN_REFERENCE = "Smith, A., Jones, B., Lee, C. Emotion models for social robots. HRI Journal, 2020."
-
-DEFAULT_OUTLINE = {
-    "thesis_statement": "Social robots need grounded emotion models.",
-    "sections": [
-        {
-            "section_name": "Introducción",
-            "section_purpose": "Presentar el tema",
-            "paragraphs": [
-                {
-                    "paragraph_number": 1,
-                    "key_idea": "emotion models matter for robots",
-                    "supporting_points": ["emotion drives interaction"],
-                    "suggested_sources": ["Emotion Models for Social Robots"],
-                }
-            ],
-        },
-        {
-            "section_name": "Conclusiones",
-            "section_purpose": "Sintetizar",
-            "paragraphs": [
-                {
-                    "paragraph_number": 1,
-                    "key_idea": "navigation and speech complete the picture",
-                    "supporting_points": [],
-                    "suggested_sources": [],
-                }
-            ],
-        },
-    ],
-}
 
 
 def fake_embedding(text: str) -> list[float]:
@@ -149,43 +117,18 @@ def _segment_answer(prompt: str) -> str:
     )
 
 
-def _script_default_pipeline(llm: FakeLLM) -> None:
-    """Rules covering every call of AdvancedPerspectiveOrchestrator.run() and of PDF processing.
-
-    Processing makes metadata, structure, then one call per segment (see tests/test_extraction.py).
-    """
+def _script_pdf_processing(llm: FakeLLM) -> None:
+    """Metadata, structure and one extraction call per PDF segment."""
     llm.on("extract metadata", json.dumps({"title": "Paper de prueba", "authors": ["Ana Smith"], "year": 2020}))
     llm.on("identify its section structure", json.dumps([{"section_name": "Introduction", "section_number": 1}]))
     llm.on("MAIN IDEAS and its CLAIMS", _segment_answer)
-    llm.on("planificador de papers", json.dumps(DEFAULT_OUTLINE))
-    llm.on("ESQUEMA A REVISAR", "Sin cambios necesarios")
-    llm.on("Escribe UN SOLO PÁRRAFO", f"Párrafo escrito {KNOWN_CITATION}.")
-    llm.on(
-        "identifica 4 queries",
-        json.dumps(
-            {
-                "support": "emotion robot",
-                "counter": "navigation robot",
-                "examples": "speech robot",
-                "connections": "emotion speech",
-            }
-        ),
-    )
-    llm.on("Revisa y mejora la siguiente sección", f"Sección revisada {KNOWN_CITATION}.")
-    llm.on("Genera un resumen conciso", "Resumen de la sección.")
-    llm.on(
-        "revisión final de coherencia",
-        f"### Introducción\nIntro final {KNOWN_CITATION}.\n\n"
-        f"### Conclusiones\nCierre final {KNOWN_CITATION}.",
-    )
-    llm.on("revisión crítica exhaustivo", "# Revisión Crítica\n\nTexto de la revisión.")
 
 
 @pytest.fixture
 def fake_llm() -> FakeLLM:
     """A FakeLLM and a FakeEmbedder installed as the shared client and embedder."""
     llm = FakeLLM()
-    _script_default_pipeline(llm)
+    _script_pdf_processing(llm)
     set_llm_client(LLMClient(llm, max_retries=0))
     set_embedder(FakeEmbedder())
     yield llm
@@ -219,10 +162,6 @@ def workspace(tmp_path, monkeypatch):
         path.mkdir(parents=True, exist_ok=True)
         monkeypatch.setattr(settings.paths, name, path)
     monkeypatch.delenv("THEAIWRITER_BIBLIOTECA", raising=False)
-
-    (paths["references_markdown_dir"] / "ABSTRACT.md").write_text(
-        "Abstract de prueba sobre robots sociales.", encoding="utf-8"
-    )
 
     ideas, claims = [], []
     for paper in PAPERS:

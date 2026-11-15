@@ -359,9 +359,6 @@ class Project(BaseModel):
     tipo: DocumentKind
     titulo: str
     idioma: str = "es"
-    perfil: str | None = Field(
-        default=None, description="Estructura de secciones; vacío: la del tipo de documento"
-    )
     fuente: Literal["biblioteca", "zotero"] = Field(
         default="biblioteca", description="De dónde salen las obras: la biblioteca propia o Zotero"
     )

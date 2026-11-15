@@ -8,7 +8,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from ai_writer.citations import CitationIndex, check_citations, find_citations, make_key
@@ -258,68 +257,6 @@ def test_gaps_get_suggested_sources_from_the_collections_only(library):
 def _engine(library):
     library.save_collection("Robots", library.find_papers(["emotion models", "crowded", "speech"]))
     return EvidenceEngine(library, library.paper_ids(["Robots"]))
-
-
-def _spread_topic(engine):
-    """One topic whose 8 most central ideas are near-duplicates and whose other 28 are spread out."""
-    engine.topics(n_topics=1)
-    matrix = engine.ideas._embeddings_matrix
-    rows = list(range(len(engine.ideas.items)))
-    centre = np.zeros(matrix.shape[1], dtype=np.float32)
-    centre[0] = 1
-    for j, row in enumerate(rows):
-        angle, axis = (0.45, 1) if j < 8 else (0.64, 2 + j)
-        matrix[row] = 0
-        matrix[row, 0], matrix[row, axis] = np.cos(angle), np.sin(angle)
-    engine._centroids = centre[None, :]
-    engine._members[0] = rows
-    return rows
-
-
-def _mean_similarity(engine, rows):
-    unit = engine.ideas._embeddings_matrix[rows]
-    unit = unit / np.linalg.norm(unit, axis=1, keepdims=True)
-    sims = unit @ unit.T
-    return sims[np.triu_indices(len(rows), 1)].mean()
-
-
-def test_topic_ideas_spread_out_and_never_repeat(library):
-    engine = _engine(library)
-    rows = _spread_topic(engine)
-    used: set[int] = set()
-
-    first = engine.topic_ideas(0, 1, used)
-    assert used == {0}
-    assert first[0]["idea"] == engine.ideas.items[0]["idea"]
-
-    used.clear()
-    picked = engine.topic_ideas(0, 6, used)
-    assert len(picked) == 6 and set(picked[0]) == {"idea", "cluster", "clave"}
-    assert _mean_similarity(engine, sorted(used)) < _mean_similarity(engine, rows[:6])
-
-    more = engine.topic_ideas(0, 6, used)
-    assert len(used) == 12 and not {i["idea"] for i in picked} & {i["idea"] for i in more}
-
-
-def test_topic_ideas_avoid_repeating_a_work_within_a_call(library):
-    engine = _engine(library)
-    _spread_topic(engine)
-    keys = [i["clave"] for i in engine.topic_ideas(0, 3, set())]
-    assert len(set(keys)) == 3
-
-
-def test_topic_ideas_skip_method_ideas_while_others_remain(library):
-    engine = _engine(library)
-    rows = _spread_topic(engine)
-    for row in rows[:8]:  # the most central ones
-        engine.ideas.items[row]["kind"] = "method"
-    engine.ideas.items[rows[8]]["kind"] = "finding"  # others have no kind: eligible
-    used: set[int] = set()
-    picked = engine.topic_ideas(0, len(rows) - 8, used)
-    assert len(picked) == len(rows) - 8 and not used & set(rows[:8])
-
-    rest = engine.topic_ideas(0, 20, used)  # only methods are left now
-    assert len(rest) == 8 and used == set(rows)
 
 
 def test_idea_results_expose_the_kind(library):

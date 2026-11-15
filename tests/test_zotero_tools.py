@@ -33,7 +33,7 @@ def test_collections_and_document_on_zotero(document):
 
     assert "No hay ninguna" in mcp_server.crear_documento(
         "perspectiva", "T", colecciones=["Nada"], fuente="zotero")["error"]
-    created = mcp_server.crear_documento("perspectiva", "T", colecciones=["Empatía"], fuente="zotero")
+    created = mcp_server.crear_documento("perspectiva", "T", colecciones=["Empatía"])
     assert (created["obras"], created["con_pdf"], created["pendientes"]) == (1, 1, 1)
 
 

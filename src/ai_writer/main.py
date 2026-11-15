@@ -1,17 +1,6 @@
-"""Main entry point for TheAIWriter application.
+"""CLI for PDF processing, embedding indices, libraries and document verification.
 
-TheAIWriter is an AI-assisted academic writing system specialized in perspective papers.
-It uses a 3-phase architecture: Cluster Analysis → Planning → Writing.
-
-Usage:
-    # Generate a perspective paper
-    python -m ai_writer generate "Paper Title"
-    
-    # Process new PDFs
-    python -m ai_writer process
-    
-    # Show embedding statistics
-    python -m ai_writer stats
+Claude writes documents while consulting the plugin's Zotero passage tools.
 """
 
 from pathlib import Path
@@ -34,7 +23,7 @@ app = typer.Typer(
 
 library_app = typer.Typer(help="📚 La biblioteca de papers: estado, colecciones y migración")
 app.add_typer(library_app, name="biblioteca")
-document_app = typer.Typer(help="📝 Un documento: escribirlo y ver cómo va")
+document_app = typer.Typer(help="📝 Verificar las citas y el apoyo de un documento")
 app.add_typer(document_app, name="documento")
 
 # Library chosen with --biblioteca, if any
@@ -62,86 +51,6 @@ def use_library(
 # =============================================================================
 # Main Commands
 # =============================================================================
-
-@app.command()
-def generate(
-    title: str = typer.Argument(
-        ...,
-        help="Title of the perspective paper to generate"
-    ),
-    abstract: Optional[Path] = typer.Option(
-        None,
-        "--abstract", "-a",
-        help="Path to abstract markdown file (defaults to data/references/markdown/ABSTRACT.md)"
-    ),
-    output_dir: Optional[Path] = typer.Option(
-        None,
-        "--output", "-o",
-        help="Output directory for generated files"
-    ),
-    clusters: int = typer.Option(
-        25,
-        "--clusters", "-c",
-        help="Number of clusters for topic extraction"
-    ),
-    review_iterations: int = typer.Option(
-        1,
-        "--reviews", "-r",
-        help="Number of review iterations per section"
-    ),
-    outline_iterations: int = typer.Option(
-        1,
-        "--outline-reviews",
-        help="Number of outline refinement iterations"
-    ),
-    no_logging: bool = typer.Option(
-        False,
-        "--no-log",
-        help="Disable pipeline logging"
-    ),
-) -> None:
-    """Generate a perspective paper using the 3-phase architecture.
-    
-    The pipeline consists of:
-    
-    1. **Cluster Analysis**: Extract main topics from the embedding space
-    2. **Planning**: Generate detailed outline with paragraph-level ideas
-    3. **Writing**: Write paragraph-by-paragraph with semantic search
-    
-    Example:
-        ai-writer generate "Hacia Agentes Empáticos Fundamentales"
-    """
-    from ai_writer.orchestrators.advanced_orchestrator import AdvancedPerspectiveOrchestrator
-    
-    console.print(Panel(
-        f"[bold cyan]TheAIWriter[/bold cyan] - Perspective Paper Generator\n\n"
-        f"📌 Title: [bold]{title}[/bold]",
-        border_style="blue",
-    ))
-    
-    # Initialize orchestrator
-    orchestrator = AdvancedPerspectiveOrchestrator(
-        abstract_path=abstract,
-        review_iterations=review_iterations,
-        n_clusters=clusters,
-        outline_review_iterations=outline_iterations,
-        enable_logging=not no_logging,
-    )
-    
-    # Run the pipeline
-    paper_path, review_path = orchestrator.run(
-        title=title,
-        output_dir=output_dir,
-    )
-    
-    console.print("\n")
-    console.print(Panel(
-        f"📄 Paper: [link=file://{paper_path}]{paper_path}[/link]\n"
-        f"📋 Review: [link=file://{review_path}]{review_path}[/link]",
-        title="[bold green]✓ Generation Complete[/bold green]",
-        border_style="green",
-    ))
-
 
 @app.command()
 def process(
@@ -296,140 +205,6 @@ def reindex() -> None:
 
 
 @app.command()
-def outline(
-    title: str = typer.Argument(
-        ...,
-        help="Title of the paper for outline generation"
-    ),
-    output: Optional[Path] = typer.Option(
-        None,
-        "--output", "-o",
-        help="Path to save the outline (JSON and Markdown)"
-    ),
-    clusters: int = typer.Option(
-        25,
-        "--clusters", "-c",
-        help="Number of clusters for topic extraction"
-    ),
-) -> None:
-    """Generate only the outline without writing the full paper.
-    
-    Useful for planning and reviewing the structure before full generation.
-    
-    Example:
-        ai-writer outline "Paper Title" --output outline.json
-    """
-    from ai_writer.orchestrators.advanced_orchestrator import AdvancedPerspectiveOrchestrator
-    import json
-    
-    console.print(Panel(
-        f"📌 Title: [bold]{title}[/bold]\n"
-        f"🔬 Clusters: {clusters}",
-        title="Generating Outline",
-        border_style="cyan",
-    ))
-    
-    orchestrator = AdvancedPerspectiveOrchestrator(
-        n_clusters=clusters,
-        enable_logging=True,
-    )
-    
-    # Phase 1
-    topics = orchestrator.phase1_analyze_topics()
-    
-    # Phase 2
-    outline_obj = orchestrator.phase2_generate_outline(title, topics)
-    
-    # Save outline
-    output_dir = output.parent if output else settings.paths.drafts_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in title)
-    safe_title = safe_title.replace(" ", "_")[:50]
-    
-    json_path = output or (output_dir / f"{safe_title}_outline.json")
-    md_path = json_path.with_suffix(".md")
-    
-    # Save JSON
-    json_path.write_text(
-        json.dumps(outline_obj.model_dump(), indent=2, ensure_ascii=False),
-        encoding="utf-8"
-    )
-    
-    # Save Markdown
-    md_content = outline_obj.to_markdown()
-    md_path.write_text(md_content, encoding="utf-8")
-    
-    console.print("\n")
-    console.print(Panel(
-        f"📄 JSON: [link=file://{json_path}]{json_path}[/link]\n"
-        f"📝 Markdown: [link=file://{md_path}]{md_path}[/link]",
-        title="[bold green]✓ Outline Generated[/bold green]",
-        border_style="green",
-    ))
-
-
-@app.command()
-def review(
-    paper_path: Path = typer.Argument(
-        ...,
-        help="Path to the paper markdown file to review"
-    ),
-    output: Optional[Path] = typer.Option(
-        None,
-        "--output", "-o",
-        help="Path to save the critical review"
-    ),
-) -> None:
-    """Generate a critical review of an existing paper.
-    
-    Analyzes the paper for:
-    - Argument coherence and logical flow
-    - Evidence quality and citation support
-    - Gaps and areas for improvement
-    
-    Example:
-        ai-writer review ./output/paper.md
-    """
-    from ai_writer.agents.reviewer_agent import ReviewerAgent
-    from ai_writer.readers.markdown_reader import MarkdownReader
-    from ai_writer.models.paper import Paper, Section
-    
-    if not paper_path.exists():
-        console.print(f"[red]Error: File not found: {paper_path}[/red]")
-        raise typer.Exit(1)
-    
-    console.print(Panel(
-        f"📄 Paper: {paper_path}",
-        title="Generating Critical Review",
-        border_style="cyan",
-    ))
-    
-    reader = MarkdownReader()
-    content = reader.read(paper_path)
-    
-    # Create a simple Paper object from content
-    paper = Paper(
-        title=paper_path.stem.replace("_", " "),
-        sections=[Section(title="Content", content=content)],
-    )
-    
-    reviewer = ReviewerAgent()
-    critical_review = reviewer.generate_critical_review(paper)
-    
-    # Save review
-    output_path = output or paper_path.with_name(f"{paper_path.stem}_critical_review.md")
-    output_path.write_text(critical_review, encoding="utf-8")
-    
-    console.print("\n")
-    console.print(Panel(
-        f"📋 Review saved: [link=file://{output_path}]{output_path}[/link]",
-        title="[bold green]✓ Review Complete[/bold green]",
-        border_style="green",
-    ))
-
-
-@app.command()
 def version() -> None:
     """Show version and configuration information."""
     table = Table(title="TheAIWriter Configuration", show_header=True)
@@ -575,38 +350,6 @@ def library_collection(
 # =============================================================================
 # Document Commands
 # =============================================================================
-
-@document_app.command("escribir")
-def document_write(
-    folder: Path = typer.Argument(Path("."), help="Carpeta del documento"),
-    pause: bool = typer.Option(False, "--pausar", help="Para tras el plan hasta aprobarlo"),
-) -> None:
-    """Escribe el documento (o lo continúa donde se quedó) y deja el progreso en borrador/estado.json."""
-    from ai_writer.library import LibraryError
-    from ai_writer.perspective_run import PerspectiveRun
-
-    try:
-        status = PerspectiveRun(folder).run(pause_after_plan=pause)
-    except LibraryError as error:
-        console.print(f"[red]✗ {error}[/red]")
-        raise typer.Exit(1)
-    console.print(status)
-
-
-@document_app.command("estado")
-def document_status(
-    folder: Path = typer.Argument(Path("."), help="Carpeta del documento"),
-) -> None:
-    """Muestra en qué fase está la escritura del documento."""
-    from ai_writer.library import LibraryError
-    from ai_writer.perspective_run import PerspectiveRun
-
-    try:
-        console.print(PerspectiveRun(folder).status())
-    except LibraryError as error:
-        console.print(f"[red]✗ {error}[/red]")
-        raise typer.Exit(1)
-
 
 @document_app.command("verificar")
 def document_verify(

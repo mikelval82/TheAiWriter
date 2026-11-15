@@ -21,12 +21,8 @@ _IDEA_FIELDS = ["context", "keywords", "section", "paper_title"]
 # Below this relevance a work is too loosely related to suggest it for a gap
 GAP_RELEVANCE = 0.85
 _CLAIM_FIELDS = ["evidence", "section", "paper_title"]
-# MMR weight of redundancy when picking the ideas of a topic (same as ClusterAnalyzer)
-TOPIC_DIVERSITY = 0.3
 # A statement the paper only supports by citing another work ranks below its own findings
 CITED_CLAIM_WEIGHT = 0.85
-# Ideas of these kinds do not feed the document plan while the topic has others
-PLAN_EXCLUDED_KINDS = {"method"}
 
 
 @dataclass
@@ -250,47 +246,6 @@ class EvidenceEngine:
         topics.sort(key=lambda topic: topic.ideas, reverse=True)
         self._topics = topics
         return topics
-
-    def topic_ideas(self, topic_id: int, n: int, used_rows: set[int]) -> list[dict]:
-        """Up to ``n`` ideas of a topic not in ``used_rows``, central yet spread out (MMR).
-
-        Redundancy counts the ideas of this topic already in ``used_rows``, so successive
-        calls keep spreading. Ideas of ``PLAN_EXCLUDED_KINDS`` come last. Two ideas of one work are avoided within a call while another
-        work remains. The rows taken are added to ``used_rows``, so no idea is ever repeated.
-        """
-        self.topics()
-        topic = next(t for t in self._topics if t.id == topic_id)
-        members = self._members.get(topic_id, [])
-        matrix = self.ideas._embeddings_matrix
-        norms = np.linalg.norm(matrix[members], axis=1, keepdims=True) if members else None
-        unit = matrix[members] / np.where(norms == 0, 1, norms) if members else None
-        centre = self._centroids[topic_id] / (np.linalg.norm(self._centroids[topic_id]) or 1)
-        keys = [self.citations.key_for(self.ideas.items[row].get("paper_id", "")) for row in members]
-        relevance = unit @ centre if members else None
-        taken = [i for i, row in enumerate(members) if row in used_rows]
-        candidates = [i for i, row in enumerate(members) if row not in used_rows]
-        # Method details only fill the plan when nothing else is left in the topic
-        preferred = [
-            i for i in candidates
-            if self.ideas.items[members[i]].get("kind") not in PLAN_EXCLUDED_KINDS
-        ]
-        picked_keys, ideas = set(), []
-        while candidates and len(ideas) < n:
-            tier = [i for i in preferred if i in candidates] or candidates
-            pool = [i for i in tier if keys[i] not in picked_keys] or tier
-            redundancy = (unit[pool] @ unit[taken].T).max(axis=1) if taken else np.zeros(len(pool))
-            score = (1 - TOPIC_DIVERSITY) * relevance[pool] - TOPIC_DIVERSITY * redundancy
-            best = pool[int(np.argmax(score))]
-            candidates.remove(best)
-            taken.append(best)
-            picked_keys.add(keys[best])
-            used_rows.add(members[best])
-            ideas.append({
-                "idea": self.ideas.items[members[best]].get("idea", ""),
-                "cluster": ", ".join(topic.keywords[:3]),
-                "clave": keys[best],
-            })
-        return ideas
 
     # Works
 

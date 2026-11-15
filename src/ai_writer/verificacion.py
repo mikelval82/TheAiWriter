@@ -253,7 +253,7 @@ def _open(folder: Path) -> tuple[str, PassageIndex, set[str] | None]:
     folder = Path(folder)
     project = Project.load(folder)
     if project.fuente != "zotero":
-        raise LibraryError("Este documento no usa Zotero: valídalo con «validar_documento».")
+        raise LibraryError("Este documento no toma sus obras de Zotero: no se puede verificar así.")
     if not (folder / DRAFT).exists():
         raise LibraryError(f"Todavía no hay borrador en {DRAFT}.")
     index = open_index()

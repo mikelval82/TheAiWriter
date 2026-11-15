@@ -179,12 +179,55 @@ Verificada cuando: hay una medición de pasajes frente a pasajes más ideas, con
 
 | Fase | Estado |
 |---|---|
-| 0. Preparación | Pendiente |
-| 1. Lector de Zotero | Pendiente |
-| 2. Índice de pasajes | Pendiente |
-| 3. Herramientas para Claude | Pendiente |
-| 4. Verificación | Pendiente |
-| 5. Flujo guiado | Pendiente |
-| 6. Medición | Pendiente |
-| 7. Retirada del código antiguo | Pendiente |
-| 8. Ideas como capa opcional | Pendiente |
+| 0. Preparación | Hecha |
+| 1. Lector de Zotero | Hecha |
+| 2. Índice de pasajes | Hecha |
+| 3. Herramientas para Claude | Hecha |
+| 4. Verificación | Hecha |
+| 5. Flujo guiado | Hecha |
+| 6. Medición | Hecha |
+| 7. Retirada del código antiguo | Hecha: de 17.550 a 7.671 líneas, 181 pruebas en verde |
+| 8. Ideas como capa opcional | Pendiente de decisión: E ya da 88 % sin ideas |
+
+## Registro de ejecución (2026-11-15)
+
+### Cambios respecto al plan
+
+| Qué | Plan | Hecho | Por qué |
+|---|---|---|---|
+| Mezcla de búsqueda (D10) | Fusión de rangos | Suma ponderada al 50 % de las dos puntuaciones normalizadas | Con 653 ideas verificadas como consulta y su pasaje de origen como acierto, la fusión de rangos acierta el primero en el 71,5 % y la suma ponderada en el 87,9 % (solo significado: 53,8 %; solo palabras: 91,4 %). La prueba favorece a las palabras porque las ideas se redactaron leyendo el pasaje, así que no se deja solo BM25 |
+| Tamaño del pasaje | 150 a 400 palabras | 150 a 300 | El modelo de búsqueda solo lee unas 500 piezas de texto por pasaje |
+| Carpeta del índice (supuesto 5) | Datos del plugin | `Documentos/TheAIWriter/indice` | El hook de edición corre fuera del servidor y tiene que encontrar las claves en el mismo sitio |
+| Claves y Better BibTeX (paso 1.2) | Alias | La primera clave asignada se queda para siempre | Más simple y los borradores ya escritos siguen valiendo |
+| Cita literal | `QuoteChecker` | Comparación palabra a palabra | `QuoteChecker` tolera un 8 % de diferencia: daba por literal una cita con «narrow» donde el PDF dice «broad» |
+| Paso 6.1 | Colección en el Zotero real o carpeta de prueba | Carpeta de Zotero de prueba en el scratchpad | El Zotero real no se toca |
+| Reparto | — | Codex escribió BM25 y la explicación de diferencias de una cita, y hace la retirada de la fase 7 | Pedido por el usuario para repartir el gasto |
+
+### Verificaciones
+
+- Lector contra el Zotero real: 272 obras (4 en la papelera), 100 PDF, colección de 152 obras con 50 PDF, en 0,1 s y sin cambios en `~/Zotero`.
+- Secciones sin modelo en los 12 papers: 7 por el índice del PDF, 5 por el tamaño de letra, ninguno por tamaño. 251 pasajes, indexados en 49 s sin llamadas a Claude.
+- Borrador con errores sembrados: detectados la clave inventada, la cita literal alterada (con la palabra exacta), la frase contraria a la obra (tergiversada) y la frase que la obra no dice (no apoyada). Una llamada al juez, 7 s.
+- Pruebas: 227 en verde antes de la fase 7.
+
+### Medición (fase 6)
+
+Mismo resumen, mismos 12 papers y mismo juez de texto completo que las versiones A–D de `mejoras-pipeline.md`. Claude (Sonnet) escribe en una sesión con las herramientas nuevas y las instrucciones de `/theaiwriter:escribir`, sin el juez de apoyo ni su ronda de correcciones.
+
+| Versión | Frases apoyadas | Parciales | No apoyadas | Búsquedas | Tiempo de escritura |
+|---|---|---|---|---|---|
+| A. Pipeline por párrafos | 24/65 (37 %) | | | | |
+| B. Claude directo, 12 papers en una llamada | 62/94 (66 %) | | | | |
+| C. A demanda sobre ideas | 47/71 (66 %) | | | | |
+| D. A demanda sobre trozos sencillos | 33/61 (54 %) | | | | |
+| E1. Herramientas nuevas | 54/60 (90 %) | 6 | 0 | 10 | 2 min |
+| E2. Herramientas nuevas | 48/56 (86 %) | 7 | 1 | 13 | 1 min 40 s |
+
+Media de E: 88 %. Supera el listón de D5 (60 %).
+
+Lo que esta medición no separa:
+
+- E cambia a la vez los pasajes, la búsqueda y las reglas de cita del comando. Parte de la mejora puede venir de las reglas y no de los pasajes.
+- E1 cita las 12 obras y E2 solo 10.
+- La única frase «no apoyada» (E2, prueba de significación en `chen2024mixed`) es un error del juez de medición, que lee el paper solo hasta las referencias. El dato está en un apéndice posterior (p. 10, pasaje `chen2024mixed#22`): «the scores of ground truth are significantly higher than all model-generated results». El índice de pasajes sí llega a los apéndices.
+- Los 7 + 6 veredictos «parcial» son casi todos inferencias del ensayo colgadas de una cita, no datos inventados.
