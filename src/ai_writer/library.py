@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 PROJECT_FILE = "proyecto.yaml"
-DocumentKind = Literal["perspectiva"]
+DocumentKind = Literal["perspectiva", "resultados"]
 
 
 def documents_dir() -> Path:
@@ -72,5 +72,8 @@ class Project(BaseModel):
         Zotero().item_keys(project.colecciones)
         for sub in ("materiales", "borrador", "revision", "exportacion"):
             (folder / sub).mkdir(parents=True, exist_ok=True)
+        if project.tipo == "resultados":
+            for sub in ("resultados", "analisis"):
+                (folder / sub).mkdir(parents=True, exist_ok=True)
         project.save(folder)
         return project

@@ -1,6 +1,6 @@
 ---
 description: Verifica el borrador: que las citas existan, que las citas literales estén en el PDF y que cada frase coincida con la obra
-argument-hint: "[«sin juez» para comprobar solo claves y citas literales]"
+argument-hint: "[«sin juez» para las comprobaciones que no usan un modelo]"
 ---
 
 Verifica el borrador del documento de la carpeta actual con el servidor MCP `theaiwriter` y explica el resultado en español, de forma breve.
@@ -12,6 +12,7 @@ Petición del usuario: $ARGUMENTS
    - Claves que no existen en Zotero o que están fuera de las colecciones del documento: enuméralas con la frase donde aparecen y propón para cada una una fuente real buscando con `buscar_pasajes`, o marcarla con `[@?]`.
    - Obras citadas sin PDF: sus frases no se pueden comprobar; recomienda adjuntar el PDF en Zotero.
    - Citas literales que no están en el PDF: muestra qué dice el borrador y qué dice el PDF.
+   - En documentos de tipo `resultados`, cifras propias sin origen en los CSV o Markdown de `resultados/`: indica cuántas se comprobaron y enumera las que faltan con su sección y frase. Se comprueban decimales y porcentajes, con redondeo, salvo en Introducción, Métodos, frases con cita, código y destinos de enlaces o imágenes; los enteros sin porcentaje no se comprueban. Esta comprobación no usa un modelo y confirma que la cifra existe, no que la frase la describa bien.
 3. Para el juez, llama a `estado_verificacion` cuando el usuario lo pida o pasados unos minutos. Resume cuántas frases están apoyadas, parciales, tergiversadas y no apoyadas, y enseña las peores con su motivo. Recuerda que el juez es automático y se equivoca a veces: las frases señaladas hay que mirarlas, no borrarlas sin más.
 4. No cambies el borrador sin que el usuario lo confirme.
 

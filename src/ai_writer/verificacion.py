@@ -1,12 +1,13 @@
 """Checks of a draft written from Zotero: do its citations hold?
 
-Three checks, from cheap to costly:
+Four checks, three without a model:
 
 1. every ``[@key]`` is a work of the document's collections (no LLM);
 2. every literal quotation is in the PDF of a work cited with it (no LLM);
 3. every cited sentence says what the cited work says: an LLM judges it against the
    passages of the work closest to the sentence and those consulted while writing
    (one call per paragraph, in a process of its own).
+4. a results document's own figures occur in its CSV or Markdown results (no LLM).
 
 Results go to ``revision/verificacion.json`` and ``revision/verificacion.md``.
 """
@@ -16,6 +17,7 @@ import re
 from pathlib import Path
 
 from ai_writer.background import now, process_alive, spawn_cli
+from ai_writer.cifras import check_figures
 from ai_writer.citations import find_citations
 from ai_writer.consulta import consulted, open_index, scope, write_bibliography
 from ai_writer.library import LibraryError, Project
@@ -318,6 +320,8 @@ def check_document(folder: Path) -> dict:
         "juez": previous.get("juez", {"estado": "sin_lanzar"}),
         "apoyo": previous.get("apoyo", []),
     }
+    if Project.load(folder).tipo == "resultados":
+        data["cifras"] = check_figures(text, Path(folder) / "resultados")
     _save(folder, data)
     return data
 
@@ -391,7 +395,7 @@ def overview(data: dict) -> dict:
     ]
     order = {"tergiversada": 0, "no_apoyada": 1, "parcial": 2}
     worst.sort(key=lambda e: order[e["veredicto"]])
-    return {
+    report = {
         "citas": {
             name: (len(value) if isinstance(value, list) else value)
             for name, value in citations.items()
@@ -414,6 +418,9 @@ def overview(data: dict) -> dict:
         "informe": REPORT,
         "bibliografia": data.get("bibliografia"),
     }
+    if "cifras" in data:
+        report["cifras"] = data["cifras"]
+    return report
 
 
 def markdown(data: dict) -> str:
@@ -464,6 +471,26 @@ def markdown(data: dict) -> str:
                 "  - No hay nada parecido en las obras citadas. Si está traducida, déjala en "
                 "el idioma original o quita las comillas."
             )
+
+    if "cifras" in data:
+        figures = data["cifras"]
+        lines += [
+            "", "## Cifras propias", "",
+            f"{figures['comprobadas']} cifras comprobadas; {figures['con_origen']} con origen.",
+        ]
+        if figures.get("aviso"):
+            lines.append(figures["aviso"])
+        for entry in figures["sin_origen"]:
+            lines.append(
+                f"- **Sin origen: {entry['cifra']}** "
+                f"({entry['seccion'] or 'sin sección'}): «{entry['frase']}»"
+            )
+        if not figures["sin_origen"]:
+            lines.append("Todas las cifras comprobadas tienen origen en los resultados.")
+        lines += [
+            "", "La comprobación confirma que la cifra existe en los resultados, "
+            "no que la frase la describa bien.",
+        ]
 
     lines += ["", "## Apoyo de las frases citadas", ""]
     judge = data.get("juez", {})

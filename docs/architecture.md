@@ -23,6 +23,7 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `sentences.py` | Separa frases, agrupa párrafos citados y elimina marcas de cita de la consulta del juez. |
 | `consulta.py` | Abre el índice, aplica las colecciones del proyecto, registra consultas y genera BibTeX. |
 | `verificacion.py` | Comprueba claves y citas literales, ejecuta el juez y guarda progreso e informes. |
+| `cifras.py` | Comprueba cifras propias contra los CSV y Markdown de resultados, sin modelo. |
 | `background.py` | Lanza la CLI como proceso independiente y consulta si sigue vivo. |
 | `embeddings/__init__.py` | Declara el paquete de búsqueda local. |
 | `embeddings/embedder.py` | Interfaz de embeddings y backend local con fastembed, cargado bajo demanda. |
@@ -62,6 +63,9 @@ flowchart TD
     I --> J
     Q --> J
     J --> R
+    T[resultados/: CSV y Markdown] --> F[Comprobación de cifras propias sin modelo]
+    D --> F
+    F --> R
 ```
 
 Zotero se lee desde una copia temporal de `zotero.sqlite` y, si existe, su WAL. Si la copia es
@@ -121,12 +125,15 @@ documento/
         verificacion.md
         verificacion.log
     exportacion/
+    resultados/       # solo para tipo resultados: tablas CSV, figuras y salidas Markdown
+    analisis/         # solo para tipo resultados: código que produce los resultados
 ```
 
-`Project.create` crea el YAML y las cuatro carpetas. Valida las colecciones contra Zotero antes
-de guardar. Solo tiene los campos `tipo` (literal `perspectiva`), `titulo`, `idioma` (por defecto
-`es`) y `colecciones` (lista vacía: todo Zotero). Al cargar se ignoran campos adicionales de
-proyectos antiguos, incluido `fuente`.
+`Project.create` crea el YAML y las cuatro carpetas comunes; para `resultados` añade `resultados/`
+y `analisis/`. Valida las colecciones contra Zotero antes de guardar. Solo tiene los campos
+`tipo` (`perspectiva` para un ensayo o `resultados` para un artículo con resultados propios),
+`titulo`, `idioma` (por defecto `es`) y `colecciones` (lista vacía: todo Zotero). Al cargar se
+ignoran campos adicionales de proyectos antiguos, incluido `fuente`.
 
 Claude escribe `abstract.md`, `plan.md` y `documento.md` siguiendo los comandos. El plugin escribe
 `referencias.bib` al verificar, con las obras citadas válidas y sus claves del índice.
@@ -139,7 +146,9 @@ lista. El juez usa este registro para incluir contexto que vio Claude.
 `verificacion.json` contiene la fecha `comprobado`, el resultado de `citas`, las `citas_literales`,
 la ruta de la `bibliografia`, el estado y progreso de `juez` y las entradas de `apoyo` por frase y
 obra. `verificacion.md` presenta estos datos al usuario; `verificacion.log` recoge la salida del
-proceso independiente.
+proceso independiente. Solo en documentos de tipo `resultados`, la clave `cifras` añade las cifras
+`comprobadas`, las que tienen origen (`con_origen`), las entradas `sin_origen` con cifra, sección y
+frase, los `ficheros` leídos y un `aviso` si no hay resultados numéricos.
 
 ## Secciones sin modelo
 
@@ -178,7 +187,7 @@ léxicas, se usa solo la puntuación semántica. Los resultados se ordenan por p
 por colecciones y por el máximo de pasajes por obra: ocho resultados y tres por obra por defecto.
 Cada resultado lleva identificador, clave, título, año, sección, páginas y texto literal.
 
-## Las tres comprobaciones
+## Las cuatro comprobaciones
 
 **Claves y ámbito.** `find_citations` acepta `[@clave]`, grupos `[@a; @b]` y localizadores como
 `[@clave, p. 4]`. Cuenta `[@?]` como pendiente y devuelve los grupos mal formados. La verificación
@@ -207,6 +216,22 @@ progreso tras cada párrafo. Conserva los veredictos previos de la misma frase y
 tras un límite de uso; el estado también distingue procesos interrumpidos y errores. El porcentaje
 de apoyo cuenta entradas apoyadas entre las juzgadas, excluyendo las que quedan sin juzgar.
 El juez es automático, puede equivocarse y no sustituye la revisión del artículo.
+
+**Cifras propias.** Solo para `resultados`, `check_figures` comprueba decimales con coma o punto y
+porcentajes contra las celdas numéricas de todos los CSV y los números de todos los Markdown de
+`resultados/`, de forma recursiva. Usa `csv`, con separador coma o punto y coma, y no llama a un
+modelo. Acepta el redondeo de Python y el de mitad hacia arriba, con tolerancia de 1e-9; para
+porcentajes compara también con el valor multiplicado por cien. No comprueba enteros sin porcentaje,
+secciones de segundo nivel cuyo título sin tildes y en minúsculas empiece por `introduc`, `metod`
+o `method`, frases con cita, código ni destinos de enlaces o imágenes. El informe incluye cada
+cifra sin origen con su sección y frase, y recuerda que encontrarla en los resultados no confirma
+que la frase la describa bien.
+
+En este tipo de documento, Claude lee `resultados/` y `analisis/` antes de planificar. Escribe
+Introducción, Métodos, Resultados, Discusión y Conclusión, en el idioma del documento. Toda cifra
+propia procede de las tablas o de un script de `analisis/` cuya salida CSV o Markdown queda en
+`resultados/`, también para los recuentos y diferencias citados. Estas cifras no llevan cita;
+Introducción y Discusión mantienen la búsqueda y las reglas de citas habituales.
 
 ## Decisiones y mediciones
 

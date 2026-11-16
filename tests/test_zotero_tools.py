@@ -160,7 +160,19 @@ def test_project_load_requires_a_project_file(document):
         Project.load(document)
 
 
-@pytest.mark.parametrize("kind", ["resultados", "convocatoria", "desconocido"])
+def test_create_results_document_and_its_folders(document):
+    from ai_writer.library import Project
+
+    created = mcp_server.crear_documento(
+        "resultados", "Resultados propios", colecciones=["Empatía"]
+    )
+    assert "error" not in created
+    assert Project.load(document).tipo == "resultados"
+    for sub in ("materiales", "borrador", "revision", "exportacion", "resultados", "analisis"):
+        assert (document / sub).is_dir()
+
+
+@pytest.mark.parametrize("kind", ["convocatoria", "desconocido"])
 def test_document_tools_reject_unsupported_kinds(document, kind):
     assert "Datos no válidos" in mcp_server.crear_documento(kind, "T")["error"]
     assert not (document / "proyecto.yaml").exists()

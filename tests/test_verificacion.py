@@ -68,6 +68,39 @@ def test_citations_quotes_and_bibliography_without_llm(draft):
     assert "El juez de apoyo no se ha lanzado" in report
 
 
+def test_perspective_has_no_figure_check(draft, monkeypatch):
+    def unexpected(*args):
+        pytest.fail("Las perspectivas no comprueban cifras propias")
+
+    monkeypatch.setattr(verificacion, "check_figures", unexpected)
+    data = verificacion.check_document(draft)
+    saved = json.loads((draft / verificacion.RESULT).read_text(encoding="utf-8"))
+    assert "cifras" not in data and "cifras" not in saved
+    assert "cifras" not in verificacion.overview(data)
+    assert "## Cifras propias" not in verificacion.markdown(data)
+
+
+@pytest.mark.parametrize("figure", ["0,943", "0,953"])
+def test_results_document_checks_and_reports_own_figures(document, figure):  # noqa: F811
+    mcp_server.crear_documento("resultados", "T", colecciones=["Empatía"])
+    (document / DRAFT).write_text(f"## Resultados\nLa precisión fue {figure}.", encoding="utf-8")
+    (document / "resultados/metricas.csv").write_text("modelo,valor\nA,0.943\n", encoding="utf-8")
+    data = verificacion.check_document(document)
+    figures = data["cifras"]
+    assert figures["comprobadas"] == 1
+    assert figures["con_origen"] == (figure == "0,943")
+    saved = json.loads((document / verificacion.RESULT).read_text(encoding="utf-8"))
+    assert saved["cifras"] == verificacion.overview(data)["cifras"] == figures
+    report = (document / verificacion.REPORT).read_text(encoding="utf-8")
+    assert "## Cifras propias" in report and "1 cifras comprobadas" in report
+    assert "no que la frase la describa bien" in report
+    if figure == "0,953":
+        assert "Sin origen: 0,953" in report
+        assert "(Resultados): «La precisión fue 0,953.»" in report
+    else:
+        assert "Todas las cifras comprobadas tienen origen" in report
+
+
 def test_a_single_changed_word_is_not_verbatim():
     text = ("But empathy is a broad concept that refers to the cognitive and emotional reactions of an "
             "individual to the observed experiences of another [3]. It involves co-\nregulation too.")

@@ -1,6 +1,6 @@
 {
   "name": "theaiwriter",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Escribe documentos científicos consultando los PDF de tu Zotero y verifica que cada cita dice lo que dice el paper",
   "author": {
     "name": "mikelval82"

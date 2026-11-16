@@ -30,10 +30,12 @@ Abre Claude Code en la carpeta donde vas a escribir el documento.
 
 1. Ejecuta `/theaiwriter:diagnostico`. Comprueba que se encuentra Zotero y que Claude responde con
    tu cuenta. No crea archivos del documento.
-2. Ejecuta `/theaiwriter:nuevo`. Indica el título, el idioma y las colecciones de Zotero que vas a
-   usar. Una colección incluye sus subcolecciones; si no eliges ninguna, se usa todo Zotero. Crea
-   `proyecto.yaml` y las carpetas `materiales/`, `borrador/`, `revision/` y `exportacion/`, y prepara
-   el índice de pasajes de los PDF seleccionados.
+2. Ejecuta `/theaiwriter:nuevo`. Indica el tipo, el título, el idioma y las colecciones de Zotero
+   que vas a usar. Una colección incluye sus subcolecciones; si no eliges ninguna, se usa todo
+   Zotero. Crea `proyecto.yaml` y las carpetas `materiales/`, `borrador/`, `revision/` y
+   `exportacion/`, y prepara el índice de pasajes de los PDF seleccionados. Puedes elegir un ensayo de perspectiva
+   (`perspectiva`) o un artículo con resultados propios (`resultados`); este último añade
+   `resultados/` para tablas CSV y figuras, y `analisis/` para código.
 3. Pon tu idea y la tesis que quieres defender en `materiales/abstract.md`.
 4. Ejecuta `/theaiwriter:escribir`. Claude explora los artículos, deja el plan en `borrador/plan.md`
    y escribe `borrador/documento.md`, consultando pasajes mientras redacta. Las búsquedas y los
@@ -52,6 +54,11 @@ Abre Claude Code en la carpeta donde vas a escribir el documento.
 Las citas del borrador usan claves como `[@smith2020empathy]`. Si falta una fuente, Claude debe
 marcarla con `[@?]`.
 
+En documentos de tipo `resultados`, Claude lee las tablas y el código antes de planificar y usa
+Introducción, Métodos, Resultados, Discusión y Conclusión, en el idioma del documento. Las cifras
+propias no llevan cita: salen de tablas de `resultados/` o de scripts guardados en `analisis/`
+que escriben allí sus salidas CSV o Markdown, incluidos los recuentos y diferencias citados.
+
 ## Qué comprueba la verificación
 
 1. Que la clave de cada cita existe en Zotero y pertenece a las colecciones del documento. También
@@ -65,11 +72,16 @@ marcarla con `[@?]`.
 3. Que cada frase citada dice lo que dice la obra. Un juez compara la frase con pasajes de la obra
    citada, incluidos los consultados al escribir, y la clasifica como **apoyada**, **parcial**,
    **tergiversada** o **no apoyada**. Si no puede comprobarla, queda **sin juzgar**.
+4. En documentos de tipo `resultados`, que los decimales y porcentajes propios tienen origen en
+   los CSV o Markdown de `resultados/`, incluidos sus subdirectorios. Acepta redondeo y porcentajes
+   expresados como fracciones en las tablas. Excluye Introducción, Métodos, frases con cita,
+   código y destinos de enlaces e imágenes; no comprueba enteros sin porcentaje. Confirma que
+   la cifra existe en los resultados, no que la frase la describa bien.
 
-Las dos primeras comprobaciones no usan un modelo. Por defecto, el juez hace una llamada a Claude
-por párrafo con citas que tenga pasajes para comparar, en segundo plano y con tu cuenta. Guarda el
-progreso tras cada párrafo y puede reanudar la tarea si se alcanza el límite de uso. El juez es
-automático y a veces se equivoca: revisa las frases señaladas y sus fuentes.
+Las dos primeras comprobaciones y la de cifras propias no usan un modelo. Por defecto, el juez hace
+una llamada a Claude por párrafo con citas que tenga pasajes para comparar, en segundo plano y con
+tu cuenta. Guarda el progreso tras cada párrafo y puede reanudar la tarea si se alcanza el límite
+de uso. El juez es automático y a veces se equivoca: revisa las frases señaladas y sus fuentes.
 
 ## Límites conocidos
 
@@ -79,7 +91,6 @@ automático y a veces se equivoca: revisa las frases señaladas y sus fuentes.
 - Las claves de cita las asigna el plugin y quedan en su índice. Para una obra nueva puede adoptar
   una clave existente en Zotero; una vez asignada, conserva la del índice. Usa el archivo generado
   `borrador/referencias.bib` para que las claves coincidan.
-- Solo se admite el tipo de documento `perspectiva`.
 
 ## Dónde guarda cosas
 

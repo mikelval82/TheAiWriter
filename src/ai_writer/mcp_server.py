@@ -116,7 +116,8 @@ def crear_documento(
     colecciones: list[str] | None = None,
 ) -> dict:
     """Crea `proyecto.yaml` y las carpetas materiales/, borrador/, revision/ y exportacion/.
-    `tipo` solo acepta «perspectiva». Las colecciones se validan contra Zotero;
+    `tipo` acepta «perspectiva» o «resultados»; el segundo añade resultados/ para tablas
+    y figuras y analisis/ para código. Las colecciones se validan contra Zotero;
     sin colecciones, el documento usa todas las obras."""
     from ai_writer.consulta import open_index, scope
 
@@ -295,7 +296,8 @@ def validar_citas(texto: str) -> dict:
 def verificar_documento(juez: bool = True) -> dict:
     """Verifica el borrador `borrador/documento.md` de un documento sobre Zotero. Al momento
     y sin gastar llamadas: que cada `[@clave]` exista y esté en las colecciones, y que cada
-    cita literal entre comillas esté tal cual en el PDF; además escribe
+    cita literal entre comillas esté tal cual en el PDF; en documentos de tipo resultados,
+    comprueba también que las cifras propias tengan origen en resultados/. Además escribe
     `borrador/referencias.bib`. Con `juez`, lanza en segundo plano el juez de apoyo, que
     compara cada frase citada con pasajes de la obra (una llamada a Claude por párrafo con
     citas; el resultado se consulta con `estado_verificacion`). El informe queda en
