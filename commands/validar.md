@@ -13,6 +13,7 @@ Petición del usuario: $ARGUMENTS
    - Obras citadas sin PDF: sus frases no se pueden comprobar; recomienda adjuntar el PDF en Zotero.
    - Citas literales que no están en el PDF: muestra qué dice el borrador y qué dice el PDF.
    - En documentos de tipo `resultados`, cifras propias sin origen en los CSV o Markdown de `resultados/`: indica cuántas se comprobaron y enumera las que faltan con su sección y frase. Se comprueban decimales y porcentajes, con redondeo, salvo en Introducción, Métodos, frases con cita, código y destinos de enlaces o imágenes; los enteros sin porcentaje no se comprueban. Esta comprobación no usa un modelo y confirma que la cifra existe, no que la frase la describa bien.
+   - En documentos de tipo `convocatoria`, resume la sección «Convocatoria»: requisitos de la ficha comprobados y fallidos, confirmación del usuario, apartados que faltan o sobran, orden, extensión, campos con límite de caracteres y marcas pendientes. Los avisos de página y los campos «a mano» requieren revisión. La extensión es una estimación por palabras y hay que comprobar las páginas reales en la plantilla oficial.
 3. Para el juez, llama a `estado_verificacion` cuando el usuario lo pida o pasados unos minutos. Resume cuántas frases están apoyadas, parciales, tergiversadas y no apoyadas, y enseña las peores con su motivo. Recuerda que el juez es automático y se equivoca a veces: las frases señaladas hay que mirarlas, no borrarlas sin más.
 4. No cambies el borrador sin que el usuario lo confirme.
 

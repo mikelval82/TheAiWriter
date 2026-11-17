@@ -1,6 +1,6 @@
 [project]
 name = "ai-writer"
-version = "0.3.0"
+version = "0.4.0"
 description = "Claude Code plugin for scientific writing with Zotero PDF passages and citation verification"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,6 +32,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_writer", "config"]
+artifacts = ["src/ai_writer/guias/*.md", "src/ai_writer/guias/*.yaml"]
 
 [tool.ruff]
 line-length = 100

@@ -116,8 +116,9 @@ def crear_documento(
     colecciones: list[str] | None = None,
 ) -> dict:
     """Crea `proyecto.yaml` y las carpetas materiales/, borrador/, revision/ y exportacion/.
-    `tipo` acepta «perspectiva» o «resultados»; el segundo añade resultados/ para tablas
-    y figuras y analisis/ para código. Las colecciones se validan contra Zotero;
+    `tipo` acepta «perspectiva», «resultados» o «convocatoria». Resultados añade resultados/
+    y analisis/; convocatoria añade convocatoria/ y materiales/equipo.md.
+    Las colecciones se validan contra Zotero;
     sin colecciones, el documento usa todas las obras."""
     from ai_writer.consulta import open_index, scope
 
@@ -136,6 +137,38 @@ def crear_documento(
         return _error(error)
     except ValueError as error:
         return {"error": f"Datos no válidos: {error}"}
+
+
+@tool
+def guia_escritura() -> dict:
+    """Lee proyecto.yaml y devuelve la guía de escritura obligatoria para su tipo."""
+    from importlib.resources import files
+
+    try:
+        project = Project.load(_document_folder())
+    except LibraryError as error:
+        return _error(error)
+    except ValueError as error:
+        return {"error": f"Datos no válidos en proyecto.yaml: {error}"}
+    guide = files("ai_writer").joinpath("guias", f"{project.tipo}.md")
+    return {"tipo": project.tipo, "guia": guide.read_text(encoding="utf-8")}
+
+
+@tool
+def comprobar_ficha() -> dict:
+    """Comprueba las citas de la ficha de convocatoria o revista contra sus PDF, sin modelo."""
+    from ai_writer.convocatoria import JOURNAL_FICHA, check_ficha, check_journal_ficha
+
+    folder = _document_folder()
+    try:
+        project = Project.load(folder)
+    except LibraryError as error:
+        return _error(error)
+    except ValueError as error:
+        return {"error": f"Datos no válidos en proyecto.yaml: {error}"}
+    if project.tipo != "convocatoria" and (folder / JOURNAL_FICHA).exists():
+        return check_journal_ficha(folder)
+    return check_ficha(folder)
 
 
 # Zotero: passages to consult while writing
@@ -297,7 +330,8 @@ def verificar_documento(juez: bool = True) -> dict:
     """Verifica el borrador `borrador/documento.md` de un documento sobre Zotero. Al momento
     y sin gastar llamadas: que cada `[@clave]` exista y esté en las colecciones, y que cada
     cita literal entre comillas esté tal cual en el PDF; en documentos de tipo resultados,
-    comprueba también que las cifras propias tengan origen en resultados/. Además escribe
+    comprueba también que las cifras propias tengan origen en resultados/; en convocatorias,
+    comprueba la ficha contra los PDF oficiales y la conformidad del borrador. Además escribe
     `borrador/referencias.bib`. Con `juez`, lanza en segundo plano el juez de apoyo, que
     compara cada frase citada con pasajes de la obra (una llamada a Claude por párrafo con
     citas; el resultado se consulta con `estado_verificacion`). El informe queda en
@@ -323,6 +357,31 @@ def estado_verificacion() -> dict:
 
     try:
         return verificacion.overview(verificacion.status(_document_folder()))
+    except LibraryError as error:
+        return _error(error)
+
+
+@tool
+def revisar_documento() -> dict:
+    """Evalúa el borrador por criterios en segundo plano con una llamada a Claude.
+    No cambia el borrador. El resultado se consulta con `estado_revision` y queda en
+    `revision/revision.md`. Usa la ficha confirmada de convocatoria o revista, o los
+    criterios genéricos del tipo si no hay revista."""
+    from ai_writer import revisor
+
+    try:
+        return revisor.start_review(_document_folder())
+    except LibraryError as error:
+        return _error(error)
+
+
+@tool
+def estado_revision() -> dict:
+    """Devuelve el estado, las prioridades y la evaluación por criterios de la revisión."""
+    from ai_writer import revisor
+
+    try:
+        return revisor.review_status(_document_folder())
     except LibraryError as error:
         return _error(error)
 

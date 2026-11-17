@@ -55,7 +55,7 @@ _BOLD = 16  # PyMuPDF span flag
 # -- cutting a PDF ----------------------------------------------------------
 
 
-def _page_texts(doc) -> list[str]:
+def page_texts(doc) -> list[str]:
     """Text of each page, blocks separated by a blank line so paragraphs can be told apart."""
     pages = []
     for page in doc:
@@ -139,7 +139,7 @@ def _tidy(content: str) -> str:
 def cut_pdf(path: Path) -> dict:
     """PDF pages, section source and passages with section names, pages and text."""
     with fitz.open(path) as doc:
-        pages = _page_texts(doc)
+        pages = page_texts(doc)
         text = "\n\n".join(pages)
         names, source = section_names(doc, text) if text.strip() else ([], "tamaño")
     starts, offset = [], 0

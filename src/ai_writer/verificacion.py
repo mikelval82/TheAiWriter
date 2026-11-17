@@ -1,6 +1,6 @@
 """Checks of a draft written from Zotero: do its citations hold?
 
-Four checks, three without a model:
+Five checks, four without a model:
 
 1. every ``[@key]`` is a work of the document's collections (no LLM);
 2. every literal quotation is in the PDF of a work cited with it (no LLM);
@@ -8,6 +8,7 @@ Four checks, three without a model:
    passages of the work closest to the sentence and those consulted while writing
    (one call per paragraph, in a process of its own).
 4. a results document's own figures occur in its CSV or Markdown results (no LLM).
+5. a call document follows requirements quoted from its official PDFs (no LLM).
 
 Results go to ``revision/verificacion.json`` and ``revision/verificacion.md``.
 """
@@ -19,7 +20,8 @@ from pathlib import Path
 from ai_writer.background import now, process_alive, spawn_cli
 from ai_writer.cifras import check_figures
 from ai_writer.citations import find_citations
-from ai_writer.consulta import consulted, open_index, scope, write_bibliography
+from ai_writer.consulta import BIBLIOGRAPHY, consulted, open_index, scope, write_bibliography
+from ai_writer.convocatoria import CallFicha, check_call, check_ficha, report_lines
 from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 from ai_writer.passages import PassageIndex
@@ -32,7 +34,7 @@ REPORT = "revision/verificacion.md"
 LOG = "revision/verificacion.log"
 VERDICTS = ("apoyada", "parcial", "tergiversada", "no_apoyada")
 CLOSEST_PASSAGES = 4  # passages of the work nearest to the sentence shown to the judge
-CONSULTED_PASSAGES = 2  # plus these many of the ones consulted while writing
+CONSULTED_PASSAGES = 16  # plus up to these many of the ones consulted while writing
 MIN_QUOTE_WORDS = 6
 
 _QUOTED = re.compile(r"«([^»]+)»|“([^”]+)”|\"([^\"]+)\"")
@@ -44,6 +46,10 @@ Decides si los pasajes respaldan lo que la frase atribuye a la obra.
 Reglas:
 - Juzga SOLO con los pasajes mostrados. No uses tu conocimiento del tema ni de la obra.
 - No evalúas el estilo ni la calidad de la frase: solo si la obra dice lo que se le atribuye.
+- Se atribuye a la obra la parte de la frase que su cita cierra. No se le atribuye lo que \
+la frase dice del propio documento (lo que se hará, se propone o se evaluará, sus hipótesis \
+o su valoración) ni lo que se atribuye a otra cita de la misma frase. Si la cita va al final \
+y la frase mezcla lo de la obra con lo propio, juzga solo lo que se presenta como de la obra.
 - «apoyada»: los pasajes afirman esto, con el mismo alcance, magnitud y sentido.
 - «parcial»: los pasajes tratan de esto pero la frase va más allá: generaliza, añade \
 condiciones o presenta como resultado propio de la obra algo que la obra recoge de otra.
@@ -82,6 +88,10 @@ def check_citations(text: str, index: PassageIndex, allowed: set[str] | None) ->
             report["validas"].append(key)
             if not index.passages_of(key):
                 report["sin_pdf"].append(key)  # nothing to check its sentences against
+    if allowed is not None:  # works of the document's collections that the draft never cites
+        cited = {index.work_of(key).item_key for key in report["validas"]}
+        report["en_coleccion"] = len(allowed)
+        report["sin_citar"] = sorted(index.keys.get(item, item) for item in allowed - cited)
     return report
 
 
@@ -113,8 +123,8 @@ def check_quotes(text: str, index: PassageIndex) -> list[dict]:
                 }
                 near = []
                 for key in (key for key in keys if full_text(key)):
-                    verbatim, closest = _verbatim(quote, full_text(key))
-                    if verbatim:
+                    found, closest = verbatim(quote, full_text(key))
+                    if found:
                         entry["encontrada_en"] = key
                         break
                     if closest:
@@ -126,7 +136,7 @@ def check_quotes(text: str, index: PassageIndex) -> list[dict]:
     return entries
 
 
-def _verbatim(quote: str, text: str) -> tuple[bool, dict | None]:
+def verbatim(quote: str, text: str) -> tuple[bool, dict | None]:
     """Is ``quote`` in ``text`` word for word? If not, the closest passage and what differs.
 
     Words the PDF splits or joins and footnote numbers in the paper are not differences;
@@ -152,10 +162,15 @@ def _verbatim(quote: str, text: str) -> tuple[bool, dict | None]:
 def _judge_passages(
     index: PassageIndex, sentence: str, key: str, seen: dict[str, list[int]]
 ) -> list[dict]:
-    """Passages of ``key`` for the judge: the closest to the sentence, then consulted ones."""
+    """Passages of ``key`` for the judge: the closest to the sentence, then consulted ones.
+    Ranked by meaning only: word matches mislead when the draft and the work differ in language."""
     work = index.work_of(key)
     ranked = index.search(
-        sentence_query(sentence), n=10_000, item_keys={work.item_key}, max_per_work=10_000
+        sentence_query(sentence),
+        n=10_000,
+        item_keys={work.item_key},
+        max_per_work=10_000,
+        lexical=False,
     )
     chosen = ranked[:CLOSEST_PASSAGES]
     wanted = {f"{key}#{number}" for number in seen.get(key, [])}
@@ -306,22 +321,31 @@ def _open(folder: Path) -> tuple[str, PassageIndex, set[str] | None]:
     return (folder / DRAFT).read_text(encoding="utf-8"), index, allowed
 
 
-def check_document(folder: Path) -> dict:
-    """Run the checks that need no LLM, write the bibliography and save the result."""
+def check_document(folder: Path, *, bibliography: bool = True) -> dict:
+    """Run checks without an LLM and save them; optionally update the bibliography."""
     text, index, allowed = _open(folder)
     citations = check_citations(text, index, allowed)
-    path = write_bibliography(folder, index, citations["validas"])
+    path = (write_bibliography(folder, index, citations["validas"])
+            if bibliography else Path(folder) / BIBLIOGRAPHY)
     previous = _load(folder)
     data = {
         "comprobado": now(),
         "citas": citations,
         "citas_literales": check_quotes(text, index),
-        "bibliografia": str(path.relative_to(Path(folder))),
+        "bibliografia": str(path.relative_to(Path(folder))) if path.exists() else None,
         "juez": previous.get("juez", {"estado": "sin_lanzar"}),
         "apoyo": previous.get("apoyo", []),
     }
-    if Project.load(folder).tipo == "resultados":
+    kind = Project.load(folder).tipo
+    if kind == "resultados":
         data["cifras"] = check_figures(text, Path(folder) / "resultados")
+    if kind == "convocatoria":
+        ficha = data["ficha"] = check_ficha(folder)
+        data["convocatoria"] = (
+            {"aviso": "No se puede comprobar el borrador: se necesita una ficha sin errores."}
+            if "error" in ficha or ficha["fallidos"]
+            else check_call(text, CallFicha.load(folder))
+        )
     _save(folder, data)
     return data
 
@@ -418,8 +442,9 @@ def overview(data: dict) -> dict:
         "informe": REPORT,
         "bibliografia": data.get("bibliografia"),
     }
-    if "cifras" in data:
-        report["cifras"] = data["cifras"]
+    for key in ("cifras", "ficha", "convocatoria"):
+        if key in data:
+            report[key] = data[key]
     return report
 
 
@@ -447,6 +472,13 @@ def markdown(data: dict) -> str:
             lines.append(f"- **{label}:** " + ", ".join(citations[name]))
     if citations["pendientes"]:
         lines.append(f"- Quedan {citations['pendientes']} citas por buscar (`[@?]`).")
+    if citations.get("sin_citar"):
+        total = citations["en_coleccion"]
+        lines.append(
+            f"- **Cobertura:** el borrador cita {total - len(citations['sin_citar'])} de las "
+            f"{total} obras de sus colecciones. Sin citar: " + ", ".join(citations["sin_citar"])
+            + ". Revisa si alguna aporta algo que falta; no hace falta citarlas todas."
+        )
 
     lines += ["", "## Citas literales", ""]
     missing = [q for q in quotes if not q["encontrada_en"]]
@@ -491,6 +523,9 @@ def markdown(data: dict) -> str:
             "", "La comprobación confirma que la cifra existe en los resultados, "
             "no que la frase la describa bien.",
         ]
+
+    if "ficha" in data:
+        lines.extend(report_lines(data["ficha"], data["convocatoria"]))
 
     lines += ["", "## Apoyo de las frases citadas", ""]
     judge = data.get("juez", {})

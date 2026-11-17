@@ -12,7 +12,7 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 |---|---|
 | `__init__.py` | Declara la versión del paquete. |
 | `__main__.py` | Permite ejecutar la CLI con `python -m ai_writer`. |
-| `main.py` | CLI con `version` y `documento verificar <carpeta>`. |
+| `main.py` | CLI con `version`, `documento verificar` y `documento revisar`. |
 | `mcp_server.py` | Registra las herramientas de diagnóstico, proyecto, consulta y verificación. |
 | `library.py` | `Project`, `LibraryError`, `PROJECT_FILE` y localización de la carpeta de documentos. |
 | `zotero.py` | Lee obras, colecciones y adjuntos desde una copia temporal de la base de Zotero; asigna claves. |
@@ -23,7 +23,10 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `sentences.py` | Separa frases, agrupa párrafos citados y elimina marcas de cita de la consulta del juez. |
 | `consulta.py` | Abre el índice, aplica las colecciones del proyecto, registra consultas y genera BibTeX. |
 | `verificacion.py` | Comprueba claves y citas literales, ejecuta el juez y guarda progreso e informes. |
+| `revisor.py` | Evalúa el borrador por criterios en una llamada aparte, sin reescribir ni puntuar. |
 | `cifras.py` | Comprueba cifras propias contra los CSV y Markdown de resultados, sin modelo. |
+| `convocatoria.py` | Valida fichas de convocatoria y revista y sus citas en PDF; comprueba conformidad, sin modelo. |
+| `guias/` | Guías de escritura Markdown y criterios genéricos YAML por tipo, incluidos en el paquete. |
 | `background.py` | Lanza la CLI como proceso independiente y consulta si sigue vivo. |
 | `embeddings/__init__.py` | Declara el paquete de búsqueda local. |
 | `embeddings/embedder.py` | Interfaz de embeddings y backend local con fastembed, cargado bajo demanda. |
@@ -38,8 +41,10 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `hooks/validar.py` | Tras una edición del borrador, bloquea claves desconocidas, mal formadas o fuera de las colecciones. |
 
 El MCP expone `diagnostico`, `probar_claude`, `crear_documento`, `colecciones_zotero`, `estado_indice`,
-`buscar_pasajes`, `leer_pasaje`, `leer_paginas`, `referencia`, `validar_citas`, `verificar_documento`
-y `estado_verificacion`. La carpeta del documento se obtiene de `CLAUDE_PROJECT_DIR` o del directorio
+`guia_escritura`, `comprobar_ficha`, `buscar_pasajes`, `leer_pasaje`, `leer_paginas`, `referencia`,
+`validar_citas`, `verificar_documento`, `estado_verificacion`, `revisar_documento` y `estado_revision`.
+La carpeta del documento se obtiene
+de `CLAUDE_PROJECT_DIR` o del directorio
 actual. Fuera de un documento, las consultas abarcan todo Zotero.
 
 ## Flujo de datos
@@ -66,6 +71,16 @@ flowchart TD
     T[resultados/: CSV y Markdown] --> F[Comprobación de cifras propias sin modelo]
     D --> F
     F --> R
+    G[Guía del tipo de documento] --> L
+    OCP[convocatoria/: PDF oficiales y ficha.yaml] --> K[Comprobación de ficha y conformidad sin modelo]
+    D --> K
+    K --> R
+    E[materiales/equipo.md] --> L
+    R --> REV[Revisor por criterios en segundo plano]
+    D --> REV
+    OCP --> REV
+    RC[revista/: PDF y ficha confirmada o criterios genéricos del tipo] --> REV
+    REV --> RR[revision/revision.json y .md]
 ```
 
 Zotero se lee desde una copia temporal de `zotero.sqlite` y, si existe, su WAL. Si la copia es
@@ -115,6 +130,7 @@ documento/
     proyecto.yaml
     materiales/
         abstract.md
+        equipo.md     # solo para convocatoria: datos aportados por el usuario
     borrador/
         plan.md
         documento.md
@@ -124,20 +140,42 @@ documento/
         verificacion.json
         verificacion.md
         verificacion.log
+        revision.json
+        revision.md
+        revision.log
     exportacion/
     resultados/       # solo para tipo resultados: tablas CSV, figuras y salidas Markdown
     analisis/         # solo para tipo resultados: código que produce los resultados
+    convocatoria/     # solo para convocatoria: PDF oficiales y ficha.yaml
+    revista/          # opcional para artículos: PDF de normas o guía de revisores y ficha.yaml
 ```
 
 `Project.create` crea el YAML y las cuatro carpetas comunes; para `resultados` añade `resultados/`
-y `analisis/`. Valida las colecciones contra Zotero antes de guardar. Solo tiene los campos
-`tipo` (`perspectiva` para un ensayo o `resultados` para un artículo con resultados propios),
+y `analisis/`; para `convocatoria`, `convocatoria/` y la plantilla `materiales/equipo.md`.
+Conserva esta última si el usuario ya la había escrito. Valida las colecciones contra Zotero antes
+de guardar. Solo tiene los campos
+`tipo` (`perspectiva` para un ensayo, `resultados` para un artículo con resultados propios o
+`convocatoria` para una memoria de solicitud),
 `titulo`, `idioma` (por defecto `es`) y `colecciones` (lista vacía: todo Zotero). Al cargar se
 ignoran campos adicionales de proyectos antiguos, incluido `fuente`.
 
 Claude escribe `abstract.md`, `plan.md` y `documento.md` siguiendo los comandos. El plugin escribe
 `referencias.bib` al verificar, con las obras citadas válidas y sus claves del índice.
 `exportacion/` se crea vacía; no hay un exportador en el código.
+
+Tras leer `proyecto.yaml`, el comando de escritura llama obligatoriamente a `guia_escritura`.
+La herramienta lee con `importlib.resources` el Markdown del tipo en `guias/`; el paquete instalado
+incluye las tres guías. `commands/escribir.md` contiene el flujo común y las guías contienen las
+reglas específicas de preparación, estructura y escritura de cada tipo.
+
+`convocatoria/ficha.yaml` se valida con modelos Pydantic, igual que `Project`. Contiene el nombre,
+`confirmada`, el plazo, los apartados (título, nivel 2 o 3, obligatoriedad, condición, petición y
+criterios), los límites de páginas y caracteres, la regla de idioma y los criterios de evaluación
+con puntuaciones y umbrales. Cada apartado, campo, regla de idioma y criterio lleva `fuente`
+(`fichero`, `pagina` desde 1 y `cita` literal); el límite de páginas también la exige. Sin límite
+de páginas, esa fuente puede omitirse. `palabras_por_pagina` vale 500 por defecto.
+Claude redacta la ficha leyendo los PDF oficiales, la comprueba con `comprobar_ficha` y pide la
+confirmación del usuario antes de poner `confirmada: true` y escribir el borrador.
 
 `consultas.json` contiene `consultas` (texto de cada búsqueda y los identificadores devueltos) y
 `pasajes` (identificadores consultados sin duplicados). Las lecturas añaden pasajes a esta segunda
@@ -149,6 +187,16 @@ obra. `verificacion.md` presenta estos datos al usuario; `verificacion.log` reco
 proceso independiente. Solo en documentos de tipo `resultados`, la clave `cifras` añade las cifras
 `comprobadas`, las que tienen origen (`con_origen`), las entradas `sin_origen` con cifra, sección y
 frase, los `ficheros` leídos y un `aviso` si no hay resultados numéricos.
+Solo para `convocatoria`, `ficha` añade requisitos comprobados, fallidos, avisos y confirmación;
+`convocatoria` añade apartados ausentes o sobrantes, orden, extensión, campos y pendientes.
+Si la ficha no valida o tiene citas fallidas, se devuelve un aviso en lugar de comprobar la
+conformidad. Una ficha sin confirmar se comprueba igualmente y el informe señala que falta
+la confirmación; la guía impide escribir el borrador hasta obtenerla.
+
+`revision.json` contiene `estado`, `pid`, `inicio`, `fin`, `origen`, `criterios`, `prioridades` y
+`error`. Por criterio guarda nombre, nivel (`bien`, `mejorable`, `flojo` o `sin_evaluar` si falta
+una respuesta válida), fortalezas, carencias con apartado y problema, y trabajo para el autor.
+`revision.md` presenta las prioridades y cada criterio; `revision.log` recoge la salida del proceso.
 
 ## Secciones sin modelo
 
@@ -187,12 +235,15 @@ léxicas, se usa solo la puntuación semántica. Los resultados se ordenan por p
 por colecciones y por el máximo de pasajes por obra: ocho resultados y tres por obra por defecto.
 Cada resultado lleva identificador, clave, título, año, sección, páginas y texto literal.
 
-## Las cuatro comprobaciones
+## Las cinco comprobaciones
 
 **Claves y ámbito.** `find_citations` acepta `[@clave]`, grupos `[@a; @b]` y localizadores como
 `[@clave, p. 4]`. Cuenta `[@?]` como pendiente y devuelve los grupos mal formados. La verificación
-separa claves válidas, desconocidas, fuera de las colecciones y sin pasajes indexados. El hook
-hace solo el control de claves y ámbito, sin cargar embeddings. Sus dependencias de script son
+separa claves válidas, desconocidas, fuera de las colecciones y sin pasajes indexados.
+Cuando hay colecciones seleccionadas, `citas.en_coleccion` cuenta sus obras y `citas.sin_citar`
+enumera las claves que el borrador no cita. El informe muestra la cobertura para revisar si alguna
+de esas obras aporta algo que falta; no exige citarlas todas.
+El hook hace solo el control de claves y ámbito, sin cargar embeddings. Sus dependencias son
 `pydantic` y `pyyaml`. Permanece silencioso cuando no hay citas incorrectas, incluso con `[@?]`.
 
 **Citas literales.** Se buscan comillas angulares, inglesas y rectas en las frases con citas. Las
@@ -232,6 +283,50 @@ Introducción, Métodos, Resultados, Discusión y Conclusión, en el idioma del 
 propia procede de las tablas o de un script de `analisis/` cuya salida CSV o Markdown queda en
 `resultados/`, también para los recuentos y diferencias citados. Estas cifras no llevan cita;
 Introducción y Discusión mantienen la búsqueda y las reglas de citas habituales.
+
+**Convocatoria.** Solo para `convocatoria`, `check_ficha` exige que cada fuente sea un PDF dentro
+de `convocatoria/`, extrae su texto por páginas con `passages.page_texts` y reutiliza
+`verificacion.verbatim` para comprobar citas de al menos seis palabras. Cuenta cada fuente como
+un requisito; una cita presente fuera de la página indicada ±1 es un aviso, no un fallo.
+No usa el índice de Zotero ni un modelo.
+
+`check_call` compara encabezados de nivel 2 y 3 por igualdad, sin tildes, mayúsculas, numeración
+inicial ni puntuación final, y con espacios compactados. Informa de apartados obligatorios que
+faltan, condicionales ausentes con su condición, encabezados sobrantes y el primer apartado fuera
+de orden. Cuenta palabras sin títulos de nivel 1 ni bloques de código; estima páginas con un
+decimal y avisa desde el 90 % del máximo. Los campos asociados a un apartado cuentan caracteres
+del cuerpo Markdown, con espacios y texto de subsecciones, sin encabezados ni bloques de código;
+un apartado ausente se informa como tal. Los campos sin apartado quedan en `a_mano`.
+Las marcas `[PENDIENTE: …]` se informan con su sección. La sección «Convocatoria» del informe
+recuerda que hay que comprobar las páginas reales en la plantilla oficial.
+
+La guía exige un presupuesto de palabras por apartado y una tabla de criterios y secciones
+que los cubren. El borrador conserva títulos, niveles y orden de la ficha; el plan justifica los
+apartados condicionales omitidos. Equipo, resultados previos, recursos, cronograma y presupuesto
+proceden solo de `materiales/equipo.md`, con marcas pendientes para los datos que falten.
+El estado del arte y la motivación conservan las búsquedas y citas comunes; las hipótesis no se
+presentan como resultados prometidos.
+
+## Revisión por criterios
+
+`review_criteria` usa la ficha de convocatoria o, para los artículos que la tengan, la ficha de
+revista. Ambas deben validar, tener criterios, estar confirmadas y no tener citas fallidas.
+`JournalFicha` guarda `revista`, `confirmada` y al menos un criterio con nombre, descripción,
+máximo y umbral opcionales y fuente. `check_sources` comparte la comprobación de citas literales
+entre `convocatoria/` y `revista/`, sin modelo. Sin revista, los criterios se leen con
+`importlib.resources` de `guias/criterios-<tipo>.yaml`.
+
+`start_review` comprueba los criterios antes de lanzar `documento revisar` con `spawn_cli`.
+`run_review` envía el borrador entero, los criterios y un resumen de verificación en una sola
+llamada, sin el contexto de la sesión que escribió. Actualiza las comprobaciones deterministas
+con `check_document(bibliography=False)`, sin escribir en `borrador/`, y usa `summary` para el
+apoyo previo del juez. Incluye cobertura, frases que revisar y, en convocatorias, apartados que
+faltan, extensión y número de pendientes. No vuelve a juzgar las citas.
+
+El resultado propone trabajo, sin reescribir ni dar notas. Los pendientes cuentan como datos que
+conseguir; reconocer limitaciones y riesgos es una fortaleza. La evaluación es automática y
+orientativa y no sustituye a la de la convocatoria o revista. Los estados distinguen ejecución,
+finalización, límite de uso, error e interrupción si murió el proceso.
 
 ## Decisiones y mediciones
 

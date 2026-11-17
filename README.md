@@ -33,12 +33,15 @@ Abre Claude Code en la carpeta donde vas a escribir el documento.
 2. Ejecuta `/theaiwriter:nuevo`. Indica el tipo, el título, el idioma y las colecciones de Zotero
    que vas a usar. Una colección incluye sus subcolecciones; si no eliges ninguna, se usa todo
    Zotero. Crea `proyecto.yaml` y las carpetas `materiales/`, `borrador/`, `revision/` y
-   `exportacion/`, y prepara el índice de pasajes de los PDF seleccionados. Puedes elegir un ensayo de perspectiva
-   (`perspectiva`) o un artículo con resultados propios (`resultados`); este último añade
-   `resultados/` para tablas CSV y figuras, y `analisis/` para código.
+   `exportacion/`, y prepara el índice de pasajes de los PDF seleccionados. Puedes elegir un
+   ensayo de perspectiva (`perspectiva`), un artículo con resultados propios (`resultados`) o
+   una memoria para una convocatoria (`convocatoria`). Resultados añade `resultados/` para
+   tablas CSV y figuras, y `analisis/` para código. Convocatoria añade `convocatoria/` para los
+   PDF oficiales y una plantilla en `materiales/equipo.md` para los datos del equipo.
 3. Pon tu idea y la tesis que quieres defender en `materiales/abstract.md`.
-4. Ejecuta `/theaiwriter:escribir`. Claude explora los artículos, deja el plan en `borrador/plan.md`
-   y escribe `borrador/documento.md`, consultando pasajes mientras redacta. Las búsquedas y los
+4. Ejecuta `/theaiwriter:escribir`. Claude lee la guía del tipo con `guia_escritura`, explora los
+   artículos, deja el plan en `borrador/plan.md` y escribe `borrador/documento.md`, consultando
+   pasajes mientras redacta. Las búsquedas y los
    pasajes consultados quedan en `revision/consultas.json`. Al terminar lanza la verificación,
    que escribe `borrador/referencias.bib` y `revision/verificacion.md`.
 5. Ejecuta `/theaiwriter:validar` para volver a comprobar el borrador. Actualiza la bibliografía y
@@ -50,6 +53,11 @@ Abre Claude Code en la carpeta donde vas a escribir el documento.
 7. Ejecuta `/theaiwriter:biblioteca` para consultar las colecciones de Zotero y el estado del
    índice. Puedes pedirle que actualice el índice; los cambios se guardan en la carpeta del
    índice, fuera del documento. Los artículos y las colecciones se gestionan en Zotero.
+8. Ejecuta `/theaiwriter:revisar` para evaluar el borrador por criterios y saber dónde trabajar
+   más. Hace una llamada a Claude en segundo plano, con tu cuenta, y deja prioridades,
+   fortalezas, carencias por apartado y trabajo concreto en `revision/revision.md` y `.json`.
+   No reescribe ni cambia el borrador y no da una nota numérica. Conviene pasar antes
+   `/theaiwriter:validar`: el revisor usa su resultado de apoyo de las citas.
 
 Las citas del borrador usan claves como `[@smith2020empathy]`. Si falta una fuente, Claude debe
 marcarla con `[@?]`.
@@ -59,11 +67,32 @@ Introducción, Métodos, Resultados, Discusión y Conclusión, en el idioma del 
 propias no llevan cita: salen de tablas de `resultados/` o de scripts guardados en `analisis/`
 que escriben allí sus salidas CSV o Markdown, incluidos los recuentos y diferencias citados.
 
+En documentos de tipo `convocatoria`, pon los PDF oficiales (convocatoria, instrucciones y
+plantilla) en `convocatoria/` y completa `materiales/equipo.md`: personas y su papel, resultados
+previos, recursos, presupuesto y duración previstos. Claude redacta `convocatoria/ficha.yaml`
+desde los PDF y la comprueba con `comprobar_ficha`. Cada requisito lleva fichero, página y una
+cita literal de al menos seis palabras. Debes confirmar la ficha antes de que escriba el
+borrador. El plan reparte palabras entre apartados y relaciona los criterios con las secciones.
+El borrador sigue los títulos, niveles y orden oficiales; lo que falte del equipo se marca
+`[PENDIENTE: …]`, sin inventar datos ni prometer resultados.
+
+Las tres guías están en `src/ai_writer/guias/`, incluidas en el paquete instalado. El comando
+de escritura conserva la preparación, las búsquedas, las citas y la verificación comunes.
+
+El revisor usa los criterios de la ficha confirmada de la convocatoria. Para dirigir un artículo
+a una revista, deja sus normas de autores o guía de revisores en PDF en `revista/`: Claude redacta
+`revista/ficha.yaml`, comprueba las citas literales de sus criterios y pide tu confirmación.
+Sin revista, usa criterios genéricos de perspectiva o resultados incluidos en el paquete.
+La evaluación es automática y orientativa; no sustituye a la de la convocatoria o revista.
+
 ## Qué comprueba la verificación
 
 1. Que la clave de cada cita existe en Zotero y pertenece a las colecciones del documento. También
    señala citas mal formadas, fuentes pendientes y obras sin PDF indexado. Tras editar el borrador,
    un hook bloquea las citas desconocidas, mal formadas o ajenas a sus colecciones.
+   Si hay colecciones seleccionadas, muestra cuántas obras contienen (`citas.en_coleccion`) y
+   cuáles quedan sin citar (`citas.sin_citar`), para revisar si alguna aporta algo que falta;
+   no hace falta citarlas todas.
 2. Que una cita literal entre «» aparece palabra por palabra en el PDF de alguna de las obras
    citadas en esa frase. Se comprueban las citas de seis palabras o más; también se reconocen
    comillas inglesas y rectas. Se normalizan diferencias de extracción del PDF, como guiones de
@@ -77,9 +106,16 @@ que escriben allí sus salidas CSV o Markdown, incluidos los recuentos y diferen
    expresados como fracciones en las tablas. Excluye Introducción, Métodos, frases con cita,
    código y destinos de enlaces e imágenes; no comprueba enteros sin porcentaje. Confirma que
    la cifra existe en los resultados, no que la frase la describa bien.
+5. En documentos de tipo `convocatoria`, que las citas de la ficha están en sus PDF oficiales
+   y que el borrador cumple sus apartados, orden, extensión estimada y límites de caracteres.
+   Una cita en otra página, fuera del margen de ±1, produce un aviso. El informe muestra si la
+   ficha está confirmada, los apartados condicionales ausentes, los campos que hay que comprobar
+   a mano y las marcas pendientes. La extensión es una estimación por palabras: hay que comprobar
+   las páginas reales en la plantilla oficial.
 
-Las dos primeras comprobaciones y la de cifras propias no usan un modelo. Por defecto, el juez hace
-una llamada a Claude por párrafo con citas que tenga pasajes para comparar, en segundo plano y con
+Las dos primeras comprobaciones, la de cifras propias y la de convocatoria no usan un modelo.
+Por defecto, el juez hace una llamada a Claude por párrafo con citas que tenga pasajes para
+comparar, en segundo plano y con
 tu cuenta. Guarda el progreso tras cada párrafo y puede reanudar la tarea si se alcanza el límite
 de uso. El juez es automático y a veces se equivoca: revisa las frases señaladas y sus fuentes.
 
@@ -112,20 +148,21 @@ uv sync --extra dev
 .venv/bin/python -m pytest -q
 ```
 
-La CLI conserva solo `version` y `documento verificar <carpeta>`. Este último ejecuta el juez; lo
-lanza el plugin en segundo plano.
+La CLI ofrece `version`, `documento verificar <carpeta>` para el juez de apoyo y
+`documento revisar <carpeta>` para el revisor por criterios. El plugin lanza ambos en segundo plano.
 
 ```bash
 PYTHONPATH=src:. .venv/bin/python -m ai_writer version
 PYTHONPATH=src:. .venv/bin/python -m ai_writer documento verificar /ruta/al/documento
+PYTHONPATH=src:. .venv/bin/python -m ai_writer documento revisar /ruta/al/documento
 ```
 
 La configuración se lee del entorno y del archivo `.env` del repositorio, si existe:
 
 | Variable | Uso y valor por defecto |
 |---|---|
-| `DEFAULT_MODEL` | Modelo del juez: `sonnet` |
-| `LLM_BACKEND` | Backend del juez: `claude-code` o `codex`; por defecto, `claude-code` |
+| `DEFAULT_MODEL` | Modelo del juez y del revisor: `sonnet` |
+| `LLM_BACKEND` | Backend del juez y del revisor: `claude-code` o `codex`; por defecto, `claude-code` |
 | `CLAUDE_BIN` | Ejecutable de Claude Code: `claude` |
 | `CODEX_BIN` | Ejecutable de Codex: `codex` |
 | `CODEX_EFFORT` | Esfuerzo del backend Codex: `low` |

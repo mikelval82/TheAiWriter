@@ -55,6 +55,7 @@ def test_citations_quotes_and_bibliography_without_llm(draft):
     assert data["citas"] == {
         "validas": ["smith2020empathy"], "desconocidas": ["nadie2000"],
         "fuera_de_las_colecciones": ["lee2021robots"], "sin_pdf": [], "mal_formadas": [], "pendientes": 1,
+        "en_coleccion": 1, "sin_citar": [],
     }
     found, altered = data["citas_literales"]
     assert found["encontrada_en"] == "smith2020empathy"
@@ -66,6 +67,16 @@ def test_citations_quotes_and_bibliography_without_llm(draft):
     assert "No existen en Zotero:** nadie2000" in report
     assert "El borrador dice «ignore» y el PDF dice «depend on»" in report
     assert "El juez de apoyo no se ha lanzado" in report
+
+
+def test_works_of_the_collection_left_uncited_are_reported(draft):
+    (draft / DRAFT).write_text("# T\n\nLos robots navegan [@lee2021robots].\n", encoding="utf-8")
+
+    data = verificacion.check_document(draft)
+
+    assert data["citas"]["sin_citar"] == ["smith2020empathy"]
+    report = (draft / verificacion.REPORT).read_text(encoding="utf-8")
+    assert "cita 0 de las 1 obras de sus colecciones. Sin citar: smith2020empathy." in report
 
 
 def test_perspective_has_no_figure_check(draft, monkeypatch):
@@ -104,13 +115,13 @@ def test_results_document_checks_and_reports_own_figures(document, figure):  # n
 def test_a_single_changed_word_is_not_verbatim():
     text = ("But empathy is a broad concept that refers to the cognitive and emotional reactions of an "
             "individual to the observed experiences of another [3]. It involves co-\nregulation too.")
-    assert verificacion._verbatim("empathy is a broad concept that refers to the cognitive", text) == (True, None)
-    assert verificacion._verbatim("experiences of another. It involves co-regulation too", text)[0]  # footnote, hyphen
-    assert verificacion._verbatim("empathy is a broad concept … reactions of an individual", text)[0]
-    verbatim, closest = verificacion._verbatim(
+    assert verificacion.verbatim("empathy is a broad concept that refers to the cognitive", text) == (True, None)
+    assert verificacion.verbatim("experiences of another. It involves co-regulation too", text)[0]  # footnote, hyphen
+    assert verificacion.verbatim("empathy is a broad concept … reactions of an individual", text)[0]
+    verbatim, closest = verificacion.verbatim(
         "empathy is a narrow concept that refers to the cognitive and emotional reactions of an individual", text)
     assert not verbatim and closest["diferencias"] == [{"cita": "narrow", "texto": "broad"}]
-    assert verificacion._verbatim("nothing here resembles the paper in any way at all", text) == (False, None)
+    assert verificacion.verbatim("nothing here resembles the paper in any way at all", text) == (False, None)
 
 
 def test_judge_sees_passages_of_the_cited_work(draft):
@@ -177,6 +188,17 @@ def test_sentences_are_not_split_inside_citations_or_on_abbreviations():
     ]
 
 
+def test_abbreviated_genus_names_do_not_end_a_sentence():
+    text = "Mejor exactitud en *E. coli* [@her2018pan]. Y en S. aureus también [@a2020x]. Vitamina C. Fin."
+
+    assert split_sentences(text) == [
+        "Mejor exactitud en *E. coli* [@her2018pan].",
+        "Y en S. aureus también [@a2020x].",
+        "Vitamina C.",
+        "Fin.",
+    ]
+
+
 def test_a_citation_after_the_full_stop_stays_with_its_sentence():
     assert split_sentences("Sienten. [@a2020x] Otra cosa.") == ["Sienten. [@a2020x]", "Otra cosa."]
 
@@ -221,3 +243,51 @@ def test_cli_dispatches_document_verification(tmp_path, monkeypatch, capsys):
     main(["documento", "verificar", str(tmp_path)])
     assert calls == [tmp_path]
     assert "'apoyo': None" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("kind", ["perspectiva", "resultados"])
+def test_other_kinds_have_no_call_checks(document, kind):  # noqa: F811
+    mcp_server.crear_documento(kind, "T")
+    (document / DRAFT).write_text("## Motivación\nUna idea.", encoding="utf-8")
+    data = verificacion.check_document(document)
+    for report in (data, verificacion.overview(data)):
+        assert "ficha" not in report and "convocatoria" not in report
+    assert "## Convocatoria" not in verificacion.markdown(data)
+
+
+@pytest.mark.parametrize("state", ["absent", "invalid", "failed", "unconfirmed", "confirmed"])
+def test_call_verification_with_and_without_valid_ficha(document, state):  # noqa: F811
+    from tests.fake_zotero import make_pdf
+    from tests.test_convocatoria import QUOTE, SOURCE, save_ficha
+
+    mcp_server.crear_documento("convocatoria", "T")
+    (document / DRAFT).write_text("## Motivación\n[PENDIENTE: datos del equipo]", encoding="utf-8")
+    if state != "absent":
+        make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
+        ficha = {
+            "convocatoria": "Prueba", "confirmada": state == "confirmed",
+            "apartados": [{"titulo": "Impacto", "nivel": 2, "obligatorio": True,
+                           "pide": "Explicar impacto", "fuente": dict(SOURCE)}],
+            "limites": {"paginas": 20, "fuente": dict(SOURCE)},
+        }
+        if state == "invalid":
+            del ficha["apartados"][0]["fuente"]
+        if state == "failed":
+            ficha["apartados"][0]["fuente"]["cita"] = "An invented requirement absent from this document"
+        save_ficha(document, ficha)
+    data = verificacion.check_document(document)
+    saved = json.loads((document / verificacion.RESULT).read_text(encoding="utf-8"))
+    overview = verificacion.overview(data)
+    for name in ("ficha", "convocatoria"):
+        assert saved[name] == data[name] == overview[name]
+    assert mcp_server.comprobar_ficha() == data["ficha"]
+    report = verificacion.markdown(data)
+    assert "## Convocatoria" in report and "plantilla oficial" in report
+    if state in ("absent", "invalid", "failed"):
+        assert "aviso" in data["convocatoria"]
+    else:
+        assert data["ficha"]["confirmada"] == (state == "confirmed")
+        assert data["convocatoria"]["faltan"] == ["Impacto"]
+        for label in ("2 de 2 requisitos", "Confirmada:", "Impacto", "Orden:", "Extensión:",
+                      "Campos", "Pendientes: 1", "[PENDIENTE: datos del equipo]"):
+            assert label in report

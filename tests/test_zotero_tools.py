@@ -172,7 +172,7 @@ def test_create_results_document_and_its_folders(document):
         assert (document / sub).is_dir()
 
 
-@pytest.mark.parametrize("kind", ["convocatoria", "desconocido"])
+@pytest.mark.parametrize("kind", ["desconocido"])
 def test_document_tools_reject_unsupported_kinds(document, kind):
     assert "Datos no válidos" in mcp_server.crear_documento(kind, "T")["error"]
     assert not (document / "proyecto.yaml").exists()
@@ -186,3 +186,41 @@ def test_tools_work_outside_a_document(document):
     unknown = mcp_server.validar_citas("x [@nadie2000]")
     assert unknown["correcto"] is False
     assert unknown["desconocidas"] == ["nadie2000"]
+
+
+def test_create_call_document_and_team_template(document):
+    from ai_writer.library import Project
+
+    created = mcp_server.crear_documento("convocatoria", "Memoria", colecciones=["Empatía"])
+    assert "error" not in created
+    assert Project.load(document).tipo == "convocatoria"
+    assert (document / "convocatoria").is_dir()
+    template = (document / "materiales/equipo.md").read_text(encoding="utf-8")
+    for label in ("Personas", "Resultados previos", "Recursos", "Presupuesto", "Duración",
+                  "Solo se usará lo que esté escrito aquí"):
+        assert label in template
+
+
+def test_create_call_preserves_existing_team_notes(document):
+    path = document / "materiales/equipo.md"
+    path.parent.mkdir()
+    path.write_text("Datos del usuario", encoding="utf-8")
+    mcp_server.crear_documento("convocatoria", "Memoria")
+    assert path.read_text(encoding="utf-8") == "Datos del usuario"
+
+
+@pytest.mark.parametrize("kind", ["perspectiva", "resultados", "convocatoria"])
+def test_writing_guide_matches_document_kind(document, kind):
+    from importlib.resources import files
+
+    mcp_server.crear_documento(kind, "T")
+    guide = mcp_server.guia_escritura()
+    resource = files("ai_writer").joinpath("guias", f"{kind}.md")
+    assert resource.is_file()
+    assert guide == {"tipo": kind, "guia": resource.read_text(encoding="utf-8")}
+    assert guide["guia"].strip() and f"# Guía de escritura: {kind}" in guide["guia"]
+
+
+def test_guide_and_call_check_require_a_document(document):
+    assert "falta proyecto.yaml" in mcp_server.guia_escritura()["error"]
+    assert "falta proyecto.yaml" in mcp_server.comprobar_ficha()["error"]

@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 PROJECT_FILE = "proyecto.yaml"
-DocumentKind = Literal["perspectiva", "resultados"]
+DocumentKind = Literal["perspectiva", "resultados", "convocatoria"]
 
 
 def documents_dir() -> Path:
@@ -75,5 +75,20 @@ class Project(BaseModel):
         if project.tipo == "resultados":
             for sub in ("resultados", "analisis"):
                 (folder / sub).mkdir(parents=True, exist_ok=True)
+        if project.tipo == "convocatoria":
+            (folder / "convocatoria").mkdir(parents=True, exist_ok=True)
+            team = folder / "materiales" / "equipo.md"
+            if not team.exists():
+                team.write_text(
+                    "# Datos del equipo\n\n"
+                    "Solo se usará lo que esté escrito aquí. Completa los datos que conozcas; "
+                    "lo que falte se marcará como pendiente en el borrador.\n\n"
+                    "## Personas del equipo y su papel\n\n"
+                    "## Resultados previos\n\n"
+                    "## Recursos disponibles\n\n"
+                    "## Presupuesto previsto\n\n"
+                    "## Duración y cronograma previstos\n",
+                    encoding="utf-8",
+                )
         project.save(folder)
         return project
