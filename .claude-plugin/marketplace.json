@@ -1,0 +1,28 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "theaiwriter",
+  "description": "Escribe documentos científicos consultando los PDF de tu Zotero y verifica que cada cita dice lo que dice el paper",
+  "owner": {
+    "name": "mikelval82"
+  },
+  "plugins": [
+    {
+      "name": "theaiwriter",
+      "description": "Claude escribe consultando pasajes de los PDF de tu Zotero, con citas verificadas",
+      "source": "./"
+    },
+    {
+      "name": "ai-research-writing",
+      "description": "Skill de jin-s13 para escribir papers con resultados y verificar cifras y citas (MIT)",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/jin-s13/ai-research-writing-skill.git",
+        "sha": "e8b5de964737350757b5b17d8a658a22943c9595"
+      },
+      "strict": false,
+      "skills": [
+        "./"
+      ]
+    }
+  ]
+}

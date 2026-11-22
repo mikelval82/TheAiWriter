@@ -1,0 +1,10 @@
+- nombre: Pregunta y aportación
+  descripcion: La pregunta de investigación es explícita y está justificada. El documento explica qué conocimiento aportan sus resultados respecto a esa pregunta.
+- nombre: Métodos reproducibles
+  descripcion: Describe los datos, procedimientos y análisis con el detalle necesario para reproducir el trabajo. Señala los datos o decisiones metodológicas que aún faltan.
+- nombre: Resultados claros y con origen en los datos
+  descripcion: Presenta los hallazgos de forma ordenada y con origen identificable en los datos y análisis propios. Separa los resultados de su interpretación y no inventa información ausente.
+- nombre: Discusión proporcionada a los datos, con limitaciones
+  descripcion: Las conclusiones respetan el alcance de los datos y el diseño del estudio. Expone las limitaciones, la incertidumbre y los riesgos de interpretación.
+- nombre: Relación con la literatura
+  descripcion: Sitúa la pregunta y los hallazgos en relación con las obras consultadas. Explica coincidencias, diferencias y posibles implicaciones sin atribuir a las fuentes más de lo verificado.

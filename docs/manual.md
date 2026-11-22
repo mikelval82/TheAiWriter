@@ -1,0 +1,116 @@
+# Manual de TheAIWriter
+
+Claude escribe en tu sesión de Claude Code. El plugin le da acceso a los PDF de tu Zotero y comprueba lo que escribe. Todo queda en la carpeta del documento.
+
+## Cómo se conecta
+
+```mermaid
+flowchart LR
+    Z["Zotero<br/>obras y sus PDF<br/>(solo lectura)"] --> I["Índice de pasajes<br/>en tu ordenador"]
+    I --> P
+    subgraph C["Claude Code + plugin"]
+        P["Planifica y escribe<br/>nuevo, escribir, corregir"]
+        R["Comprueba y revisa<br/>comprobar, revisar"]
+    end
+    I --> R
+    subgraph D["Carpeta del documento"]
+        E["Lo que pones tú<br/>materiales/, resultados/, convocatoria/, revista/"]
+        B["borrador/documento.md"]
+        F["informes/*.md"]
+    end
+    E --> P
+    P --> B
+    B --> R
+    R --> F
+    B -->|Pandoc| W["Word o LibreOffice<br/>exportacion/"]
+```
+
+## El camino: qué entra y qué sale
+
+| Paso | Entra | Sale |
+| --- | --- | --- |
+| `/theaiwriter:nuevo` | Título, tipo, idioma y colecciones de Zotero | `proyecto.yaml`, carpetas y plantillas con preguntas |
+| `/theaiwriter:escribir con pausa` | `materiales/abstract.md` y lo propio del tipo | `borrador/plan.md`, `documento.md`, `referencias.bib` |
+| `/theaiwriter:comprobar` | El borrador y los PDF de Zotero | `informes/comprobacion.md` |
+| `/theaiwriter:corregir` | El informe y tu elección: todas, «1, 3» o ninguna | `documento.md` corregido |
+| `/theaiwriter:revisar` | El borrador y los criterios de la convocatoria o revista | `informes/revision.md` |
+| Pandoc | `documento.md`, `referencias.bib`, estilo CSL y plantilla | `exportacion/documento.docx` u `.odt` |
+
+En cualquier momento, `/theaiwriter:estado` dice dónde estás y qué toca, y `/theaiwriter:diagnostico` comprueba la instalación y la biblioteca.
+
+## Antes de empezar
+
+- **Claude Code**, en la aplicación de escritorio o en la terminal, con tu cuenta.
+- **Zotero** en el mismo ordenador, con los PDF adjuntos a las obras. Las obras sin PDF no se pueden consultar ni comprobar, y los PDF escaneados sin texto tampoco.
+- **uv** instalado.
+
+```text
+/plugin marketplace add mikelval82/TheAiWriter
+/plugin install theaiwriter@theaiwriter
+```
+
+Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se indexan artículos se descarga el modelo de búsqueda, de unos cientos de MB.
+
+## Uso, paso a paso
+
+1. **Crea el documento.** Abre Claude Code en una carpeta vacía y escribe `/theaiwriter:nuevo` con tu idea. Te propone título, tipo, idioma y colección; contesta «vale» o di qué cambias.
+2. **Rellena los materiales.** Contesta las preguntas de `materiales/abstract.md` y añade los archivos de tu tipo de documento. `/theaiwriter:estado` te dice lo que falta.
+3. **Escribe.** `/theaiwriter:escribir con pausa` deja el plan en `borrador/plan.md` y espera. Léelo, pide cambios y contesta «aprobado». Al acabar comprueba el borrador.
+4. **Lee la comprobación y corrige.** Las comprobaciones sin modelo salen al momento. El juez tarda unos minutos y Claude te avisa en tu siguiente mensaje. Mira las frases tergiversadas, no apoyadas y parciales, y usa `/theaiwriter:corregir`. Después, `/theaiwriter:comprobar` vuelve a juzgar las frases cambiadas.
+5. **Revisa por criterios.** `/theaiwriter:revisar`, o con el nombre de una revista y sus normas en `revista/`. Si hay ficha de criterios, te la enseña y espera tu «sí».
+6. **Pásalo a Word** con la [guía de exportación](exportar.md).
+
+**Qué gasta de tu cuenta.** La conversación con Claude, sobre todo al escribir. Además, el juez hace una llamada por cada párrafo con citas y el revisor una por revisión. «Comprobar sin juez», `estado` y el índice no lanzan llamadas aparte.
+
+## Archivos de entrada
+
+| Archivo o carpeta | Perspectiva | Resultados | Convocatoria | Qué contiene |
+| --- | --- | --- | --- | --- |
+| Colección de Zotero | sí | sí | sí | Las obras que se pueden citar, con su PDF. Si no eliges ninguna, se usa todo Zotero |
+| `materiales/abstract.md` | sí | sí | sí | Tus respuestas a las preguntas de la plantilla |
+| `resultados/` | — | sí | — | Tablas CSV (al menos una), figuras y salidas en Markdown. De aquí salen todas tus cifras |
+| `analisis/` | — | opcional | — | El código que produjo los resultados |
+| `materiales/equipo.md` | — | — | sí | Personas y papel, resultados previos, recursos, presupuesto y duración. Lo que falte se marca `[PENDIENTE]`, no se inventa |
+| `convocatoria/*.pdf` | — | — | sí | Convocatoria, instrucciones de la memoria y plantilla oficiales |
+| `revista/*.pdf` | opcional | opcional | — | Guía para revisores o normas de autores. Vale una web guardada con Ctrl+P, si el texto se puede seleccionar |
+
+## Archivos de salida
+
+| Archivo | Lo escribe | Para qué sirve |
+| --- | --- | --- |
+| `proyecto.yaml` | nuevo | Tipo, título, idioma y colecciones del documento |
+| `borrador/plan.md` | escribir | Secciones, qué sostiene cada una y con qué obras |
+| `borrador/documento.md` | escribir, corregir | El texto, con citas como `[@smith2020empathy]`. Puedes editarlo. `[@?]` marca una fuente por buscar |
+| `borrador/referencias.bib` | comprobar | La bibliografía citada, para Pandoc. Se regenera sola |
+| `convocatoria/ficha.yaml`, `revista/ficha.yaml` | escribir, revisar | Requisitos o criterios sacados de los PDF, cada uno con página y cita literal. Los confirmas tú |
+| `informes/comprobacion.md` | comprobar | Citas, literalidad, cobertura, cifras, conformidad con la convocatoria y veredicto del juez |
+| `informes/revision.md` | revisar | Tres prioridades y, por criterio, nivel (bien, mejorable o flojo), fortalezas, carencias y trabajo |
+| `exportacion/documento-zotero.md` | si pides «prepara las citas vivas» | Copia del borrador con las claves de Better BibTeX |
+| `exportacion/documento.docx` | Pandoc | El documento final (u `.odt`) |
+
+En `informes/` hay también archivos internos que no hace falta abrir: `consultas.json`, `avisos.json`, los `.json` de cada informe y los `.log`. El índice de pasajes está en `Documentos/TheAIWriter/indice`.
+
+## Qué comprueba y hasta dónde
+
+| Comprobación | Usa un modelo | Qué mira |
+| --- | --- | --- |
+| Citas | No | Que la obra exista en Zotero y esté en tus colecciones, y cuáles no has citado |
+| Citas literales | No | Que lo que va entre «» esté palabra por palabra en el PDF (6 palabras o más) |
+| Frases sin cita | No | Las que parecen hablar de una obra y no la citan. Avisa de más y puede saltarse alguna |
+| Cifras propias | No | En resultados: decimales y porcentajes que no están en tus tablas |
+| Convocatoria | No | Apartados, orden, extensión estimada y límites de caracteres |
+| Apoyo de las citas | Sí, el juez | Si cada frase dice lo que dice la obra |
+| Revisión por criterios | Sí, el revisor | Dónde conviene trabajar más |
+
+El juez y el revisor se equivocan a veces. Toma lo que señalan como una lista de cosas que mirar, y decide tú. Los veredictos de frases que no han cambiado no se rehacen.
+
+## Si algo falla
+
+| Qué ves | Qué hacer |
+| --- | --- |
+| No sabes por dónde ibas | `/theaiwriter:estado` |
+| El juez se ha parado por límite de uso | `/theaiwriter:comprobar` cuando se renueve: sigue donde lo dejó |
+| El informe dice «desactualizado» | El borrador ha cambiado. Pasa `/theaiwriter:comprobar` |
+| Una obra no aparece en las búsquedas | Mira que tenga el PDF en Zotero y pide `/theaiwriter:diagnostico actualiza el índice` |
+| Claude dice que una cita está bloqueada | La clave no existe o está fuera de tus colecciones: añade la obra en Zotero o usa `[@?]` |
+| Quieres la última versión | `claude plugin marketplace update theaiwriter`, luego `claude plugin update theaiwriter@theaiwriter`, y reinicia Claude Code |
