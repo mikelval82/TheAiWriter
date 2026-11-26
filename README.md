@@ -51,7 +51,7 @@ El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → 
 5. Pasa a Word siguiendo la [guía de exportación](docs/exportar.md), con Pandoc y bibliografía o
    con citas vivas de Zotero. La carpeta `exportacion/` está preparada para el documento final.
 
-Tres ayudas acompañan el camino:
+Cuatro ayudas acompañan el camino:
 
 - `/theaiwriter:estado` usa `estado_documento` para ver materiales que faltan o siguen como plantilla,
   palabras del borrador, comprobación, revisión y siguiente paso; también resume el índice.
@@ -59,6 +59,8 @@ Tres ayudas acompañan el camino:
   que aceptes, vuelve a comprobar sin juez y sugiere pasar el juez por las frases cambiadas.
 - `/theaiwriter:diagnostico` comprueba la instalación y resume la biblioteca. Puedes pedir «obras
   sin PDF» o «actualiza el índice». Las obras y colecciones se gestionan en Zotero.
+- `/theaiwriter:ayuda` explica los comandos y qué toca ahora; con una duda («cómo paso a Word»)
+  contesta a partir del manual. No escribe nada ni lanza comprobaciones.
 
 Los comandos empiezan su respuesta final con un resumen de 3 a 5 líneas y terminan con el siguiente
 paso. Antes de escribir, comprobar con juez o revisar, avisan del gasto con tu cuenta de Claude.

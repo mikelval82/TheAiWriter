@@ -53,8 +53,8 @@ de `CLAUDE_PROJECT_DIR` o del directorio
 actual. Fuera de un documento, las consultas abarcan todo Zotero.
 
 El camino de cinco verbos es `nuevo`, `escribir`, `comprobar`, `revisar` y pasar a Word según
-[exportar.md](exportar.md). Las tres ayudas son `estado`, `corregir` y `diagnostico`, que también
-atiende consultas sobre la biblioteca. `corregir` muestra antes y después y solo aplica los cambios
+[exportar.md](exportar.md). Las ayudas son `estado`, `corregir`, `diagnostico`, que también
+atiende consultas sobre la biblioteca, y `ayuda`, que explica los comandos a partir del manual. `corregir` muestra antes y después y solo aplica los cambios
 aceptados; vuelve a comprobar sin juez. `escribir` comprueba al terminar y resume lo señalado.
 Cada comando resume en 3 a 5 líneas, indica el siguiente paso y avisa del gasto cuando corresponde.
 

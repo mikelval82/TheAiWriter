@@ -36,7 +36,7 @@ flowchart LR
 | `/theaiwriter:revisar` | El borrador y los criterios de la convocatoria o revista | `informes/revision.md` |
 | Pandoc | `documento.md`, `referencias.bib`, estilo CSL y plantilla | `exportacion/documento.docx` u `.odt` |
 
-En cualquier momento, `/theaiwriter:estado` dice dónde estás y qué toca, y `/theaiwriter:diagnostico` comprueba la instalación y la biblioteca.
+En cualquier momento, `/theaiwriter:estado` dice dónde estás y qué toca, `/theaiwriter:diagnostico` comprueba la instalación y la biblioteca, y `/theaiwriter:ayuda` explica los comandos o responde a una duda («cómo paso a Word»).
 
 ## Antes de empezar
 
