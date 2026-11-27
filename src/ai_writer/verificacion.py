@@ -40,6 +40,7 @@ from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 from ai_writer.passages import PassageIndex
 from ai_writer.quotes import explain_mismatch, fragments, normalize
+from ai_writer.reglas_convocatoria import evaluate_rules, file_present
 from ai_writer.sentences import (
     cited_paragraphs,
     fold_text,
@@ -513,7 +514,18 @@ def _check_document(
             }
         else:
             call = check_call(text, call_ficha, modalidad=ficha.get("modalidad", {}).get("seleccion"))
-            call["pdf_final"] = check_final_pdf(folder, call_ficha, ficha, call["extension"])
+            final = call["pdf_final"] = check_final_pdf(folder, call_ficha, ficha, call["extension"])
+            if call_ficha.reglas_aplicables:
+                values = {name: field["valor"] for name, field in ficha["datos_propuesta"].items()}
+                calculated = {
+                    "idioma_proyecto": ficha["idioma_proyecto"] or None,
+                    "paginas_pdf": final["paginas"],
+                    "palabras_borrador": call["extension"]["palabras"],
+                }
+                call["reglas_aplicables"] = evaluate_rules(
+                    Path(folder), call_ficha.reglas_aplicables, call_ficha.datos_propuesta,
+                    values, calculated, approved=ficha["confirmada"],
+                )
             data["convocatoria"] = call
     _save(folder, data)
     return data
@@ -591,13 +603,21 @@ def status(folder: Path, *, findings: list[dict] | None = None) -> dict:
         findings = list_findings(folder)
     if findings is not None and findings_changed(data.get("hallazgos_borrador"), findings):
         data["hallazgos_desactualizados"] = True
-    if final := data.get("convocatoria", {}).get("pdf_final"):
+    call = data.get("convocatoria", {})
+    if final := call.get("pdf_final"):
         if final_pdf_is_stale(folder, final):
             final.update(estado="desactualizado", paginas=None,
                          motivo="El PDF final cambió desde la última comprobación.")
     if budget := data.get("ficha", {}).get("idioma_por_presupuesto"):
         if budget_inputs_changed(folder, budget):
             budget.update(estado="desactualizado", pregunta=None)
+    for rule in call.get("reglas_aplicables", []):
+        if (relative := rule.get("archivo")) and file_present(Path(folder), relative) != rule["presente"]:
+            rule["estado"] = "desactualizada"
+        if rule.get("comparacion", {}).get("dato") == "paginas_pdf" and (
+            call["pdf_final"]["estado"] == "desactualizado"
+        ):
+            rule.update(estado="desactualizada", observado=None)
     return data
 
 

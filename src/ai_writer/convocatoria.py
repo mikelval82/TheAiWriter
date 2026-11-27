@@ -24,6 +24,16 @@ from ai_writer.presupuesto_convocatoria import (
     quoted_budget_language,
     read_amount,
 )
+from ai_writer.reglas_convocatoria import (
+    ApplicableRule,
+    Key,
+    ProposalField,
+    Source,
+    Value,
+    evaluate_rules,
+    proposal_value,
+    validate_rules,
+)
 
 FICHA = Path("convocatoria") / "ficha.yaml"
 APPROVALS = FICHA.with_name("aprobaciones.json")
@@ -45,12 +55,6 @@ _PAGE_LIMIT_CUE = re.compile(r"\b(?:m[aá]xim[oa]|l[ií]mite)\s+de\s+p[aá]ginas
 _COMMENT = re.compile(r"<!--.*?(?:-->|$)", re.S)
 _PENDING = re.compile(r"\[PENDIENTE(?::[^\]\n]+)?\]", re.I)
 _FICHA_CHANGED = "La ficha cambió. Muéstrala y revísala otra vez."
-
-
-class Source(BaseModel):
-    fichero: str = Field(min_length=1)
-    pagina: int = Field(ge=1)
-    cita: str = Field(min_length=1)
 
 
 class CallSection(BaseModel):
@@ -121,6 +125,13 @@ class CallFicha(BaseModel):
     limites: Limits
     idioma: LanguageRule | None = None
     criterios: list[Criterion] = Field(default_factory=list)
+    datos_propuesta: dict[Key, ProposalField] = Field(default_factory=dict)
+    reglas_aplicables: list[ApplicableRule] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_applicable_rules(self):
+        validate_rules(self.datos_propuesta, self.reglas_aplicables)
+        return self
 
     @classmethod
     def load(cls, folder: Path) -> "CallFicha":
@@ -189,6 +200,11 @@ def _call_rules(ficha: CallFicha) -> Iterable[CallRule]:
             f"criterio:{criterion.nombre}", f"criterios[{i}].fuente ({criterion.nombre})",
             criterion.fuente, criterion.model_dump(),
         )
+    for rule in ficha.reglas_aplicables:
+        yield CallRule(
+            f"regla:{rule.id}", f"{rule.requisito} ({rule.id})",
+            rule.fuente, rule.model_dump(mode="json"),
+        )
 
 
 def _fingerprint(value: object) -> str:
@@ -220,6 +236,39 @@ def _write_json(path: Path, data: dict) -> None:
     finally:
         if temp is not None:
             temp.unlink(missing_ok=True)
+
+
+def _proposal_data_path(folder: Path, key: str) -> Path:
+    path = folder / FICHA.parent / f"dato-{key}.json"
+    if not path.resolve().is_relative_to(folder.resolve()):
+        raise LibraryError("El dato de la propuesta debe guardarse dentro del proyecto.")
+    return path
+
+
+def _proposal_values(folder: Path, ficha: CallFicha) -> dict:
+    values = {}
+    for name, field in ficha.datos_propuesta.items():
+        try:
+            saved = json.loads(_proposal_data_path(folder, name).read_text(encoding="utf-8"))
+            value = proposal_value(field, saved["valor"])
+            values[name] = str(value) if isinstance(value, Decimal) else value
+        except (LibraryError, KeyError, TypeError, OSError, ValueError):
+            continue
+    return values
+
+
+def set_proposal_value(folder: Path, key: str, value: Value | None) -> dict:
+    folder = Path(folder)
+    if Project.load(folder).tipo != "convocatoria":
+        raise LibraryError("Los datos de la propuesta pertenecen a una convocatoria.")
+    ficha = CallFicha.load(folder)
+    if (field := ficha.datos_propuesta.get(key)) is None:
+        raise LibraryError(f"La ficha no define el dato {key}.")
+    normalized = proposal_value(field, value) if value is not None else None
+    if isinstance(normalized, Decimal):
+        normalized = str(normalized)
+    _write_json(_proposal_data_path(folder, key), {"valor": normalized})
+    return {"dato": key, "valor": normalized}
 
 
 def _saved_modality(folder: Path) -> str | None:
@@ -343,6 +392,12 @@ def ficha_text(folder: Path) -> str:
         lines.append("No constan criterios de evaluación.")
     if isinstance(ficha, CallFicha):
         report, _ = _check_call_ficha(Path(folder), ficha)
+        for rule in ficha.reglas_aplicables:
+            conditions = ", ".join(f"{c.dato} {c.operador} {c.valor}" for c in rule.cuando)
+            check = rule.comprobar.model_dump() if rule.comprobar else "revisión manual"
+            lines.append(
+                f"- {rule.requisito}. Aplica: {conditions or 'siempre'}. Comprobar: {check}."
+            )
         if modality := report.get("modalidad"):
             lines.append(
                 modality["pregunta"] or f"Modalidad de la propuesta: {modality['seleccion']}."
@@ -504,6 +559,8 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
                             f"La cita indica un máximo de {quoted}.")
         if rule.id == "idioma" and budget_rule is not None and matched is not None:
             item["valor"], mismatch = _budget_rule_value(budget_rule, rule.source, matched[1])
+        if rule.id.startswith("regla:") and matched is not None:
+            item["valor"] = "revision_manual"
         if mismatch is not None:
             report["fallidos"].append({**item, "motivo": mismatch})
             report["comprobados"] -= 1
@@ -540,6 +597,23 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
         revision += (budget["importe_eur"], budget["idioma_declarado"])
     elif ficha_data["idioma"] is not None:
         del ficha_data["idioma"]["costes_directos"]
+    if ficha.reglas_aplicables or ficha.datos_propuesta:
+        values = _proposal_values(folder, ficha)
+        language = Project.load(folder).idioma
+        preview = evaluate_rules(
+            folder, ficha.reglas_aplicables, ficha.datos_propuesta, values,
+            {"idioma_proyecto": language or None}, approved=report["confirmada"],
+        )
+        report["reglas_aplicables"] = preview
+        needed = {name for row in preview for name in row.get("datos_pendientes", [])}
+        report["datos_propuesta"] = {
+            name: {**field.model_dump(), "valor": values.get(name), "solicitar": name in needed}
+            for name, field in ficha.datos_propuesta.items()
+        }
+        report["idioma_proyecto"] = language
+        revision += (values, language)
+    else:
+        del ficha_data["datos_propuesta"], ficha_data["reglas_aplicables"]
     report["revision"] = _fingerprint(revision)
     return report, snapshot
 
@@ -924,11 +998,28 @@ def report_lines(ficha: dict, call: dict) -> list[str]:
             "desactualizado": "El PDF cambió. Vuelve a ejecutar /theaiwriter:comprobar sin juez.",
             "ficha_pendiente": "Confirma la ficha para contrastar el recuento con el límite.",
             "modalidad_pendiente": "Elige la modalidad para determinar el límite.",
-            "sin_limite": "La ficha no recoge un máximo de páginas.",
+            "sin_limite": "La ficha carece de un máximo general de páginas.",
             "excedido": "El PDF final supera el máximo de páginas.",
             "ok": "El PDF final está dentro del límite de páginas.",
         }
         lines.append(messages[final["estado"]])
     if budget := ficha.get("idioma_por_presupuesto"):
         lines.extend(_budget_report_lines(budget))
+    if applicable := call.get("reglas_aplicables"):
+        lines += ["", "### Reglas de la convocatoria", ""]
+        for rule in applicable:
+            source = rule["fuente"]
+            lines.append(
+                f"- {rule['requisito']} ({rule['estado'].replace('_', ' ')}). "
+                f"{source['fichero']}, p. {source['pagina']}. «{source['cita']}»"
+            )
+            if relative := rule.get("archivo"):
+                lines.append(f"  Archivo esperado: `{relative}`.")
+            if comparison := rule.get("comparacion"):
+                operator = comparison["operador"].replace("_", " ")
+                observed = rule["observado"] if rule["observado"] is not None else "pendiente"
+                lines.append(
+                    f"  Esperado: {comparison['dato']} {operator} {comparison['valor']}. "
+                    f"Observado: {observed}."
+                )
     return lines

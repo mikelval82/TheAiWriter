@@ -69,6 +69,8 @@ Para comprobar la extensión definitiva, guarda la memoria preparada con la plan
 
 Si el idioma exigido depende de un importe mínimo en euros, usa `/theaiwriter:escribir presupuesto` para registrar, corregir o dejar pendientes los costes directos. La comprobación muestra el umbral, su fuente y si el idioma declarado en el proyecto coincide con el exigido. Puedes decidir después si cambias el idioma del proyecto y si adaptas el texto ya redactado.
 
+En las fichas nuevas, los requisitos condicionales se guardan como reglas de la convocatoria, junto con la cita oficial. Usa `/theaiwriter:escribir datos` para aportar o corregir las respuestas y `/theaiwriter:comprobar sin juez` para ver qué requisitos aplican. El informe indica el alcance de cada prueba y qué queda para revisión manual.
+
 **Qué gasta de tu cuenta.** La conversación con Claude, sobre todo al escribir. Además, el juez hace una llamada por cada párrafo con citas y el revisor una por revisión. «Comprobar sin juez», `estado` y el índice no lanzan llamadas aparte.
 
 ## Archivos de entrada

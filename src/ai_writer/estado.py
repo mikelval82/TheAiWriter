@@ -106,6 +106,10 @@ def _next_action(
                 f"Los costes directos activan la regla de idioma ({budget['idioma_requerido']}).",
                 (f"{ESCRIBIR} presupuesto", "Consultar o corregir los costes directos declarados."),
             )
+        pending = next((field for field in ficha.get("datos_propuesta", {}).values()
+                        if field["solicitar"]), None)
+        if pending:
+            return navigation(f"{ESCRIBIR} datos", pending["pregunta"])
     if not text.strip():
         return navigation(ESCRIBIR, "Los materiales básicos están listos.",
                           (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."))
@@ -115,6 +119,9 @@ def _next_action(
     pdf_state = check.get("pdf_final", {}).get("estado")
     if pdf_state == "desactualizado":
         return navigation(f"{COMPROBAR} sin juez", "El PDF final cambió desde el último informe.")
+    rules = check.get("reglas_aplicables", [])
+    if any(rule["estado"] == "desactualizada" for rule in rules):
+        return navigation(f"{COMPROBAR} sin juez", "Cambió un archivo de la propuesta.")
     if check["estado"] in ("sin hacer", "desactualizada"):
         return navigation(COMPROBAR, "Hace falta una comprobación del borrador actual.",
                           (f"{COMPROBAR} sin juez", "Hacer solo las comprobaciones inmediatas."))
@@ -130,6 +137,9 @@ def _next_action(
             f"Actualizar {FINAL_PDF.as_posix()}", reason,
             ("Leer informes/comprobacion.md", "Consultar el recuento y la regla aplicable."),
         )
+    if any(rule["estado"] == "no_cumple" for rule in rules):
+        return navigation("Leer informes/comprobacion.md",
+                          "Hay requisitos de la convocatoria que requieren cambios.")
     if problems:
         return navigation(CORREGIR, "Hay citas, cifras o datos pendientes que requieren una decisión.",
                           ("Leer informes/comprobacion.md", "Consultar los avisos y sus fuentes."),
@@ -207,6 +217,8 @@ def document_status(folder: Path) -> dict:
         stale = draft.exists() and _stale(checks, result, draft, fingerprint)
         final = checks.get("convocatoria", {}).get("pdf_final")
         stale |= bool(final and final["estado"] == "desactualizado")
+        rules = checks.get("convocatoria", {}).get("reglas_aplicables", [])
+        stale |= any(rule["estado"] == "desactualizada" for rule in rules)
         if ficha is not None and ficha.get("confirmada"):
             saved_ficha = checks.get("ficha", {})
             stale |= (not saved_ficha.get("confirmada")
@@ -228,6 +240,8 @@ def document_status(folder: Path) -> dict:
             verification["hallazgos"] = report_counts(checks["hallazgos_borrador"])
         if final:
             verification["pdf_final"] = final
+        if rules:
+            verification["reglas_aplicables"] = rules
 
     review_path = folder / revisor.REVIEW
     review = revisor.review_status(folder) if review_path.exists() else {"estado": "sin hacer"}
@@ -250,6 +264,7 @@ def document_status(folder: Path) -> dict:
         **({"modalidad": ficha["modalidad"]} if ficha and "modalidad" in ficha else {}),
         **({"idioma_por_presupuesto": ficha["idioma_por_presupuesto"]}
            if ficha and "idioma_por_presupuesto" in ficha else {}),
+        **({"datos_propuesta": ficha["datos_propuesta"]} if ficha and "datos_propuesta" in ficha else {}),
         **_next_action(missing, text, verification, review, _problems(checks, text),
                        findings, export, ficha),
     }

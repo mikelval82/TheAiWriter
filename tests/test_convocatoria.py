@@ -406,6 +406,82 @@ def test_budget_language_cannot_disagree_with_an_explicit_quote(budget_call, fic
     assert failure["id"] == "idioma" and "inglés" in failure["motivo"]
 
 
+def test_ficha_reuses_declared_data_for_different_requirements(modal_call, ficha):
+    from ai_writer import mcp_server, verificacion
+
+    ficha["datos_propuesta"] = {
+        "modalidad": {"tipo": "texto", "pregunta": "¿La propuesta es coordinada o individual?",
+                      "opciones": ["coordinada", "individual"]},
+        "importe_solicitado": {"tipo": "numero", "pregunta": "¿Qué importe consta en la solicitud?"},
+    }
+    pages = {"dato": "paginas_pdf", "operador": "menor_o_igual", "valor": 20}
+    annex = {"archivo": "exportacion/plan-coordinacion.pdf"}
+    ficha["reglas_aplicables"] = [
+        {"id": "extension", "requisito": "Máximo de 20 páginas en proyectos individuales",
+         "cuando": [{"dato": "modalidad", "operador": "igual", "valor": "individual"}],
+         "comprobar": pages, "fuente": ficha["limites"]["paginas_por_modalidad"][0]["fuente"]},
+        {"id": "anexo", "requisito": "Plan de coordinación",
+         "cuando": [{"dato": "modalidad", "operador": "igual", "valor": "coordinada"},
+                    {"dato": "importe_solicitado", "operador": "mayor_o_igual", "valor": 50000}],
+         "comprobar": annex, "fuente": dict(SOURCE)},
+    ]
+    ficha["limites"]["paginas_por_modalidad"] = []
+    save_ficha(modal_call, ficha)
+    write_final_pdf(modal_call, 25)
+
+    def states():
+        report = mcp_server.comprobar_documento(juez=False)
+        assert report["ficha"]["confirmada"]
+        return {rule["id"]: rule["estado"] for rule in report["convocatoria"]["reglas_aplicables"]}
+
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    assert states() == {"extension": "datos_pendientes", "anexo": "datos_pendientes"}
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:escribir datos"
+    assert "error" in mcp_server.fijar_dato_convocatoria("modalidad", "desconocida")
+    mcp_server.fijar_dato_convocatoria("modalidad", "individual")
+    assert states() == {"extension": "no_cumple", "anexo": "no_aplica"}
+    mcp_server.fijar_dato_convocatoria("modalidad", "coordinada")
+    assert states() == {"extension": "no_aplica", "anexo": "datos_pendientes"}
+    mcp_server.fijar_dato_convocatoria("importe_solicitado", "50000")
+    assert states() == {"extension": "no_aplica", "anexo": "no_cumple"}
+    (modal_call / annex["archivo"]).write_bytes(b"anexo de prueba")
+    status = mcp_server.estado_documento()
+    assert status["comprobacion"]["estado"] == "desactualizada"
+    assert states() == {"extension": "no_aplica", "anexo": "cumple"}
+    assert "Plan de coordinación" in (modal_call / verificacion.REPORT).read_text(encoding="utf-8")
+
+
+def test_generic_rule_rejects_an_unknown_input(official, ficha):
+    ficha["reglas_aplicables"] = [
+        {"id": "test", "requisito": "Comprobación", "fuente": dict(SOURCE),
+         "cuando": [{"dato": "errata", "operador": "igual", "valor": True}]},
+    ]
+    save_ficha(official, ficha)
+    assert "errata" in check_ficha(official)["error"]
+
+
+def test_another_call_uses_the_same_rules_with_a_boolean_and_manual_check(modal_call, ficha):
+    from ai_writer import mcp_server
+    from ai_writer.library import Project
+    Project(tipo="convocatoria", titulo="Otra convocatoria").save(modal_call)
+    ficha["limites"]["paginas_por_modalidad"] = []
+    ficha["datos_propuesta"] = {
+        "hay_colaboracion": {"tipo": "booleano", "pregunta": "¿Participa un colaborador?"},
+    }
+    condition = {"dato": "hay_colaboracion", "operador": "igual", "valor": False}
+    ficha["reglas_aplicables"] = [
+        {"id": "idioma", "requisito": "Idioma de la propuesta", "cuando": [condition],
+         "comprobar": {"dato": "idioma_proyecto", "operador": "igual", "valor": "es"},
+         "fuente": dict(SOURCE)},
+        {"id": "argumento", "requisito": "Justificar la contribución", "fuente": dict(SOURCE)},
+    ]
+    save_ficha(modal_call, ficha)
+    assert confirm_ficha(modal_call)["confirmada"]
+    assert mcp_server.fijar_dato_convocatoria("hay_colaboracion", False)["valor"] is False
+    results = mcp_server.comprobar_documento(juez=False)["convocatoria"]["reglas_aplicables"]
+    assert [rule["estado"] for rule in results] == ["cumple", "revision_manual"]
+
+
 def test_page_limits_match_the_number_for_each_modality(modal_call, ficha):
     report = check_ficha(modal_call)
     rules = [rule for rule in report["reglas"] if rule["id"].startswith("paginas:")]

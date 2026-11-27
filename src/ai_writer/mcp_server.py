@@ -24,6 +24,7 @@ from mcp.server.mcpserver import MCPServer
 from ai_writer.evidencia import Fuente
 from ai_writer.hallazgos import Propuesta, Seleccion
 from ai_writer.library import PROJECT_FILE, LibraryError, Project
+from ai_writer.reglas_convocatoria import Value
 
 server = MCPServer("theaiwriter")
 
@@ -289,6 +290,17 @@ def fijar_costes_directos_convocatoria(importe_eur: str | None) -> dict:
 
     try:
         return set_direct_costs(_document_folder(), importe_eur)
+    except (LibraryError, OSError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def fijar_dato_convocatoria(dato: str, valor: Value | None) -> dict:
+    """Guarda un dato definido en la ficha tras la respuesta explícita del investigador."""
+    from ai_writer.convocatoria import set_proposal_value
+
+    try:
+        return set_proposal_value(_document_folder(), dato, valor)
     except (LibraryError, OSError, ValueError) as error:
         return {"error": str(error)}
 
