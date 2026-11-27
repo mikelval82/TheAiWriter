@@ -139,7 +139,9 @@ def write_bibliography(folder: Path, index: PassageIndex, keys: list[str]) -> Pa
     entries = [bibtex(index.work_of(key), key) for key in sorted(set(keys)) if index.work_of(key)]
     path = Path(folder) / BIBLIOGRAPHY
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n\n".join(entries) + ("\n" if entries else ""), encoding="utf-8")
+    content = "\n\n".join(entries) + ("\n" if entries else "")
+    if not path.is_file() or path.read_text(encoding="utf-8") != content:
+        path.write_text(content, encoding="utf-8")
     return path
 
 

@@ -30,7 +30,7 @@ cientos de MB. Después se calcula la búsqueda en el ordenador.
 
 Abre Claude Code en la carpeta donde vas a escribir el documento.
 
-El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → pasar a Word**.
+El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → exportar**.
 
 1. `/theaiwriter:nuevo`: elige tipo, título, idioma y colecciones de Zotero. Una colección incluye
    sus subcolecciones; sin elegir ninguna se usa todo Zotero. Crea `proyecto.yaml`, `materiales/`,
@@ -39,8 +39,8 @@ El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → 
    completa las respuestas antes de escribir. Resultados añade `resultados/` (CSV y figuras) y
    `analisis/` (código); convocatoria añade `convocatoria/` (PDF oficiales) y `materiales/equipo.md`.
 2. `/theaiwriter:escribir`: Claude lee `guia_escritura`, explora los artículos, deja el plan en
-   `borrador/plan.md` y escribe `borrador/documento.md`, consultando pasajes por sección. Con
-   «con pausa» espera tu aprobación del plan. Registra las lecturas en `informes/consultas.json`.
+   `borrador/plan.md` y escribe `borrador/documento.md`, consultando pasajes por sección. En
+   proyectos de Resultados o con «con pausa» espera tu aprobación del plan. Registra las lecturas en `informes/consultas.json`.
    Al terminar comprueba el borrador y resume lo señalado; las correcciones se proponen aparte.
 3. `/theaiwriter:comprobar`: comprueba el borrador, actualiza `borrador/referencias.bib` y escribe
    `informes/comprobacion.md` y `.json`. El juez corre en segundo plano; con «sin juez» solo hace
@@ -48,8 +48,7 @@ El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → 
 4. `/theaiwriter:revisar`: evalúa por criterios con una llamada a Claude en segundo plano y deja
    prioridades, fortalezas, carencias y trabajo concreto en `informes/revision.md` y `.json`.
    No cambia el borrador ni da una nota. Conviene comprobar antes: usa el apoyo previo de las citas.
-5. Pasa a Word siguiendo la [guía de exportación](docs/exportar.md), con Pandoc y bibliografía o
-   con citas vivas de Zotero. La carpeta `exportacion/` está preparada para el documento final.
+5. `/theaiwriter:exportar` genera `exportacion/documento.docx` con Pandoc y bibliografía. Consulta la [guía de exportación](docs/exportar.md) para elegir un estilo o usar citas vivas de Zotero.
 
 Cuatro ayudas acompañan el camino:
 

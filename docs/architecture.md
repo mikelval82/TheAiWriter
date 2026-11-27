@@ -16,6 +16,7 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `mcp_server.py` | Registra las herramientas de diagnóstico, proyecto, consulta y verificación. |
 | `library.py` | Proyecto, plantillas de materiales, migración de informes y carpeta de documentos. |
 | `estado.py` | Estado determinista del documento y siguiente paso, sin abrir el índice. |
+| `exportacion.py` | Convierte el borrador y la bibliografía en DOCX con Pandoc y conserva la copia previa si la conversión falla. |
 | `evidencia.py` | Inventaría los materiales y lee una celda CSV o un fragmento guardado en una salida de texto o Jupyter. |
 | `hallazgos.py` | Registra propuestas y decisiones en SQLite, con la huella de la evidencia aprobada. |
 | `hallazgos_borrador.py` | Coteja los enunciados del manuscrito con los hallazgos aprobados y señala cifras por vincular. |
@@ -51,12 +52,12 @@ El MCP expone `diagnostico`, `probar_claude`, `crear_documento`, `colecciones_zo
 `guardar_hallazgos`, `decidir_hallazgos`, `comprobar_ficha`, `mostrar_ficha`, `confirmar_ficha`,
 `buscar_pasajes`, `leer_pasaje`, `leer_paginas`, `referencia`,
 `preparar_citas_vivas`, `comprobar_citas`, `comprobar_documento`, `estado_comprobacion`,
-`revisar_documento` y `estado_revision`.
+`revisar_documento`, `estado_revision` y `exportar_documento`.
 La carpeta del documento se obtiene
 de `CLAUDE_PROJECT_DIR` o del directorio
 actual. Fuera de un documento, las consultas abarcan todo Zotero.
 
-El camino de cinco verbos es `nuevo`, `escribir`, `comprobar`, `revisar` y pasar a Word según
+El camino de cinco verbos es `nuevo`, `escribir`, `comprobar`, `revisar` y `exportar` según
 [exportar.md](exportar.md). Las ayudas son `estado`, `corregir`, `diagnostico`, que también
 atiende consultas sobre la biblioteca, y `ayuda`, que explica los comandos a partir del manual. `corregir` muestra antes y después y solo aplica los cambios
 aceptados; vuelve a comprobar sin juez. `escribir` comprueba al terminar y resume lo señalado.
@@ -180,7 +181,7 @@ ignoran campos adicionales de proyectos antiguos, incluido `fuente`.
 
 Claude escribe `abstract.md`, `plan.md` y `documento.md` siguiendo los comandos. El plugin escribe
 `referencias.bib` al verificar, con las obras citadas válidas y sus claves del índice.
-`exportacion/` se crea vacía; no hay un exportador en el código.
+`exportacion/` se crea vacía. `exportar_documento` genera allí `documento.docx` al pedir la exportación.
 
 Tras leer `proyecto.yaml`, el comando de escritura llama obligatoriamente a `guia_escritura`.
 La herramienta lee con `importlib.resources` el Markdown del tipo en `guias/`; el paquete instalado
@@ -235,10 +236,7 @@ informe y usa la fecha de modificación con informes anteriores que carecen de h
 comprueba que haya equipo y PDF oficiales. En resultados busca una tabla, una salida de texto o
 una salida guardada de Jupyter y resume el estado de las aprobaciones. La comprobación incluye el
 total de pares de frase y obra, incluso mientras hay pares pendientes. `siguiente`,
-`motivo_siguiente` y `alternativas` orientan al usuario según el estado actual. La exportación se
-hace con la guía,
-sin dependencias ni exportador propio; `preparar_citas_vivas` solo copia el borrador con las claves
-que Zotero guarda en `citationKey` o en `extra`, las de Better BibTeX.
+`motivo_siguiente` y `alternativas` orientan al usuario según el estado actual. La exportación usa Pandoc para guardar un DOCX en `exportacion/`. `preparar_citas_vivas` copia el borrador con las claves que Zotero guarda en `citationKey` o en `extra`, las de Better BibTeX.
 
 ## Secciones sin modelo
 

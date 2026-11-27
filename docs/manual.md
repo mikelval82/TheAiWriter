@@ -35,7 +35,7 @@ flowchart LR
 | `/theaiwriter:comprobar` | El borrador, los hallazgos aprobados y los PDF de Zotero | `informes/comprobacion.md` |
 | `/theaiwriter:corregir` | El informe y tu elección: todas, «1, 3» o ninguna | `documento.md` corregido |
 | `/theaiwriter:revisar` | El borrador y los criterios de la convocatoria o revista | `informes/revision.md` |
-| Pandoc | `documento.md`, `referencias.bib`, estilo CSL y plantilla | `exportacion/documento.docx` u `.odt` |
+| `/theaiwriter:exportar` | `documento.md`, `referencias.bib`, estilo CSL y plantilla opcionales | `exportacion/documento.docx` |
 
 Los comandos muestran el siguiente paso, por qué toca y qué alternativas tienes. Usa `/theaiwriter:estado` para retomar el trabajo, `/theaiwriter:ayuda` para una duda («cómo paso a Word») y `/theaiwriter:diagnostico` para comprobar la instalación o Zotero.
 
@@ -59,7 +59,7 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 3. **Escribe.** En un estudio con resultados propios, usa primero `/theaiwriter:hallazgos` para revisar los hallazgos. Luego `/theaiwriter:escribir con pausa` deja el plan en `borrador/plan.md` y espera. Léelo, pide cambios y contesta «aprobado». Al acabar comprueba el borrador.
 4. **Lee la comprobación y corrige.** Las comprobaciones sin modelo salen al momento. El juez tarda unos minutos y Claude te avisa en tu siguiente mensaje. Mira las frases tergiversadas, no apoyadas y parciales, y usa `/theaiwriter:corregir`. Después, `/theaiwriter:comprobar` vuelve a juzgar las frases cambiadas.
 5. **Revisa por criterios.** `/theaiwriter:revisar`, o con el nombre de una revista y sus normas en `revista/`. Si hay ficha de criterios, te la enseña y espera tu «sí».
-6. **Pásalo a Word** con la [guía de exportación](exportar.md).
+6. **Pásalo a Word** con `/theaiwriter:exportar`. Para actualizar una copia anterior, usa `/theaiwriter:exportar reemplazar`. [Guía de exportación](exportar.md)
 
 **Qué gasta de tu cuenta.** La conversación con Claude, sobre todo al escribir. Además, el juez hace una llamada por cada párrafo con citas y el revisor una por revisión. «Comprobar sin juez», `estado` y el índice no lanzan llamadas aparte.
 
@@ -98,7 +98,7 @@ Si un cuaderno tiene solo una imagen como salida o todavía no se ha ejecutado, 
 | `informes/comprobacion.md` | comprobar | Citas, literalidad, cobertura, cifras, conformidad con la convocatoria y veredicto del juez |
 | `informes/revision.md` | revisar | Tres prioridades y, por criterio, nivel (bien, mejorable o flojo), fortalezas, carencias y trabajo |
 | `exportacion/documento-zotero.md` | si pides «prepara las citas vivas» | Copia del borrador con las claves de Better BibTeX |
-| `exportacion/documento.docx` | Pandoc | El documento final (u `.odt`) |
+| `exportacion/documento.docx` | `/theaiwriter:exportar` con Pandoc | Copia editable para Word |
 
 En `informes/hallazgos.sqlite` se guardan las propuestas y las decisiones. Consulta el registro con `/theaiwriter:hallazgos ver`.
 

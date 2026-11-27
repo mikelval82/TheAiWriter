@@ -158,7 +158,7 @@ def test_next_step_without_draft_or_check_and_word_count(ready):
     (None, ["0,95"], None, True, "/theaiwriter:corregir"),
     (None, None, ["Impacto"], False, "/theaiwriter:corregir"),
     ("parcial", None, None, False, "/theaiwriter:corregir"),
-    ("apoyada", None, None, True, "pasar a Word: guía en docs/exportar.md"),
+    ("apoyada", None, None, True, "/theaiwriter:exportar"),
 ])
 def test_next_step_follows_report_priority(ready, verdict, figures, missing, review, expected):
     (ready / verificacion.DRAFT).write_text("Borrador con texto.")
@@ -252,4 +252,27 @@ def test_review_priorities_offer_correction_with_export_as_an_alternative(ready)
     )
     status = mcp_server.estado_documento()
     assert status["siguiente"] == "/theaiwriter:corregir la revisión"
-    assert any(a["accion"].startswith("pasar a Word") for a in status["alternativas"])
+    assert any(a["accion"] == "/theaiwriter:exportar" for a in status["alternativas"])
+
+
+def test_export_next_step_after_review_and_after_a_draft_change(ready):
+    draft = ready / verificacion.DRAFT
+    draft.write_text("Borrador listo.")
+    write_reports(ready, review=True)
+    output = ready / "exportacion/documento.docx"
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:exportar"
+
+    output.write_bytes(b"Copia de Word")
+    status = mcp_server.estado_documento()
+    assert status["exportacion"] == {"estado": "terminada", "documento": "exportacion/documento.docx"}
+    assert status["siguiente"] == "Abrir exportacion/documento.docx"
+
+    stamp = output.stat().st_mtime_ns
+    os.utime(draft, ns=(stamp + 1_000_000, stamp + 1_000_000))
+    write_reports(ready, review=True)
+    fixed_stamp = stamp + 2_000_000
+    for report in (verificacion.RESULT, revisor.REVIEW):
+        os.utime(ready / report, ns=(fixed_stamp, fixed_stamp))
+    status = mcp_server.estado_documento()
+    assert status["exportacion"]["estado"] == "desactualizada"
+    assert status["siguiente"] == "/theaiwriter:exportar reemplazar"

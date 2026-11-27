@@ -7,7 +7,7 @@ Comprueba la instalación o consulta la biblioteca con las herramientas MCP de `
 
 Petición del usuario: $ARGUMENTS
 
-- Sin petición: llama a `diagnostico` y `probar_claude`, como comprobación de instalación. Avisa antes de que la prueba hace una llamada breve a Claude con la cuenta del usuario. Resume sistema, Python, Zotero (carpeta, obras y PDF), índice, documento actual y si Claude está disponible y respondió. Añade un resumen de `colecciones_zotero` y `estado_indice`: colecciones y obras con PDF, indexadas o pendientes; si hay documento, di qué colecciones usa.
+- Sin petición: llama a `diagnostico` y `probar_claude`, como comprobación de instalación. Avisa antes de que la prueba hace una llamada breve a Claude con la cuenta del usuario. Resume sistema, Python, Zotero (carpeta, obras y PDF), índice, documento actual y si Claude está disponible y respondió. Indica si Pandoc está disponible para exportar a Word. Añade un resumen de `colecciones_zotero` y `estado_indice`: colecciones y obras con PDF, indexadas o pendientes; si hay documento, di qué colecciones usa.
 - «Actualiza el índice»: llama a `estado_indice` con `actualizar` a verdadero. No gasta llamadas a Claude. Di cuántas obras se indexaron, cuáles no dieron texto y cuáles fallaron.
 - «Obras sin PDF»: consulta `estado_indice`, enuméralas y explica que no se pueden consultar ni comprobar hasta adjuntarles el PDF en Zotero.
 - Otras peticiones sobre colecciones o biblioteca: usa `colecciones_zotero` y `estado_indice` según lo que se pide.

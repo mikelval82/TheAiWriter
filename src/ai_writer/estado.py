@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ai_writer import revisor, verificacion
 from ai_writer.evidencia import has_results, inventory
+from ai_writer.exportacion import export_status
 from ai_writer.hallazgos import list_findings
 from ai_writer.hallazgos_borrador import report_counts
 from ai_writer.library import Project, is_template
@@ -15,7 +16,7 @@ REVISAR = "/theaiwriter:revisar"
 CORREGIR = "/theaiwriter:corregir"
 ESTADO = "/theaiwriter:estado"
 HALLAZGOS = "/theaiwriter:hallazgos"
-WORD = "pasar a Word: guía en docs/exportar.md"
+EXPORTAR = "/theaiwriter:exportar"
 
 
 def _material(path: Path) -> str:
@@ -58,7 +59,7 @@ def _problems(checks: dict, text: str) -> bool:
 
 def _next_action(
     missing: list[str], text: str, check: dict, review: dict, problems: bool,
-    findings: dict[str, int] | None,
+    findings: dict[str, int] | None, export: dict,
 ) -> dict:
     def navigation(action: str, reason: str, *alternatives: tuple[str, str]) -> dict:
         return {
@@ -128,8 +129,14 @@ def _next_action(
     ):
         return navigation(f"{CORREGIR} la revisión", "La revisión propone cambios para el borrador.",
                           ("Leer informes/revision.md", "Decidir qué cambios tienen sentido."),
-                          (WORD, "Exportar si ya has valorado las sugerencias."))
-    return navigation(WORD, "La comprobación y la revisión del borrador actual están completas.",
+                          (EXPORTAR, "Exportar si ya has valorado las sugerencias."))
+    if export["estado"] == "terminada":
+        return navigation(f"Abrir {export['documento']}", "El documento de Word está disponible.",
+                          (f"{EXPORTAR} reemplazar", "Generar de nuevo la copia de Word."))
+    if export["estado"] == "desactualizada":
+        return navigation(f"{EXPORTAR} reemplazar", "Cambió el borrador o la bibliografía.",
+                          (f"Abrir {export['documento']}", "Consultar la copia anterior."))
+    return navigation(EXPORTAR, "La comprobación y la revisión del borrador actual están completas.",
                       ("Leer borrador/documento.md", "Hacer una última lectura."))
 
 
@@ -185,9 +192,11 @@ def document_status(folder: Path) -> dict:
             review["estado"] = "parcial"
 
     missing = [name for name, state in materials.items() if state != "escrito"]
+    export = export_status(folder, draft)
     return {
         "titulo": project.titulo, "tipo": project.tipo, "materiales": materials,
         "palabras": len(text.split()), "comprobacion": verification, "revision": review,
+        "exportacion": export,
         **({"hallazgos": findings} if findings is not None else {}),
-        **_next_action(missing, text, verification, review, _problems(checks, text), findings),
+        **_next_action(missing, text, verification, review, _problems(checks, text), findings, export),
     }

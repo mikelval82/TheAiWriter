@@ -15,7 +15,7 @@ Duda del usuario: $ARGUMENTS
    - `/theaiwriter:escribir`: plan y borrador con los PDF de Zotero; con «con pausa» espera a que apruebes el plan.
    - En proyectos de Resultados, `/theaiwriter:hallazgos` muestra de dónde sale cada resultado y te permite aprobarlo, editarlo o dejarlo pendiente.
    - `/theaiwriter:comprobar` comprueba las citas y señala qué pasajes respaldan las frases citadas. Con «sin juez» hace solo las comprobaciones inmediatas.
-   - Pasar a Word o LibreOffice con Pandoc, según la guía de exportación.
+   - `/theaiwriter:exportar` crea un DOCX editable con Pandoc. Acepta una plantilla o estilo y ofrece exportar una copia provisional si sigues revisando.
 3. Añade que `/theaiwriter:estado` sirve para retomar el trabajo. Si toca corregir, revisar por criterios o resolver un problema de instalación, explica también el comando correspondiente.
 4. Recuerda en una línea qué gasta cuota de la cuenta de Claude: escribir, el juez de `comprobar` (una llamada por párrafo con citas) y `revisar` (una llamada).
 

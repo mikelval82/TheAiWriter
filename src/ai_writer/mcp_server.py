@@ -51,6 +51,7 @@ def _error(error: LibraryError) -> dict:
 @tool
 def diagnostico() -> dict:
     """Informa de dónde corre el plugin: sistema, Python, carpetas y si `claude` está disponible."""
+    from ai_writer.exportacion import pandoc_executable
     from ai_writer.zotero import Zotero, default_index_dir
 
     is_document = (_document_folder() / PROJECT_FILE).exists()
@@ -71,6 +72,7 @@ def diagnostico() -> dict:
         "zotero": found,
         "indice_de_pasajes": str(default_index_dir()),
         "claude_en_path": shutil.which("claude"),
+        "pandoc": pandoc_executable(),
     }
 
 
@@ -406,6 +408,23 @@ def referencia(clave: str) -> dict:
     except LibraryError as error:
         return _error(error)
     return found or {"error": f"La clave «{clave}» no existe en Zotero."}
+
+
+@tool
+def exportar_documento(
+    estilo_csl: str | None = None, plantilla_docx: str | None = None, reemplazar: bool = False,
+) -> dict:
+    """Genera exportacion/documento.docx desde el borrador con Pandoc, sin modelo.
+    El estilo y la plantilla son archivos del proyecto. Reemplaza solo cuando se indica."""
+    from ai_writer.exportacion import export_document
+
+    try:
+        return export_document(
+            _document_folder(), style=estilo_csl, template=plantilla_docx,
+            replace_existing=reemplazar,
+        )
+    except (LibraryError, OSError, ValueError) as error:
+        return {"error": str(error)}
 
 
 @tool
