@@ -63,6 +63,8 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 
 En una convocatoria, `/theaiwriter:escribir solo ficha` permite revisar las reglas sin modificar el borrador. Si editas una regla o cambia su página de origen, vuelve a aprobar lo afectado. Las fichas anteriores se pueden abrir y requieren una confirmación inicial para guardar las aprobaciones por regla.
 
+Si las bases fijan máximos distintos por modalidad, el plugin te pide elegir antes de planificar. Usa `/theaiwriter:escribir modalidad` para consultar o cambiar la elección. `/theaiwriter:comprobar sin juez` muestra la estimación de extensión para el límite aplicable, junto con su PDF, página y cita.
+
 **Qué gasta de tu cuenta.** La conversación con Claude, sobre todo al escribir. Además, el juez hace una llamada por cada párrafo con citas y el revisor una por revisión. «Comprobar sin juez», `estado` y el índice no lanzan llamadas aparte.
 
 ## Archivos de entrada

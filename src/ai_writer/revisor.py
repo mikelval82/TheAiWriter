@@ -94,6 +94,8 @@ def _review_criteria(folder: Path) -> tuple[str, list[dict], str | None]:
         raise LibraryError(f"La ficha de la {label} tiene citas fallidas: {details}")
     if not report["confirmada"]:
         raise LibraryError(f"Falta confirmar la ficha de la {label} antes de revisar el borrador.")
+    if question := report.get("modalidad", {}).get("pregunta"):
+        raise LibraryError(f"{question} Usa /theaiwriter:escribir modalidad.")
     if not ficha.criterios:
         raise LibraryError(f"Falta al menos un criterio de evaluación en la ficha de la {label}.")
     origin = f"{label}: {getattr(ficha, label)}"

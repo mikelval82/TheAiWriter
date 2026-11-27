@@ -271,6 +271,17 @@ def comprobar_ficha() -> dict:
     return check_ficha(folder)
 
 
+@tool
+def fijar_modalidad_convocatoria(modalidad: str) -> dict:
+    """Guarda la modalidad de la propuesta indicada explícitamente por el investigador."""
+    from ai_writer.convocatoria import set_call_modality
+
+    try:
+        return set_call_modality(_document_folder(), modalidad)
+    except (LibraryError, OSError) as error:
+        return {"error": str(error)}
+
+
 # Zotero: passages to consult while writing
 
 

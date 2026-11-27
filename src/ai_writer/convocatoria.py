@@ -18,6 +18,7 @@ from ai_writer.passages import page_texts
 
 FICHA = Path("convocatoria") / "ficha.yaml"
 APPROVALS = FICHA.with_name("aprobaciones.json")
+PROPOSAL = FICHA.with_name("propuesta.json")
 JOURNAL_FICHA = Path("revista") / "ficha.yaml"
 _HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$")
 _NUMBER = re.compile(r"(?<!\w)[0-9]+(?:[., \u00a0\u202f][0-9]+)*(?!\w)")
@@ -28,6 +29,8 @@ _MAXIMUM = re.compile(
     r"maximum(?:\s+of)?|up\s+to|at\s+most|no\s+more\s+than|not\s+exceed)\s+$",
     re.I,
 )
+_PAGE_UNITS = r"p[aá]ginas?|pages?"
+_PAGE_LIMIT_CUE = re.compile(r"\b(?:m[aá]xim[oa]|l[ií]mite)\s+de\s+p[aá]ginas\b", re.I)
 _COMMENT = re.compile(r"<!--.*?(?:-->|$)", re.S)
 _PENDING = re.compile(r"\[PENDIENTE(?::[^\]\n]+)?\]", re.I)
 _FICHA_CHANGED = "La ficha cambió. Muéstrala y revísala otra vez."
@@ -56,16 +59,32 @@ class FieldLimit(BaseModel):
     fuente: Source
 
 
+def _modality_key(label: str) -> str:
+    return " ".join(label.casefold().split())
+
+
+class ModalPageLimit(BaseModel):
+    modalidad: str = Field(min_length=1)
+    paginas: int = Field(gt=0)
+    fuente: Source
+
+
 class Limits(BaseModel):
     paginas: int | None = Field(default=None, gt=0)
     palabras_por_pagina: int = Field(default=500, gt=0)
     fuente: Source | None = None
     campos: list[FieldLimit] = Field(default_factory=list)
+    paginas_por_modalidad: list[ModalPageLimit] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def require_page_source(self):
         if self.paginas is not None and self.fuente is None:
             raise ValueError("limites.fuente es obligatoria si hay un límite de páginas")
+        choices = [_modality_key(limit.modalidad) for limit in self.paginas_por_modalidad]
+        if choices and self.paginas is not None:
+            raise ValueError("Usa un límite general o límites por modalidad.")
+        if "" in choices or len(set(choices)) != len(choices):
+            raise ValueError("Cada límite por modalidad debe tener un nombre distinto y no vacío.")
         return self
 
 
@@ -124,6 +143,7 @@ class CallRule(NamedTuple):
     source: Source
     contents: dict
     limit: tuple[int, str, str] | None = None
+    modality: str | None = None
 
 
 def _call_rules(ficha: CallFicha) -> Iterable[CallRule]:
@@ -133,9 +153,16 @@ def _call_rules(ficha: CallFicha) -> Iterable[CallRule]:
     if ficha.limites.fuente is not None:
         limit = None
         if ficha.limites.paginas is not None:
-            limit = (ficha.limites.paginas, "páginas", r"p[aá]ginas?|pages?")
+            limit = (ficha.limites.paginas, "páginas", _PAGE_UNITS)
         yield CallRule("paginas", "limites.fuente", ficha.limites.fuente,
                        {"paginas": ficha.limites.paginas}, limit)
+    for index, option in enumerate(ficha.limites.paginas_por_modalidad):
+        yield CallRule(
+            f"paginas:{_modality_key(option.modalidad)}",
+            f"limites.paginas_por_modalidad[{index}].fuente ({option.modalidad})",
+            option.fuente, option.model_dump(), (option.paginas, "páginas", _PAGE_UNITS),
+            option.modalidad,
+        )
     for i, field in enumerate(ficha.limites.campos):
         yield CallRule(f"campo:{field.nombre}", f"limites.campos[{i}].fuente ({field.nombre})",
                        field.fuente, field.model_dump(),
@@ -165,17 +192,66 @@ def _read_approvals(folder: Path) -> dict:
     return saved if isinstance(keys, list) and all(isinstance(key, str) for key in keys) else {}
 
 
-def _write_approvals(path: Path, snapshot: dict) -> None:
+def _write_json(path: Path, data: dict) -> None:
     temp = None
     try:
-        with NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+        with NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, delete=False,
+        ) as stream:
             temp = Path(stream.name)
-            json.dump(snapshot, stream, indent=2)
+            json.dump(data, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
         temp.replace(path)
     finally:
         if temp is not None:
             temp.unlink(missing_ok=True)
+
+
+def _saved_modality(folder: Path) -> str | None:
+    try:
+        saved = json.loads((folder / PROPOSAL).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    choice = saved.get("modalidad") if isinstance(saved, dict) else None
+    return choice if isinstance(choice, str) else None
+
+
+def _modal_page_limit(limits: Limits, modality: str | None) -> ModalPageLimit | None:
+    if modality is None:
+        return None
+    key = _modality_key(modality)
+    return next((rule for rule in limits.paginas_por_modalidad
+                 if _modality_key(rule.modalidad) == key), None)
+
+
+def _modality_status(limits: Limits, modality: str | None) -> dict:
+    options = [limit.modalidad for limit in limits.paginas_por_modalidad]
+    selected = _modal_page_limit(limits, modality)
+    return {
+        "estado": "seleccionada" if selected is not None else "pendiente",
+        "seleccion": selected.modalidad if selected is not None else None,
+        "opciones": options,
+        "limite": selected.model_dump() if selected is not None else None,
+        "pregunta": None if selected is not None else
+        f"¿Cuál es la modalidad de la propuesta? Opciones: {', '.join(options)}.",
+    }
+
+
+def set_call_modality(folder: Path, modality: str) -> dict:
+    """Record the investigator's choice independently of rule approval."""
+    folder = Path(folder)
+    if Project.load(folder).tipo != "convocatoria":
+        raise LibraryError("Solo se puede fijar la modalidad en un proyecto de convocatoria.")
+    limits = CallFicha.load(folder).limites
+    if not limits.paginas_por_modalidad:
+        raise LibraryError("La ficha no contiene límites por modalidad.")
+    status = _modality_status(limits, modality)
+    selected = status["seleccion"]
+    if selected is None:
+        raise LibraryError(f"Modalidad no disponible. {status['pregunta']}")
+    if _saved_modality(folder) != selected:
+        _write_json(folder / PROPOSAL, {"modalidad": selected})
+    return status
 
 
 def ficha_text(folder: Path) -> str:
@@ -186,8 +262,17 @@ def ficha_text(folder: Path) -> str:
     name = ficha.convocatoria if kind == "convocatoria" else ficha.revista
     lines = [f"{label}: {name}"]
     if isinstance(ficha, CallFicha):
-        lines += [f"Plazo: {ficha.plazo or 'no consta'}",
-                  f"Límite de páginas: {ficha.limites.paginas or 'no consta'}"]
+        lines.append(f"Plazo: {ficha.plazo or 'no consta'}")
+        if ficha.limites.paginas_por_modalidad:
+            lines.append("Límites de páginas por modalidad:")
+            for limit in ficha.limites.paginas_por_modalidad:
+                source = limit.fuente
+                lines.append(
+                    f"- {limit.modalidad}: {limit.paginas} páginas "
+                    f"({source.fichero}, p. {source.pagina}). «{source.cita}»"
+                )
+        else:
+            lines.append(f"Límite de páginas: {ficha.limites.paginas or 'no consta'}")
         for field in ficha.limites.campos:
             lines.append(f"- {field.nombre}: {field.caracteres} caracteres "
                          f"({field.apartado or 'a mano'}).")
@@ -208,6 +293,10 @@ def ficha_text(folder: Path) -> str:
         lines.append("No constan criterios de evaluación.")
     if isinstance(ficha, CallFicha):
         report, _ = _check_call_ficha(Path(folder), ficha)
+        if modality := report.get("modalidad"):
+            lines.append(
+                modality["pregunta"] or f"Modalidad de la propuesta: {modality['seleccion']}."
+            )
         if not report["confirmada"]:
             lines += ["", "Ficha por confirmar. Reglas por revisar:"]
             for rule in report["reglas"]:
@@ -265,7 +354,7 @@ def confirm_ficha(folder: Path, revision: str | None = None) -> dict:
                 lines.insert(1, "confirmada: true" + newline)
                 updated = "".join(lines)
         if snapshot is not None:
-            _write_approvals(Path(folder) / APPROVALS, snapshot)
+            _write_json(Path(folder) / APPROVALS, snapshot)
         if updated != text:
             with path.open("w", encoding="utf-8", newline="") as stream:
                 stream.write(updated)
@@ -289,6 +378,29 @@ def _quoted_limit(quote: str, unit: str) -> int | None:
     return None
 
 
+def _modality_pattern(label: str) -> str:
+    words = [re.escape(word) + r"(?:es|s)?" for word in _modality_key(label).split()]
+    return r"\b" + r"\s+".join(words) + r"\b"
+
+
+def _quoted_modal_limit(quote: str, modality: str, options: list[ModalPageLimit]) -> int | None:
+    """Read a maximum tied to the named modality when the wording makes the pair explicit."""
+    quote = _normalize_pdf_spacing(quote)
+    label = _modality_pattern(modality)
+    values = set()
+    for clause in re.split(r"(?<=[.!?])\s+|;\s*", quote):
+        if cue := _PAGE_LIMIT_CUE.search(clause):
+            pattern = (rf"(?<![\w.,-])([0-9]+)\s+(?:(?:{_PAGE_UNITS})\s+)?"
+                       rf"para\s+(?:(?:los|las)\s+)?(?:proyectos?\s+)?{label}")
+            values.update(int(number) for number in re.findall(pattern, clause[cue.end():]))
+        mentioned = [option.modalidad for option in options
+                     if re.search(_modality_pattern(option.modalidad), clause)]
+        if mentioned == [modality]:
+            if (limit := _quoted_limit(clause, _PAGE_UNITS)) is not None:
+                values.add(limit)
+    return next(iter(values)) if len(values) == 1 else None
+
+
 def _normalize_pdf_spacing(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
 
@@ -303,12 +415,19 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
     approved_keys = set(saved.get("reglas", []))
     current_keys = []
     summaries = []
+    options = ficha.limites.paginas_por_modalidad
     for rule in rules:
         item = {"id": rule.id, "donde": rule.location, **rule.source.model_dump()}
+        if rule.modality is not None:
+            item["modalidad"] = rule.modality
         matched = evidence.get(rule.location)
         if rule.limit and matched is not None:
             declared, units, pattern = rule.limit
-            quoted = _quoted_limit(rule.source.cita, pattern) if matched[1] else None
+            quoted = None
+            if matched[1] and rule.modality is not None:
+                quoted = _quoted_modal_limit(rule.source.cita, rule.modality, options)
+            elif matched[1]:
+                quoted = _quoted_limit(rule.source.cita, pattern)
             item["valor"] = "revision_manual" if quoted is None else "coincide"
             if quoted is not None and quoted != declared:
                 item["valor"] = "difiere"
@@ -333,7 +452,15 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
     report["reglas"] = summaries
     report["confirmada"] = not report["fallidos"] and saved == snapshot
     report["cambio_estructura"] = bool(saved and saved.get("estructura") != structure)
-    report["revision"] = _fingerprint((snapshot, ficha.model_dump(exclude={"confirmada"})))
+    ficha_data = ficha.model_dump(exclude={"confirmada"})
+    revision = (snapshot, ficha_data)
+    if options:
+        modality = report["modalidad"] = _modality_status(ficha.limites, _saved_modality(folder))
+        revision += (modality["seleccion"],)
+    else:
+        # Keep the existing revision for calls with a single unconditional limit.
+        del ficha_data["limites"]["paginas_por_modalidad"]
+    report["revision"] = _fingerprint(revision)
     return report, snapshot
 
 
@@ -408,7 +535,8 @@ def check_sources(
                     candidates = (sorted(nearby, key=lambda i: abs(i + 1 - source.pagina))
                                   if in_nearby else range(len(pages)))
                     found = next(
-                        (i for i in candidates if verbatim(source.cita, pages[i], explain=False)[0]),
+                        (i for i in candidates
+                         if verbatim(source.cita, pages[i], explain=False)[0]),
                         None,
                     )
                     scope = nearby if in_nearby else range(len(pages))
@@ -458,7 +586,7 @@ def _section_body(lines: list[str], headings: list[dict], heading: dict) -> str:
                      if not _HEADING.match(line)).strip()
 
 
-def check_call(text: str, ficha: CallFicha | dict) -> dict:
+def check_call(text: str, ficha: CallFicha | dict, *, modalidad: str | None = None) -> dict:
     """Compare headings, length, character limits and pending marks with a validated ficha."""
     if not isinstance(ficha, CallFicha):
         ficha = CallFicha.model_validate(ficha)
@@ -505,10 +633,19 @@ def check_call(text: str, ficha: CallFicha | dict) -> dict:
             last = position
 
     count = len(words)
-    maximum = ficha.limites.paginas
+    limit = _modal_page_limit(ficha.limites, modalidad)
+    maximum = limit.paginas if limit is not None else ficha.limites.paginas
     capacity = maximum * ficha.limites.palabras_por_pagina if maximum is not None else None
     state = ("sin_limite" if capacity is None else "excedido" if count > capacity
              else "aviso" if count >= capacity * 0.9 else "ok")
+    if ficha.limites.paginas_por_modalidad and limit is None:
+        state = "modalidad_pendiente"
+    extension = {
+        "palabras": count, "paginas_estimadas": round(count / ficha.limites.palabras_por_pagina, 1),
+        "maximo": maximum, "estado": state,
+    }
+    if limit is not None:
+        extension.update(modalidad=limit.modalidad, fuente=limit.fuente.model_dump())
     fields, manual = [], []
     for field in ficha.limites.campos:
         if field.apartado is None:
@@ -525,9 +662,7 @@ def check_call(text: str, ficha: CallFicha | dict) -> dict:
     return {
         "faltan": missing, "vacios": empty, "condicionales_ausentes": conditional, "sobran": extra,
         "orden": order,
-        "extension": {"palabras": count,
-                      "paginas_estimadas": round(count / ficha.limites.palabras_por_pagina, 1),
-                      "maximo": maximum, "estado": state},
+        "extension": extension,
         "campos": fields, "a_mano": manual, "pendientes": pending,
     }
 
@@ -558,6 +693,8 @@ def report_lines(ficha: dict, call: dict) -> list[str]:
                 )
             if rule.get("valor") == "revision_manual":
                 lines.append(f"- Cotejo manual del límite: {rule['donde']}.")
+        if question := ficha.get("modalidad", {}).get("pregunta"):
+            lines.append(question)
     if "aviso" in call:
         lines.append(call["aviso"])
     else:
@@ -579,6 +716,14 @@ def report_lines(ficha: dict, call: dict) -> list[str]:
                                   "primer apartado fuera de sitio: " + ", ".join(call["orden"])))
         length = call["extension"]
         maximum = length["maximo"] if length["maximo"] is not None else "sin límite"
+        if length["estado"] == "modalidad_pendiente":
+            maximum = "por determinar según la modalidad"
+        if source := length.get("fuente"):
+            lines.append(
+                f"Modalidad: {length['modalidad']}. "
+                f"Límite de {maximum} páginas ({source['fichero']}, p. {source['pagina']}). "
+                f"«{source['cita']}»"
+            )
         lines.append(
             f"Extensión: {length['palabras']} palabras; {length['paginas_estimadas']:.1f} "
             f"páginas estimadas; máximo: {maximum}. Estado: {length['estado']}."

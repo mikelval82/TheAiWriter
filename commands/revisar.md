@@ -8,7 +8,7 @@ Revisa el borrador de la carpeta actual por criterios con el servidor MCP `theai
 Petición del usuario: $ARGUMENTS
 
 1. Lee `proyecto.yaml` y determina el origen de los criterios:
-   - Tipo `convocatoria`: llama a `comprobar_ficha`. Si falta, hay fallidos o requiere confirmación, sigue el procedimiento de `/theaiwriter:escribir solo ficha` antes de revisar la memoria. Debe tener al menos un criterio de evaluación con fuente.
+   - Tipo `convocatoria`: llama a `comprobar_ficha`. Si falta, hay fallidos o requiere confirmación, sigue el procedimiento de `/theaiwriter:escribir solo ficha` antes de revisar la memoria. Si falta la modalidad, sigue `/theaiwriter:escribir modalidad`. Debe haber al menos un criterio de evaluación con fuente.
    - Si el usuario nombra una revista, pídele que deje en `revista/` las normas de autores o la guía de revisores en PDF. Mira todos los PDF de `revista/` y di qué páginas no has leído, sin afirmar qué hay en ellas. Redacta `revista/ficha.yaml` solo con criterios que estén en esos PDF, cada uno con una cita literal de al menos seis palabras:
      - Si la revista da una lista expresa de criterios de publicación o evaluación, van primero, uno por elemento, sin juntarlos ni saltarse ninguno y con su nombre. Si un elemento tiene menos de seis palabras, cita el tramo seguido de la lista que lo contiene, copiado tal cual, con los elementos vecinos que hagan falta.
      - Las demás preguntas o exigencias para evaluar el manuscrito que detallen un criterio de la lista van en su `descripcion`. Con las que queden, agrupa por tema (literatura, datos y código, claridad…) en pocos criterios más, sin pasar de unos 10 en total salvo que la lista ya los supere.

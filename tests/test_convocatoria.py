@@ -196,6 +196,101 @@ def test_estado_guides_to_ficha_and_then_to_a_fresh_check(document, ficha):  # n
     assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:comprobar"
 
 
+MODALITY_QUOTE = (
+    "Número máximo de páginas incluyendo la portada y el índice: "
+    "20 para proyectos individuales y 35 para proyectos coordinados."
+)
+
+
+@pytest.fixture
+def modal_call(document, ficha):  # noqa: F811
+    from ai_writer import mcp_server, verificacion
+
+    mcp_server.crear_documento("convocatoria", "T")
+    make_pdf(document / "convocatoria/instrucciones.pdf",
+             [("Instructions", QUOTE), ("Límites de la memoria", MODALITY_QUOTE)])
+    fuente = {**SOURCE, "pagina": 2, "cita": MODALITY_QUOTE}
+    ficha["limites"].update(paginas=None, fuente=None, paginas_por_modalidad=[
+        {"modalidad": "individual", "paginas": 20, "fuente": fuente},
+        {"modalidad": "coordinado", "paginas": 35, "fuente": fuente},
+    ])
+    save_ficha(document, ficha)
+    for name in ("abstract.md", "equipo.md"):
+        (document / "materiales" / name).write_text("Datos de la propuesta.", encoding="utf-8")
+    (document / verificacion.DRAFT).write_text("## Motivación\n" + "dato " * 250, encoding="utf-8")
+    return document
+
+
+def test_call_asks_for_modality_and_recalculates_the_limit(modal_call):
+    from ai_writer import mcp_server, verificacion
+
+    initial = mcp_server.comprobar_ficha()
+    assert mcp_server.confirmar_ficha(initial["revision"])["confirmada"]
+    report = mcp_server.comprobar_documento(juez=False)
+    assert report["ficha"]["modalidad"]["opciones"] == ["individual", "coordinado"]
+    assert report["convocatoria"]["extension"]["estado"] == "modalidad_pendiente"
+    assert report["convocatoria"]["extension"]["maximo"] is None
+    assert "modalidad" in report["ficha"]["modalidad"]["pregunta"]
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:escribir modalidad"
+    assert "¿Cuál es la modalidad" in (modal_call / verificacion.REPORT).read_text()
+
+    assert mcp_server.fijar_modalidad_convocatoria(" individual ")["seleccion"] == "individual"
+    individual = mcp_server.comprobar_documento(juez=False)
+    first = individual["convocatoria"]["extension"]
+    assert first["maximo"] == 20 and first["estado"] == "excedido"
+    assert first["modalidad"] == "individual"
+    assert first["fuente"]["pagina"] == 2 and first["fuente"]["cita"] == MODALITY_QUOTE
+    assert "modalidad" in mcp_server.fijar_modalidad_convocatoria("externo")["error"].casefold()
+    assert mcp_server.comprobar_ficha()["modalidad"]["seleccion"] == "individual"
+
+    assert mcp_server.fijar_modalidad_convocatoria("coordinado")["seleccion"] == "coordinado"
+    assert mcp_server.estado_documento()["comprobacion"]["estado"] == "desactualizada"
+    coordinated = mcp_server.comprobar_documento(juez=False)
+    second = coordinated["convocatoria"]["extension"]
+    assert second["maximo"] == 35 and second["estado"] == "ok"
+    assert coordinated["ficha"]["confirmada"]
+    assert not coordinated["ficha"]["fallidos"]
+    markdown = (modal_call / verificacion.REPORT).read_text()
+    assert "coordinado" in markdown and "p. 2" in markdown and MODALITY_QUOTE in markdown
+
+
+def test_page_limits_match_the_number_for_each_modality(modal_call, ficha):
+    report = check_ficha(modal_call)
+    rules = [rule for rule in report["reglas"] if rule["id"].startswith("paginas:")]
+    assert [rule["valor"] for rule in rules] == ["coincide", "coincide"]
+
+    ficha["limites"]["paginas_por_modalidad"][0]["paginas"] = 35
+    save_ficha(modal_call, ficha)
+    failure, = check_ficha(modal_call)["fallidos"]
+    assert failure["id"] == "paginas:individual"
+    assert "35" in failure["motivo"] and "20" in failure["motivo"]
+
+
+def test_page_limit_does_not_infer_modality_from_an_unrelated_sentence(modal_call, ficha):
+    quote = (
+        "Los proyectos individuales entregarán un resumen. "
+        "Los anexos tienen un máximo de 20 páginas."
+    )
+    make_pdf(modal_call / "convocatoria/instrucciones.pdf",
+             [("Instructions", QUOTE), ("Límites de la memoria", MODALITY_QUOTE + "\n" + quote)])
+    ficha["limites"]["paginas_por_modalidad"][0]["fuente"]["cita"] = quote
+    save_ficha(modal_call, ficha)
+    rule = next(rule for rule in check_ficha(modal_call)["reglas"]
+                if rule["id"] == "paginas:individual")
+    assert rule["valor"] == "revision_manual"
+
+
+def test_modality_is_pending_if_the_saved_option_disappears(modal_call, ficha):
+    from ai_writer import mcp_server
+
+    assert mcp_server.fijar_modalidad_convocatoria("coordinado")["seleccion"] == "coordinado"
+    ficha["limites"]["paginas_por_modalidad"].pop()
+    save_ficha(modal_call, ficha)
+    report = mcp_server.comprobar_ficha()
+    assert report["modalidad"]["seleccion"] is None
+    assert report["modalidad"]["opciones"] == ["individual"]
+
+
 def test_ficha_checks_every_source_and_keeps_confirmation(official, ficha):
     from ai_writer.library import Project
 

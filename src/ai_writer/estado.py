@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from ai_writer import revisor, verificacion
-from ai_writer.convocatoria import check_ficha
+from ai_writer.convocatoria import FICHA, check_ficha
 from ai_writer.evidencia import has_results, inventory
 from ai_writer.exportacion import export_status
 from ai_writer.hallazgos import list_findings
@@ -89,13 +89,16 @@ def _next_action(
         return navigation(ESCRIBIR, "Ya hay hallazgos aprobados para el borrador.",
                           (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."),
                           (f"{HALLAZGOS} ver", "Volver a los hallazgos y decidir qué incluir."))
-    if not text.strip():
-        return navigation(ESCRIBIR, "Los materiales básicos están listos.",
-                          (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."))
-    if ficha is not None and not ficha.get("confirmada"):
+    if ficha is not None and not ficha.get("confirmada") and text.strip():
         return navigation(f"{ESCRIBIR} solo ficha",
                           "La ficha de la convocatoria necesita corrección o confirmación.",
                           (f"{COMPROBAR} sin juez", "Ver las reglas pendientes y sus fuentes."))
+    if ficha is not None and ficha.get("confirmada"):
+        if question := ficha.get("modalidad", {}).get("pregunta"):
+            return navigation(f"{ESCRIBIR} modalidad", question)
+    if not text.strip():
+        return navigation(ESCRIBIR, "Los materiales básicos están listos.",
+                          (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."))
     if check["estado"] == "juez en curso" or review["estado"] == "en_curso":
         return navigation(ESTADO, "Hay un informe en preparación.",
                           ("Leer borrador/documento.md", "Revisar el texto mientras se prepara."))
@@ -164,7 +167,9 @@ def document_status(folder: Path) -> dict:
 
     draft = folder / verificacion.DRAFT
     text = draft.read_text(encoding="utf-8") if draft.exists() else ""
-    ficha = check_ficha(folder) if project.tipo == "convocatoria" and text.strip() else None
+    ficha = (check_ficha(folder)
+             if project.tipo == "convocatoria" and (text.strip() or (folder / FICHA).is_file())
+             else None)
     fingerprint = verificacion.draft_fingerprint(text)
     result = folder / verificacion.RESULT
     checks = {}
@@ -212,6 +217,7 @@ def document_status(folder: Path) -> dict:
         "palabras": len(text.split()), "comprobacion": verification, "revision": review,
         "exportacion": export,
         **({"hallazgos": findings} if findings is not None else {}),
+        **({"modalidad": ficha["modalidad"]} if ficha and "modalidad" in ficha else {}),
         **_next_action(missing, text, verification, review, _problems(checks, text),
                        findings, export, ficha),
     }

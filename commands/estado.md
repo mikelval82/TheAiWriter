@@ -6,4 +6,6 @@ Llama a `estado_documento` y responde en español. Muestra el título, el tipo, 
 
 Si falta `proyecto.yaml`, sugiere abrir la carpeta de trabajo y usar `/theaiwriter:nuevo`. Ante otro error, indica cómo resolverlo antes de avanzar.
 
+Si el proyecto de convocatoria devuelve `modalidad`, muestra la selección y el máximo de páginas o la pregunta pendiente. Para modificar la elección, indica `/theaiwriter:escribir modalidad`.
+
 Muestra **Siguiente** con `siguiente` y `motivo_siguiente`, y **También puedes** con `alternativas` cuando las haya. Si hace falta ayuda para exportar, enlaza [la guía](https://github.com/mikelval82/TheAiWriter/blob/master/docs/exportar.md).

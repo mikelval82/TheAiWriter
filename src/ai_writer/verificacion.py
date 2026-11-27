@@ -502,7 +502,7 @@ def _check_document(
         data["convocatoria"] = (
             {"aviso": "No se puede comprobar el borrador: se necesita una ficha sin errores."}
             if "error" in ficha or ficha["fallidos"]
-            else check_call(text, call_ficha)
+            else check_call(text, call_ficha, modalidad=ficha.get("modalidad", {}).get("seleccion"))
         )
     _save(folder, data)
     return data

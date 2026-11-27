@@ -25,6 +25,7 @@ limites:
   paginas: null             # máximo si consta; con páginas, fuente es obligatoria
   palabras_por_pagina: 500
   fuente: null              # {fichero: ..., pagina: ..., cita: ...}
+  paginas_por_modalidad: [] # si varía, deja paginas y fuente en null
   campos:
     - nombre: "Nombre del campo"
       caracteres: 3500      # solo si consta ese máximo en el PDF
@@ -41,9 +42,13 @@ criterios:
 
 Los valores del ejemplo son ilustrativos: sustitúyelos por los de los PDF. `fuente` es obligatoria en cada apartado, en `limites` si hay `paginas`, en cada campo, en la regla de `idioma` si la hay y en cada criterio. Si no hay campos o criterios, usa una lista vacía.
 
-Llama a `comprobar_ficha` aunque la ficha ya exista. Revisa los fallidos y los avisos de página. Si el límite exige cotejo manual, muestra el valor registrado y la cita para que el investigador los compare. Si hay varias modalidades en la cita, pregunta cuál aplica antes de elegir un valor.
+Si las bases dan límites distintos según la modalidad, recoge cada opción como `{modalidad: ..., paginas: ..., fuente: ...}` en `paginas_por_modalidad`. La cita de cada opción debe incluir su nombre y su máximo. Puedes usar el mismo pasaje para varias opciones si las distingue de forma expresa. Si una ficha anterior tiene un único máximo tomado de un pasaje con varias modalidades, propone convertirlo en varias reglas y pide confirmar la ficha actualizada.
+
+Llama a `comprobar_ficha` aunque la ficha ya exista. Revisa los fallidos y los avisos de página. Si el límite exige cotejo manual, muestra el valor registrado y la cita para que el investigador los compare.
 
 Cuando la ficha requiera confirmación y pase las comprobaciones, muestra `mostrar_ficha` y pregunta «¿Confirmas la ficha? (sí/no)». Llama a `confirmar_ficha` solo tras el sí y pasa `revision` del `comprobar_ficha` que precedió al texto mostrado. Si cambió entretanto, vuelve a mostrar la ficha y pide confirmación otra vez. Las reglas ya aprobadas se conservan. Una ficha antigua sin registro de aprobación se confirma una vez con este procedimiento. Respeta el idioma y el plazo recogidos en la ficha.
+
+Si `comprobar_ficha` devuelve `modalidad.pregunta`, usa esa pregunta y espera la respuesta antes de hacer el plan. Llama a `fijar_modalidad_convocatoria` solo con una opción que el investigador haya indicado expresamente. Muestra el límite, el PDF, la página y la cita que devuelve. Usa ese máximo en el plan. Cambiar la modalidad deja vigentes las aprobaciones de las reglas y requiere una nueva comprobación del borrador.
 
 ## Plan
 
