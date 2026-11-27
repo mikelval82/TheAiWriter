@@ -75,7 +75,8 @@ def test_perspective_uses_generic_criteria_in_one_call(draft):  # noqa: F811
     assert all(c["maximo"] is c["umbral"] is None for c in criteria)
     assert prompt.endswith((draft / verificacion.DRAFT).read_text(encoding="utf-8"))
     checks = prompt_checks(reviewer)
-    assert checks["apoyo"] is None and checks["frases_a_revisar"] == 0
+    assert checks["apoyo"]["juzgadas"] == checks["frases_a_revisar"] == 0
+    assert checks["apoyo"]["total"] == checks["apoyo"]["sin_juzgar"] == 5
     assert not (draft / "borrador/referencias.bib").exists()
 
 
@@ -310,3 +311,19 @@ def test_cli_dispatches_review(tmp_path, monkeypatch, capsys, explicit_folder):
     main(["documento", "revisar"] + ([str(tmp_path)] if explicit_folder else []))
     assert calls == [tmp_path if explicit_folder else Path(".")]
     assert capsys.readouterr().out.strip() == "terminado"
+
+
+def test_review_is_stale_if_draft_changed_during_generation(draft):  # noqa: F811
+    (draft / "materiales/abstract.md").write_text("Mi estudio.")
+    path = draft / verificacion.DRAFT
+    path.write_text("Versión anterior.")
+
+    class EditingReviewer(Reviewer):
+        def complete_json(self, system, user):
+            path.write_text("Versión nueva.")
+            return super().complete_json(system, user)
+
+    assert revisor.run_review(draft, EditingReviewer())["estado"] == "terminado"
+    assert mcp_server.estado_documento()["revision"]["estado"] == "desactualizada"
+    verificacion.check_document(draft)
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:revisar"

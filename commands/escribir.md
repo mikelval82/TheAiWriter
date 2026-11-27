@@ -38,11 +38,11 @@ Petición del usuario: $ARGUMENTS
 
 ## Comprobación
 
-10. Al terminar, llama a `comprobar_documento`. Resume las claves que no existan o estén fuera de las colecciones y las citas literales que no coincidan.
-11. El juez de apoyo corre en segundo plano y hace una llamada a Claude por cada párrafo con citas. Avisa al usuario y consulta el resultado con `estado_comprobacion` cuando lo pida o al cabo de unos minutos.
+10. Al terminar, avisa del coste del juez y llama a `comprobar_documento`. Resume las claves que no existan o estén fuera de las colecciones y las citas literales que no coincidan.
+11. El juez de apoyo corre en segundo plano y hace una llamada a Claude por cada párrafo con citas. Consulta el resultado con `estado_comprobacion` cuando lo pida o al cabo de unos minutos.
 12. Con el resultado del juez, resume las frases tergiversadas, no apoyadas y parciales y lo señalado en cifras o convocatoria. Las correcciones se proponen con `/theaiwriter:corregir`, con el visto bueno del usuario.
-13. Resume dónde está el borrador, las frases apoyadas y las que quedan por revisar, las obras sin citar que podrían aportar algo, el informe `informes/comprobacion.md` y la bibliografía `borrador/referencias.bib`. Termina con «Siguiente: /theaiwriter:corregir» si hay algo señalado; si no, «Siguiente: /theaiwriter:revisar».
-
-Empieza la respuesta final con un resumen de 3 a 5 líneas; el detalle está en el informe. Termina con una línea «Siguiente: /theaiwriter:…» con el paso que toca.
+13. Resume dónde están el borrador, el informe `informes/comprobacion.md` y la bibliografía `borrador/referencias.bib`. Indica cuántos pares de frase y obra se han juzgado del total y cuántos quedan pendientes. Si hay obras sin citar que podrían aportar algo, indícalas.
 
 Antes de empezar, avisa en una línea de lo que gasta con la cuenta de Claude del usuario.
+
+Antes de cerrar, llama a `estado_documento`. Muestra **Siguiente** con `siguiente` y `motivo_siguiente`, y **También puedes** con `alternativas` cuando las haya. Si el paso es pasar a Word, enlaza [la guía](https://github.com/mikelval82/TheAiWriter/blob/master/docs/exportar.md).

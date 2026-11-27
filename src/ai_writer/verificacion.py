@@ -16,6 +16,7 @@ Results go to ``informes/comprobacion.json`` and ``informes/comprobacion.md``.
 
 import json
 import re
+from hashlib import sha256
 from pathlib import Path
 
 from ai_writer.avisos import add_notice
@@ -323,12 +324,30 @@ def judge_support(
     return entries
 
 
-def summary(entries: list[dict]) -> dict:
-    """Entries per verdict and ``apoyo``: share of the judged ones that are ``apoyada``."""
-    counts = {v: sum(e["veredicto"] == v for e in entries) for v in (*VERDICTS, "sin_juzgar")}
-    judged = sum(counts[v] for v in VERDICTS)
-    counts["apoyo"] = round(counts["apoyada"] / judged, 3) if judged else None
-    return counts
+def draft_fingerprint(text: str) -> str:
+    return sha256(text.encode("utf-8")).hexdigest()
+
+
+def count_cited_pairs(text: str) -> int:
+    return sum(len(keys) for paragraph in cited_paragraphs(text) for _, keys in paragraph["frases"])
+
+
+def summary(entries: list[dict], *, total: int | None = None) -> dict:
+    """Count verdicts for sentence–work pairs, including pairs still awaiting judgment."""
+    counts = {v: sum(e["veredicto"] == v for e in entries) for v in VERDICTS}
+    judged = sum(counts.values())
+    total = max(len(entries), total if total is not None else len(entries))
+    return {
+        **counts,
+        "total": total,
+        "juzgadas": judged,
+        "sin_juzgar": total - judged,
+        "apoyo": round(counts["apoyada"] / judged, 3) if judged else None,
+    }
+
+
+def support_summary(data: dict) -> dict:
+    return summary(data.get("apoyo", []), total=data.get("total_pares_citados"))
 
 
 # -- the document ----------------------------------------------------------
@@ -360,7 +379,12 @@ def _open(folder: Path) -> tuple[str, PassageIndex, set[str] | None]:
 
 def check_document(folder: Path, *, bibliography: bool = True) -> dict:
     """Run checks without an LLM and save them; optionally update the bibliography."""
-    text, index, allowed = _open(folder)
+    return _check_document(folder, *_open(folder), bibliography=bibliography)
+
+
+def _check_document(
+    folder: Path, text: str, index: PassageIndex, allowed: set[str] | None, *, bibliography: bool
+) -> dict:
     citations = check_citations(text, index, allowed)
     path = (write_bibliography(folder, index, citations["validas"])
             if bibliography else Path(folder) / BIBLIOGRAPHY)
@@ -374,6 +398,8 @@ def check_document(folder: Path, *, bibliography: bool = True) -> dict:
     surnames = {m.group(0) for key in index.keys.values() if (m := re.match("[a-z]+", key))}
     data = {
         "comprobado": now(),
+        "borrador_sha256": draft_fingerprint(text),
+        "total_pares_citados": count_cited_pairs(text),
         "citas": citations,
         "citas_literales": check_quotes(text, index),
         "bibliografia": str(path.relative_to(Path(folder))) if path.exists() else None,
@@ -417,8 +443,10 @@ def judge_running(data: dict) -> bool:
 
 def run_judge(folder: Path, llm=None) -> dict:
     """Judge the draft's cited sentences, saving progress after every paragraph."""
-    text, index, _ = _open(folder)
-    data = _load(folder) or check_document(folder)
+    text, index, allowed = _open(folder)
+    data = _load(folder)
+    if data.get("borrador_sha256") != draft_fingerprint(text):
+        data = _check_document(folder, text, index, allowed, bibliography=True)
     judge = data.setdefault("juez", {})
 
     def progress(entries: list[dict], done: int, total: int) -> None:
@@ -440,10 +468,12 @@ def run_judge(folder: Path, llm=None) -> dict:
     finally:
         judge["fin"] = now()
         _save(folder, data)
-        total = sum(len(keys) for p in cited_paragraphs(text) for _, keys in p["frases"])
-        supported = summary(data.get("apoyo", []))["apoyada"]
-        message = (f"El juez de citas ha terminado: {supported} de {total} frases apoyadas, "
-                   f"{total - supported} por revisar. ")
+        stats = support_summary(data)
+        message = (
+            f"El juez de citas ha terminado. Ha juzgado {stats['juzgadas']} de {stats['total']} "
+            f"pares de frase y obra. {stats['apoyada']} apoyados y "
+            f"{stats['sin_juzgar']} pendientes de juicio. "
+        )
         if judge["estado"] != "terminado":
             message = (f"El juez de citas se ha detenido: {judge['estado']}. "
                        "Reanuda con /theaiwriter:comprobar. ")
@@ -489,7 +519,7 @@ def overview(data: dict) -> dict:
         },
         "atribuciones_sin_cita": data.get("atribuciones_sin_cita", []),
         "juez": data.get("juez", {}),
-        "apoyo": summary(data.get("apoyo", [])),
+        "apoyo": support_summary(data),
         "frases_a_revisar": [
             {k: e[k] for k in ("seccion", "frase", "clave", "veredicto", "motivo")}
             for e in worst[:25]
@@ -593,6 +623,11 @@ def markdown(data: dict) -> str:
 
     lines += ["", "## Apoyo de las frases citadas", ""]
     judge = data.get("juez", {})
+    stats = support_summary(data)
+    lines.append(
+        f"Cobertura: {stats['juzgadas']} de {stats['total']} pares de frase y obra juzgados. "
+        f"{stats['sin_juzgar']} pendientes."
+    )
     if not entries:
         lines.append(
             "El juez de apoyo no se ha lanzado todavía."
@@ -600,12 +635,10 @@ def markdown(data: dict) -> str:
             else f"Juez: {judge.get('estado')}."
         )
         return "\n".join(lines) + "\n"
-    stats = summary(entries)
-    apoyo = "sin datos" if stats["apoyo"] is None else f"{stats['apoyo']:.0%}"
     lines += [
-        f"Apoyo: {apoyo} ({stats['apoyada']} apoyadas, {stats['parcial']} parciales, "
-        f"{stats['tergiversada']} tergiversadas, {stats['no_apoyada']} no apoyadas, "
-        f"{stats['sin_juzgar']} sin juzgar). Estado del juez: {judge.get('estado')}.",
+        f"De los juzgados: {stats['apoyada']} apoyados, {stats['parcial']} parciales, "
+        f"{stats['tergiversada']} tergiversados y {stats['no_apoyada']} sin apoyo. "
+        f"Estado del juez: {judge.get('estado')}.",
         "Un juez automático compara cada frase con pasajes de la obra citada. Se equivoca a veces: "
         "revisa a mano las peores.",
         "",

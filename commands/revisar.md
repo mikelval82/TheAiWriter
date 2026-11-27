@@ -36,10 +36,8 @@ Petición del usuario: $ARGUMENTS
 2. Recomienda haber pasado `/theaiwriter:comprobar` antes: la revisión usa su resultado de apoyo de las citas y actualiza las comprobaciones que no necesitan un modelo. No vuelve a juzgar las citas.
 3. Avisa en una línea de que hace una llamada a Claude con su cuenta y corre en segundo plano. Llama a `revisar_documento`; consulta `estado_revision` cuando el usuario lo pida o pasados unos minutos.
 4. Presenta las prioridades y, por criterio, su nivel y el trabajo que haría falta. Señala las carencias con el apartado del borrador; no des puntuaciones numéricas. Recuerda que la evaluación es automática y orientativa y no sustituye a la de la convocatoria o revista. Los `[PENDIENTE: …]` piden conseguir el dato, nunca inventarlo; reconocer limitaciones y riesgos es una fortaleza.
-5. No cambies el borrador. Si la revisión sigue en curso, termina con «Siguiente: /theaiwriter:estado». Si ha terminado, con «Siguiente: /theaiwriter:corregir» si hay prioridades; si no, «Siguiente: /theaiwriter:estado».
+5. Conserva el borrador y resume el estado de la revisión.
 
 El informe completo queda en `informes/revision.md` y el resultado también en `informes/revision.json`.
 
-Empieza la respuesta final con un resumen de 3 a 5 líneas; el detalle está en el informe. Termina con una línea «Siguiente: /theaiwriter:…» con el paso que toca.
-
-Antes de empezar, avisa en una línea de lo que gasta con la cuenta de Claude del usuario.
+Antes de cerrar, llama a `estado_documento`. Muestra **Siguiente** con `siguiente` y `motivo_siguiente`, y **También puedes** con `alternativas` cuando las haya. Si el paso es pasar a Word, enlaza [la guía](https://github.com/mikelval82/TheAiWriter/blob/master/docs/exportar.md).

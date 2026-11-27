@@ -99,7 +99,7 @@ def _verification_summary(data: dict) -> dict:
     citations = data["citas"]
     entries = data.get("apoyo", [])
     report = {
-        "apoyo": verificacion.summary(entries) if entries else None,
+        "apoyo": verificacion.support_summary(data),
         "frases_a_revisar": len({(e["seccion"], e["frase"]) for e in entries
                                   if e["veredicto"] in ("parcial", "tergiversada", "no_apoyada")}),
         "citas": {k: len(v) if isinstance(v, list) else v for k, v in citations.items()},
@@ -170,6 +170,7 @@ def run_review(folder: Path, llm=None) -> dict:
         "estado": "en_curso", "pid": os.getpid(),
         "inicio": previous.get("inicio", now()) if previous.get("estado") == "en_curso" else now(),
         "fin": None, "origen": origin,
+        "borrador_sha256": verificacion.draft_fingerprint(text),
         "criterios": [_unevaluated(c["nombre"]) for c in criteria],
         "prioridades": [], "error": None,
     }

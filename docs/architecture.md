@@ -56,7 +56,7 @@ El camino de cinco verbos es `nuevo`, `escribir`, `comprobar`, `revisar` y pasar
 [exportar.md](exportar.md). Las ayudas son `estado`, `corregir`, `diagnostico`, que también
 atiende consultas sobre la biblioteca, y `ayuda`, que explica los comandos a partir del manual. `corregir` muestra antes y después y solo aplica los cambios
 aceptados; vuelve a comprobar sin juez. `escribir` comprueba al terminar y resume lo señalado.
-Cada comando resume en 3 a 5 líneas, indica el siguiente paso y avisa del gasto cuando corresponde.
+Los comandos usan `estado_documento` para proponer el siguiente paso, su motivo y las alternativas. Avisa del gasto cuando corresponde.
 
 ## Flujo de datos
 
@@ -224,11 +224,12 @@ y vacía. El hook `UserPromptSubmit` usa el `cwd` de la entrada, exige `proyecto
 avisos y los añade a `additionalContext`. Sin avisos o ante un fallo sale silencioso con código 0;
 no carga embeddings ni llama a modelos.
 
-`estado_documento` lee materiales, palabras y estados guardados; marca la comprobación desactualizada
-si el borrador tiene una fecha posterior al JSON. Devuelve recuentos del juez, el estado de revisión
-y `siguiente`: completar materiales, escribir, comprobar, corregir problemas, revisar o pasar a
-Word con `docs/exportar.md`, en ese orden. En convocatorias exige equipo y PDF oficiales; en resultados,
-CSV. Con el juez o el revisor en marcha, `siguiente` es volver a `estado`. La exportación es una guía,
+`estado_documento` lee los materiales y los informes. Compara la huella del borrador con la de cada
+informe y usa la fecha de modificación con informes anteriores que carecen de huella. En convocatorias
+comprueba que haya equipo y PDF oficiales. En resultados busca un CSV. La comprobación incluye el
+total de pares de frase y obra, incluso mientras hay pares pendientes. `siguiente`,
+`motivo_siguiente` y `alternativas` orientan al usuario según el estado actual. La exportación se
+hace con la guía,
 sin dependencias ni exportador propio; `preparar_citas_vivas` solo copia el borrador con las claves
 que Zotero guarda en `citationKey` o en `extra`, las de Better BibTeX.
 

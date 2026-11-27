@@ -36,7 +36,7 @@ flowchart LR
 | `/theaiwriter:revisar` | El borrador y los criterios de la convocatoria o revista | `informes/revision.md` |
 | Pandoc | `documento.md`, `referencias.bib`, estilo CSL y plantilla | `exportacion/documento.docx` u `.odt` |
 
-En cualquier momento, `/theaiwriter:estado` dice dónde estás y qué toca, `/theaiwriter:diagnostico` comprueba la instalación y la biblioteca, y `/theaiwriter:ayuda` explica los comandos o responde a una duda («cómo paso a Word»).
+Los comandos muestran el siguiente paso, por qué toca y qué alternativas tienes. Usa `/theaiwriter:estado` para retomar el trabajo, `/theaiwriter:ayuda` para una duda («cómo paso a Word») y `/theaiwriter:diagnostico` para comprobar la instalación o Zotero.
 
 ## Antes de empezar
 
@@ -68,8 +68,9 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 | --- | --- | --- | --- | --- |
 | Colección de Zotero | sí | sí | sí | Las obras que se pueden citar, con su PDF. Si no eliges ninguna, se usa todo Zotero |
 | `materiales/abstract.md` | sí | sí | sí | Tus respuestas a las preguntas de la plantilla |
+| Notas en `materiales/` | — | opcional | — | Detalles del estudio y decisiones del análisis |
 | `resultados/` | — | sí | — | Tablas CSV (al menos una), figuras y salidas en Markdown. De aquí salen todas tus cifras |
-| `analisis/` | — | opcional | — | El código que produjo los resultados |
+| `analisis/` | — | opcional | — | Los scripts y cuadernos que produjeron los resultados |
 | `materiales/equipo.md` | — | — | sí | Personas y papel, resultados previos, recursos, presupuesto y duración. Lo que falte se marca `[PENDIENTE]`, no se inventa |
 | `convocatoria/*.pdf` | — | — | sí | Convocatoria, instrucciones de la memoria y plantilla oficiales |
 | `revista/*.pdf` | opcional | opcional | — | Guía para revisores o normas de autores. Vale una web guardada con Ctrl+P, si el texto se puede seleccionar |
@@ -99,7 +100,7 @@ En `informes/` hay también archivos internos que no hace falta abrir: `consulta
 | Frases sin cita | No | Las que parecen hablar de una obra y no la citan. Avisa de más y puede saltarse alguna |
 | Cifras propias | No | En resultados: decimales y porcentajes que no están en tus tablas |
 | Convocatoria | No | Apartados, orden, extensión estimada y límites de caracteres |
-| Apoyo de las citas | Sí, el juez | Si cada frase dice lo que dice la obra |
+| Apoyo de las citas | Sí, el juez | Cuántos pares de frase y obra se han juzgado, cuáles están apoyados y cuántos siguen pendientes |
 | Revisión por criterios | Sí, el revisor | Dónde conviene trabajar más |
 
 El juez y el revisor se equivocan a veces. Toma lo que señalan como una lista de cosas que mirar, y decide tú. Los veredictos de frases que no han cambiado no se rehacen.

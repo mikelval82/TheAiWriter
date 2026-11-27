@@ -70,6 +70,9 @@ def test_guided_materials_are_empty_until_answered(document, kind, question):  #
     assert mcp_server.guia_escritura()["abstract_vacio"]
     status = mcp_server.estado_documento()
     assert status["tipo"] == kind
+    assert status["titulo"] == "T"
+    assert status["motivo_siguiente"]
+    assert status["alternativas"][0]["accion"] == "/theaiwriter:ayuda materiales"
     assert status["materiales"]["materiales/abstract.md"] == "plantilla"
     assert status["siguiente"] == "Completar materiales/abstract.md"
     if kind == "convocatoria":
@@ -153,7 +156,7 @@ def test_next_step_without_draft_or_check_and_word_count(ready):
     ("no_apoyada", None, None, False, "/theaiwriter:corregir"),
     (None, ["0,95"], None, True, "/theaiwriter:corregir"),
     (None, None, ["Impacto"], False, "/theaiwriter:corregir"),
-    ("parcial", None, None, False, "/theaiwriter:revisar"),
+    ("parcial", None, None, False, "/theaiwriter:corregir"),
     ("apoyada", None, None, True, "pasar a Word: guía en docs/exportar.md"),
 ])
 def test_next_step_follows_report_priority(ready, verdict, figures, missing, review, expected):
@@ -203,3 +206,49 @@ def test_deterministic_check_has_new_names_and_finished_status(ready):
     assert status["comprobacion"]["juez"]["estado"] == "sin_lanzar"
     assert status["comprobacion"]["recuento"]["apoyada"] == 0
     assert status["siguiente"] == "/theaiwriter:revisar"
+
+
+@pytest.mark.parametrize("state", ["error", "limite_de_uso", "interrumpido"])
+def test_failed_reviews_offer_a_retry(ready, state):
+    (ready / verificacion.DRAFT).write_text("Borrador con texto.")
+    write_reports(ready, review=True)
+    (ready / revisor.REVIEW).write_text(json.dumps({"estado": state}))
+    status = mcp_server.estado_documento()
+    assert status["revision"]["estado"] == state
+    assert status["siguiente"] == "/theaiwriter:revisar"
+    assert status["motivo_siguiente"]
+    assert status["alternativas"][0]["accion"] == "Leer borrador/documento.md"
+
+
+def test_citations_without_judgment_offer_next_steps(ready):
+    (ready / verificacion.DRAFT).write_text(
+        "El efecto depende de la condición [@smith2020empathy]."
+    )
+    report = mcp_server.comprobar_documento(juez=False)
+    status = mcp_server.estado_documento()
+    assert status["comprobacion"]["estado"] == "parcial"
+    assert status["comprobacion"]["recuento"] == report["apoyo"]
+    assert report["apoyo"]["total"] == report["apoyo"]["sin_juzgar"] == 1
+    assert report["apoyo"]["juzgadas"] == 0
+    assert status["siguiente"] == "/theaiwriter:comprobar"
+    assert any(a["accion"] == "/theaiwriter:revisar" for a in status["alternativas"])
+
+
+@pytest.mark.parametrize("pending", ["El alcance es [PENDIENTE: muestra].", "Falta una obra [@?]."])
+def test_pending_items_offer_correction_before_export(ready, pending):
+    (ready / verificacion.DRAFT).write_text(pending)
+    mcp_server.comprobar_documento(juez=False)
+    (ready / revisor.REVIEW).write_text('{"estado": "terminado"}')
+    status = mcp_server.estado_documento()
+    assert status["siguiente"] == "/theaiwriter:corregir"
+
+
+def test_review_priorities_offer_correction_with_export_as_an_alternative(ready):
+    (ready / verificacion.DRAFT).write_text("Borrador con texto.")
+    write_reports(ready, review=True)
+    (ready / revisor.REVIEW).write_text(
+        '{"estado": "terminado", "prioridades": ["Aclarar las limitaciones."]}'
+    )
+    status = mcp_server.estado_documento()
+    assert status["siguiente"] == "/theaiwriter:corregir la revisión"
+    assert any(a["accion"].startswith("pasar a Word") for a in status["alternativas"])

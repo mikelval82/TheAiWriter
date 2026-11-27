@@ -83,7 +83,8 @@ def test_judge_notices_every_terminal_state(draft, monkeypatch, state):  # noqa:
     notices = pop_notices(draft)
     assert len(notices) == 1 and "informes/comprobacion.md" in notices[0]
     if state == "terminado":
-        assert "3 de 5 frases apoyadas, 2 por revisar" in notices[0]
+        assert "3 de 5 pares de frase y obra" in notices[0]
+        assert "3 apoyados y 2 pendientes de juicio" in notices[0]
     else:
         assert state in notices[0] and "/theaiwriter:comprobar" in notices[0]
 

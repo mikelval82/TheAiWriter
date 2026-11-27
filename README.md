@@ -62,8 +62,7 @@ Cuatro ayudas acompañan el camino:
 - `/theaiwriter:ayuda` explica los comandos y qué toca ahora; con una duda («cómo paso a Word»)
   contesta a partir del manual. No escribe nada ni lanza comprobaciones.
 
-Los comandos empiezan su respuesta final con un resumen de 3 a 5 líneas y terminan con el siguiente
-paso. Antes de escribir, comprobar con juez o revisar, avisan del gasto con tu cuenta de Claude.
+Los comandos resumen el resultado e indican el siguiente paso, su motivo y las alternativas disponibles. Antes de escribir, comprobar con juez o revisar, avisan del gasto con tu cuenta de Claude.
 Cuando el juez o el revisor terminan, se detienen por límite de uso o fallan, dejan un aviso en
 `informes/avisos.json`: el hook lo recoge en tu siguiente mensaje y Claude te lo menciona al principio.
 Al abrir un documento antiguo se migra `revision/` a `informes/` si esta última no existe,

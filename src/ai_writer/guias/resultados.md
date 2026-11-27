@@ -1,9 +1,9 @@
 # Guía de escritura: resultados
 
-- Usa estas secciones de segundo nivel, en el idioma del documento: «Introducción», «Métodos», «Resultados», «Discusión», «Conclusión».
-- Antes de planificar, lee todos los ficheros de `resultados/` y el código de `analisis/`.
-- Toda cifra propia sale de una tabla de `resultados/` o de un cálculo hecho con un script guardado en `analisis/` que escribe su salida en `resultados/` (CSV o Markdown). No calcules ninguna cifra de cabeza. Los recuentos y diferencias que cites en el texto también deben quedar escritos en esas salidas.
-- Las cifras propias no llevan cita; su fuente son esos resultados, en lugar de un pasaje de Zotero. Redondea a dos o tres decimales sin cambiar el valor.
-- No digas «significativo» si no hay una prueba estadística en los resultados.
-- Lo que los resultados no contienen (tamaño de muestra, validación, parámetros) se toma de una obra de las colecciones con su cita, o se dice que no consta.
+- Usa estas secciones de segundo nivel, en el idioma del documento: «Introducción», «Métodos», «Resultados», «Discusión», «Conclusión». Si el investigador pide una sección concreta, trabaja solo en ella.
+- Antes de planificar, revisa los materiales del investigador: notas de `materiales/`, tablas y figuras de `resultados/` y scripts o cuadernos de `analisis/`. Lee el código y las salidas guardadas de los cuadernos. Si falta una salida, pregunta si el investigador puede aportarla o quiere que ejecutes el análisis antes de hacerlo.
+- Describe lo que se hizo en este estudio (muestra, asignación de grupos, exclusiones, parámetros, validación) a partir de sus propios materiales. Si hay un dato ausente o una discrepancia, deja `[PENDIENTE: …]` y explica qué debe confirmar el investigador. Puedes citar una obra de Zotero para justificar un método, explicar un precedente o comparar hallazgos.
+- Toda cifra propia sale de una tabla de `resultados/` o de una salida del análisis. Si el investigador autoriza un cálculo adicional, guarda el código en `analisis/` y la salida en `resultados/` (CSV o Markdown). Guarda también los recuentos y las diferencias que vayas a citar.
+- Para cada cifra, identifica la métrica, el grupo o subconjunto, la unidad y la salida de la que procede. Mantén la precisión que permitan los datos.
+- Usa «significativo» en sentido estadístico solo cuando los materiales documenten la prueba y su resultado.
 - En «Introducción» y «Discusión» se aplican las reglas de citas comunes y hay que volver a buscar por sección.

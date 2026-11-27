@@ -147,7 +147,11 @@ def test_judge_sees_passages_of_the_cited_work(draft):
 def test_judge_resumes_after_the_usage_limit(draft):
     data = verificacion.run_judge(draft, Judge(fail_after=1))
     assert data["juez"]["estado"] == "limite_de_uso" and data["juez"]["hechos"] == 1
-    assert verificacion.summary(data["apoyo"])["apoyada"] == 2
+    stats = verificacion.overview(data)["apoyo"]
+    assert (stats["total"], stats["juzgadas"], stats["sin_juzgar"], stats["apoyada"]) == (5, 2, 3, 2)
+    report = (draft / verificacion.REPORT).read_text(encoding="utf-8")
+    assert "2 de 5 pares de frase y obra juzgados. 3 pendientes." in report
+    assert "100%" not in report
 
     second = Judge()
     data = verificacion.run_judge(draft, second)

@@ -12,6 +12,6 @@ Petición del usuario: $ARGUMENTS
 - «Obras sin PDF»: consulta `estado_indice`, enuméralas y explica que no se pueden consultar ni comprobar hasta adjuntarles el PDF en Zotero.
 - Otras peticiones sobre colecciones o biblioteca: usa `colecciones_zotero` y `estado_indice` según lo que se pide.
 
-La biblioteca se gestiona en Zotero. TheAIWriter solo la lee y recoge los cambios en la siguiente búsqueda. Si una herramienta devuelve `error`, explica qué dice y cómo resolverlo. Sugiere `nuevo` si todavía no hay documento; si lo hay, `estado`.
+La biblioteca se gestiona en Zotero. TheAIWriter solo la lee y recoge los cambios en la siguiente búsqueda. Si una herramienta devuelve `error`, explica qué dice y cómo resolverlo. Si Zotero o Claude fallan, indica primero cómo completar el diagnóstico. Si la instalación funciona y falta `proyecto.yaml`, sugiere `/theaiwriter:nuevo`. En un proyecto, muestra el siguiente paso y las alternativas que devuelve `estado_documento`.
 
-Empieza la respuesta final con un resumen de 3 a 5 líneas; el detalle está en el informe. Termina con una línea «Siguiente: /theaiwriter:…» con el paso que toca.
+Resume la instalación y termina con **Siguiente**, el motivo y **También puedes** cuando haya alternativas.
