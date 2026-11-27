@@ -44,7 +44,7 @@ El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → 
    Al terminar comprueba el borrador y resume lo señalado; las correcciones se proponen aparte.
 3. `/theaiwriter:comprobar`: comprueba el borrador, actualiza `borrador/referencias.bib` y escribe
    `informes/comprobacion.md` y `.json`. El juez corre en segundo plano; con «sin juez» solo hace
-   las comprobaciones sin modelo. Los cambios del borrador pueden dejar el informe desactualizado.
+   las comprobaciones sin modelo. Con «evidencia» puedes consultar el pasaje de una cita, incluidas las apoyadas. Los cambios del borrador o de los PDF pueden dejar el informe desactualizado.
 4. `/theaiwriter:revisar`: evalúa por criterios con una llamada a Claude en segundo plano y deja
    prioridades, fortalezas, carencias y trabajo concreto en `informes/revision.md` y `.json`.
    No cambia el borrador ni da una nota. Conviene comprobar antes: usa el apoyo previo de las citas.

@@ -86,6 +86,14 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 
 Si un cuaderno tiene solo una imagen como salida o todavía no se ha ejecutado, adjunta la tabla o guarda una salida de texto con el valor. La revisión del hallazgo incluye su significado y unidad. Al redactar, verás un comentario como `<!-- hallazgo:1 -->` al final de la línea del hallazgo en Markdown. El vínculo permite comprobar esa línea después de editarla.
 
+## Consultar la evidencia en Introducción y Discusión
+
+El informe de comprobación muestra las frases citadas, sus veredictos y los pasajes señalados por el juez. Incluye las citas que el juez considera apoyadas. Cuando el adjunto se puede identificar, el enlace abre en Zotero la primera página del pasaje. También puedes pedir el pasaje por su identificador desde Claude Code.
+
+Usa `/theaiwriter:comprobar evidencia Discusión` o escribe un fragmento de la frase después de «evidencia». Puedes consultar lo guardado sin volver a lanzar el juez. Si cambió el texto o la fuente, vuelve a comprobar las citas afectadas.
+
+En el mismo informe aparecen las fuentes marcadas como pendientes y algunas afirmaciones de Introducción o Discusión que, por su redacción, parecen necesitar una referencia. Decide si cada frase describe un resultado propio, expresa tu interpretación o afirma algo sobre la literatura.
+
 ## Archivos de salida
 
 | Archivo | Lo escribe | Para qué sirve |

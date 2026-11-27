@@ -179,6 +179,7 @@ def document_status(folder: Path) -> dict:
             state = "parcial" if stats["sin_juzgar"] else "terminado"
         verification = {
             "estado": state, "juez": judge, "recuento": stats, "informe": verificacion.REPORT,
+            "fuentes_por_revisar": len(checks.get("fuentes_por_revisar", [])),
         }
         if "hallazgos_borrador" in checks:
             verification["hallazgos"] = report_counts(checks["hallazgos_borrador"])

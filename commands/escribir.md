@@ -17,7 +17,7 @@ Petición del usuario: $ARGUMENTS
 ## Plan
 
 5. Para las secciones que requieren bibliografía, explora antes de planificar: haz entre 6 y 12 llamadas a `buscar_pasajes` sobre los temas del abstract. Busca en el idioma de los papers y con los términos que usarían.
-6. Escribe `borrador/plan.md`: el objetivo, las secciones y, para cada sección, qué va a sostener y qué obras lo apoyan. Si algo del abstract no tiene apoyo en las colecciones, dilo en el plan en vez de taparlo.
+6. Escribe `borrador/plan.md`: el objetivo, las secciones y, para cada sección, qué va a sostener y qué obras lo apoyan. Para cada afirmación central de Introducción y Discusión, indica la obra, la página y el pasaje, o déjala con una fuente pendiente. Si falta apoyo para una parte del abstract, señálalo.
 7. En un proyecto de Resultados, enseña el plan con los hallazgos por sección y pide aprobación antes de redactar. Aplica la misma pausa en los otros tipos si el usuario pidió «con pausa».
 
 ## Escritura

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from ai_writer.avisos import add_notice
 from ai_writer.background import now, process_alive, spawn_cli
-from ai_writer.cifras import check_figures
+from ai_writer.cifras import check_figures, lines_without_code
 from ai_writer.citations import find_citations
 from ai_writer.consulta import BIBLIOGRAPHY, consulted, open_index, scope, write_bibliography
 from ai_writer.convocatoria import CallFicha, check_call, check_ficha, report_lines
@@ -32,7 +32,13 @@ from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 from ai_writer.passages import PassageIndex
 from ai_writer.quotes import explain_mismatch, fragments, normalize
-from ai_writer.sentences import cited_paragraphs, sentence_query, uncited_attributions
+from ai_writer.sentences import (
+    cited_paragraphs,
+    fold_text,
+    literature_gaps,
+    sentence_query,
+    uncited_attributions,
+)
 
 DRAFT = Path("borrador") / "documento.md"
 RESULT = "informes/comprobacion.json"
@@ -68,10 +74,14 @@ condiciones o presenta como resultado propio de la obra algo que la obra recoge 
 otra cifra, otra población u otra conclusión.
 - «no_apoyada»: los pasajes no dicen nada de esto.
 - Ante la duda entre dos veredictos, elige el más severo.
-- En «pasaje» indica el identificador del pasaje que más pesa en tu veredicto, o null.
+- Para «apoyada», «parcial» y «tergiversada», indica en «pasaje» el identificador de uno de \
+los pasajes mostrados que fundamenta el veredicto. En «fragmento» copia un fragmento literal \
+breve y consecutivo de ese mismo pasaje. Si ninguna de las muestras da apoyo, usa \
+«no_apoyada» y deja «pasaje» y «fragmento» a null.
 
 Responde solo con JSON: {"veredictos": [{"n": <número>, "veredicto": \
-"apoyada|parcial|tergiversada|no_apoyada", "motivo": "una frase en español", "pasaje": "<id>"}]}, \
+"apoyada|parcial|tergiversada|no_apoyada", "motivo": "una frase en español", \
+"pasaje": "<id>|null", "fragmento": "<cita literal>|null"}]}, \
 con un veredicto por cada número recibido."""
 
 
@@ -223,18 +233,70 @@ def _apply_verdicts(llm, pairs: list[dict], paragraph: str) -> None:
         except (KeyError, TypeError, ValueError):
             continue
         if verdict in VERDICTS:
-            found[number] = (verdict, str(row.get("motivo", "")).strip(), row.get("pasaje"))
+            found[number] = (verdict, str(row.get("motivo", "")).strip(),
+                             row.get("pasaje"), row.get("fragmento"))
     for pair in pairs:
         row = pair["row"]
-        if pair["n"] in found:
-            row["veredicto"], row["motivo"], passage = found[pair["n"]]
-            shown = {p["id"]: p for p in pair["pasajes"]}
-            if passage in shown:
-                row["pasaje"] = {
-                    k: shown[passage][k] for k in ("id", "seccion", "paginas", "texto")
-                }
-        else:
+        proposed = found.get(pair["n"])
+        if proposed is None:
             row["motivo"] = failure
+            continue
+        verdict, reason, passage_id, excerpt = proposed
+        passage = next((p for p in pair["pasajes"] if p["id"] == passage_id), None)
+        if passage is None and verdict != "no_apoyada":
+            row["motivo"] = "El juez no indicó un pasaje válido de la obra citada."
+            continue
+        row.update(veredicto=verdict, motivo=reason)
+        if passage is not None:
+            row["pasaje"] = _passage_record(passage, excerpt)
+        elif verdict == "no_apoyada":
+            row["pasajes_consultados"] = [
+                {key: value for key, value in _passage_record(p).items() if key != "texto"}
+                for p in pair["pasajes"][:CLOSEST_PASSAGES]
+            ]
+
+
+def _passage_record(passage: dict, excerpt: object = None) -> dict:
+    record = {key: passage[key] for key in (
+        "id", "titulo", "archivo", "seccion", "paginas", "zotero_url", "texto"
+    ) if key in passage}
+    if isinstance(excerpt, str):
+        fragment = " ".join(excerpt.split())
+        if fragment and fragment in " ".join(passage["texto"].split()):
+            record["fragmento"] = fragment
+    return record
+
+
+def _fresh_support(entries: list[dict], index: PassageIndex, allowed: set[str] | None) -> list[dict]:
+    """Keep anchored verdicts and recover links in older reports when the passage still matches."""
+    current, stamps, passages = [], {}, {}
+    for entry in entries:
+        if entry["veredicto"] == "sin_juzgar":
+            current.append(entry)
+            continue
+        key = entry["clave"]
+        work = index.work_of(key)
+        if not work or (allowed is not None and work.item_key not in allowed):
+            continue
+        if key not in stamps:
+            stamps[key] = index.source_stamp(key)
+        stamp = stamps[key]
+        if not stamp:
+            continue
+        if entry.get("huella_fuente") == stamp:
+            if entry.get("pasaje") or entry["veredicto"] == "no_apoyada":
+                current.append(entry)
+        elif "huella_fuente" not in entry and (previous := entry.get("pasaje")):
+            if key not in passages:
+                passages[key] = {p["id"]: p for p in index.passages_of(key)}
+            passage = passages[key].get(previous["id"])
+            if passage and all(passage[k] == previous[k] for k in ("paginas", "texto", "seccion")):
+                current.append({
+                    **entry,
+                    "huella_fuente": stamp,
+                    "pasaje": _passage_record(passage, previous.get("fragmento")),
+                })
+    return current
 
 
 def _find(known: dict, sentence: str, key: str, before: str) -> dict | None:
@@ -255,7 +317,7 @@ def current_support(text: str, entries: list[dict]) -> tuple[list[dict], bool]:
                 if entry is None:
                     new = True
                     entry = _row(paragraph, sentence, key, before, UNJUDGED)
-                current.append(entry)
+                current.append({**entry, "seccion": paragraph["seccion"]})
     return current, new
 
 
@@ -278,11 +340,14 @@ def judge_support(
     llm=None,
     previous: list[dict] | None = None,
     on_progress=None,
+    allowed: set[str] | None = None,
 ) -> list[dict]:
     """Judge every (sentence, cited work) of ``text``. ``previous`` verdicts are kept, so a
     run cut short by the usage limit resumes where it stopped. ``UsageLimitError`` propagates
     after ``on_progress`` has received what was judged."""
-    known = {(e["frase"], e["clave"]): e for e in previous or [] if e["veredicto"] != "sin_juzgar"}
+    fresh = _fresh_support(previous or [], index, allowed)
+    known = {(e["frase"], e["clave"]): e for e in fresh if e["veredicto"] != "sin_juzgar"}
+    stamps = {}
     llm = llm or get_llm_client()
     paragraphs = cited_paragraphs(text)
     entries: list[dict] = []
@@ -291,12 +356,18 @@ def judge_support(
         for (sentence, keys), before in zip(paragraph["frases"], paragraph["previas"]):
             for key in keys:
                 if entry := _find(known, sentence, key, before):
-                    rows.append(entry)
+                    rows.append({**entry, "seccion": paragraph["seccion"]})
                     continue
                 row = _row(paragraph, sentence, key, before)
                 rows.append(row)
                 work = index.work_of(key)
-                passages = _judge_passages(index, sentence, key, seen) if work else []
+                if work and allowed is not None and work.item_key not in allowed:
+                    row["motivo"] = "La obra está fuera de las colecciones y no se puede comprobar."
+                    continue
+                if key not in stamps:
+                    stamps[key] = index.source_stamp(key)
+                stamp = stamps[key]
+                passages = _judge_passages(index, sentence, key, seen) if stamp else []
                 if not passages:
                     row["motivo"] = (
                         "La clave no existe en Zotero"
@@ -304,6 +375,7 @@ def judge_support(
                         else "La obra no tiene PDF indexado: no se puede comprobar"
                     )
                     continue
+                row["huella_fuente"] = stamp
                 to_judge.append(
                     {
                         "n": len(to_judge) + 1,
@@ -395,10 +467,11 @@ def _check_document(
     judge = previous.get("juez", {"estado": "sin_lanzar"})
     support = previous.get("apoyo", [])
     if support and not judge_running(previous):  # the draft may have changed since the judge ran
-        support, new = current_support(text, support)
+        support, new = current_support(text, _fresh_support(support, index, allowed))
         if new and judge["estado"] == "terminado":
             judge["estado"] = "desactualizado"
     surnames = {m.group(0) for key in index.keys.values() if (m := re.match("[a-z]+", key))}
+    uncited = uncited_attributions(text, surnames)
     data = {
         "comprobado": now(),
         "borrador_sha256": draft_fingerprint(text),
@@ -406,7 +479,8 @@ def _check_document(
         "citas": citations,
         "citas_literales": check_quotes(text, index),
         "bibliografia": str(path.relative_to(Path(folder))) if path.exists() else None,
-        "atribuciones_sin_cita": uncited_attributions(text, surnames),
+        "atribuciones_sin_cita": uncited,
+        "fuentes_por_revisar": literature_gaps("\n".join(lines_without_code(text)), uncited),
         "juez": judge,
         "apoyo": support,
     }
@@ -464,7 +538,7 @@ def run_judge(folder: Path, llm=None) -> dict:
     judge.update(estado="en_curso", error=None)
     try:
         data["apoyo"] = judge_support(
-            text, index, consulted(folder), llm, data.get("apoyo"), progress
+            text, index, consulted(folder), llm, data.get("apoyo"), progress, allowed
         )
         judge.update(estado="terminado", fin=now())
     except UsageLimitError as error:
@@ -503,6 +577,42 @@ def status(folder: Path, *, findings: list[dict] | None = None) -> dict:
     return data
 
 
+def citation_evidence(
+    folder: Path, *, phrase: str = "", section: str = "", offset: int = 0, limit: int = 12
+) -> dict:
+    """Read saved verdicts and their PDF links for the current manuscript, without a model."""
+    if offset < 0 or not 1 <= limit <= 25:
+        raise LibraryError("Indica desde ≥ 0 y un límite entre 1 y 25.")
+    folder = Path(folder)
+    project = Project.load(folder)
+    data = status(folder)
+    draft = folder / DRAFT
+    if not draft.is_file():
+        raise LibraryError(f"Todavía no hay borrador en {DRAFT}.")
+    text = draft.read_text(encoding="utf-8")
+    index = open_index()
+    entries, changed = current_support(
+        text, _fresh_support(data.get("apoyo", []), index, scope(project, index))
+    )
+    phrase, section = fold_text(phrase.strip()), fold_text(section.strip())
+    filtered = [
+        {key: entry[key] for key in (
+            "seccion", "frase", "clave", "veredicto", "motivo", "pasaje", "pasajes_consultados"
+        ) if key in entry}
+        for entry in entries
+        if phrase in fold_text(entry["frase"]) and section in fold_text(entry["seccion"])
+    ]
+    return {
+        "total": len(filtered), "desde": offset,
+        "siguiente_desde": offset + limit if offset + limit < len(filtered) else None,
+        "desactualizado": data.get("borrador_sha256") != draft_fingerprint(text) or (
+            changed and data.get("juez", {}).get("estado") == "terminado"
+        ),
+        "resultados": filtered[offset:offset + limit],
+        "informe": REPORT,
+    }
+
+
 def overview(data: dict) -> dict:
     """What a tool returns: counts, and the entries that need the student's attention."""
     citations = data["citas"]
@@ -529,6 +639,7 @@ def overview(data: dict) -> dict:
             "no_encontradas": [q for q in quotes if not q["encontrada_en"]],
         },
         "atribuciones_sin_cita": data.get("atribuciones_sin_cita", []),
+        "fuentes_por_revisar": data.get("fuentes_por_revisar", []),
         "juez": data.get("juez", {}),
         "apoyo": support_summary(data),
         "frases_a_revisar": [
@@ -542,6 +653,16 @@ def overview(data: dict) -> dict:
         if key in data:
             report[key] = data[key]
     return report
+
+
+def _passage_location(passage: dict) -> str:
+    pages = f"p. {passage['paginas']}"
+    if url := passage.get("zotero_url"):
+        pages = f"[{pages} en Zotero]({url})"
+    location = f"`{passage['id']}` · {passage['seccion']} · {pages}"
+    if filename := passage.get("archivo"):
+        location += f" · {filename}"
+    return location
 
 
 def markdown(data: dict) -> str:
@@ -584,6 +705,18 @@ def markdown(data: dict) -> str:
             "avisos de más y faltar alguna.",
         ]
         lines += [f"- ({e['seccion'] or 'sin sección'}) «{e['frase']}»" for e in uncited]
+
+    if gaps := data.get("fuentes_por_revisar"):
+        reasons = {
+            "fuente_pendiente": "Fuente marcada como pendiente",
+            "afirmacion_empirica": "Menciona un hallazgo de la literatura sin citarlo",
+            "porcentaje": "Porcentaje sin referencia explícita",
+        }
+        lines += ["", "## Afirmaciones cuya fuente conviene revisar", ""]
+        for entry in gaps:
+            reason = reasons[entry["motivo"]]
+            lines.append(f"- {reason} ({entry['seccion'] or 'sin sección'}) «{entry['frase']}»")
+        lines.append("Revisa estos avisos y confirma si la frase necesita una fuente.")
 
     lines += ["", "## Citas literales", ""]
     missing = [q for q in quotes if not q["encontrada_en"]]
@@ -654,22 +787,26 @@ def markdown(data: dict) -> str:
         f"{stats['tergiversada']} tergiversados y {stats['no_apoyada']} sin apoyo. "
         f"Estado del juez: {judge.get('estado')}.",
         "Un juez automático compara cada frase con pasajes de la obra citada. Se equivoca a veces: "
-        "revisa a mano las peores.",
+        "revisa también los pasajes de las citas que marca como apoyadas.",
         "",
     ]
     if judge.get("estado") == "desactualizado":
         lines += [
-            "**El borrador ha cambiado desde que pasó el juez.** Las frases nuevas o cambiadas "
-            "salen sin juzgar; pásalo otra vez con `/theaiwriter:comprobar`.", "",
+            "**El borrador ha cambiado o hay evidencia nueva desde que pasó el juez.** "
+            "Las frases afectadas salen sin juzgar. Usa `/theaiwriter:comprobar` para actualizarlas.", "",
         ]
     names = {
         "tergiversada": "Tergiversada",
         "no_apoyada": "No apoyada",
         "parcial": "Parcial",
         "sin_juzgar": "Sin juzgar",
+        "apoyada": "Apoyada",
     }
     for verdict, name in names.items():
-        for entry in (e for e in entries if e["veredicto"] == verdict):
+        matching = [entry for entry in entries if entry["veredicto"] == verdict]
+        if verdict == "apoyada" and matching:
+            lines += ["", "### Pasajes de las citas apoyadas", ""]
+        for entry in matching:
             lines.append(
                 f"- **{name}** [@{entry['clave']}] "
                 f"({entry['seccion'] or 'sin sección'}): «{entry['frase']}»"
@@ -678,8 +815,14 @@ def markdown(data: dict) -> str:
                 lines.append(f"  - Motivo: {entry['motivo']}")
             if entry.get("pasaje"):
                 passage = entry["pasaje"]
-                lines.append(
-                    f"  - La obra dice ({passage['seccion']}, p. {passage['paginas']}): "
-                    f"«{passage['texto'][:600]}»"
-                )
+                lines.append(f"  - Pasaje · {_passage_location(passage)}")
+                preview = " ".join(passage["texto"].split())
+                if fragment := passage.get("fragmento"):
+                    lines.append(f"  - Fragmento señalado · «{fragment}»")
+                else:
+                    ending = "…" if len(preview) > 420 else ""
+                    lines.append(f"  - Inicio del pasaje · «{preview[:420]}{ending}»")
+            elif consulted_passages := entry.get("pasajes_consultados"):
+                lines.append("  - Pasajes consultados")
+                lines.extend(f"    - {_passage_location(p)}" for p in consulted_passages)
     return "\n".join(lines) + "\n"

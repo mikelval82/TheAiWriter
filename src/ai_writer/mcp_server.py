@@ -496,6 +496,20 @@ def estado_comprobacion() -> dict:
 
 
 @tool
+def evidencia_citas(frase: str = "", seccion: str = "", desde: int = 0, limite: int = 12) -> dict:
+    """Muestra los veredictos guardados y sus pasajes de Zotero, incluidas las citas apoyadas.
+    Filtra por un fragmento de la frase o por el nombre del apartado. No lanza el juez."""
+    from ai_writer.verificacion import citation_evidence
+
+    try:
+        return citation_evidence(
+            _document_folder(), phrase=frase, section=seccion, offset=desde, limit=limite
+        )
+    except (LibraryError, ValueError, OSError) as error:
+        return {"error": str(error)}
+
+
+@tool
 def revisar_documento() -> dict:
     """Evalúa el borrador por criterios en segundo plano con una llamada a Claude.
     No cambia el borrador. El resultado se consulta con `estado_revision` y queda en

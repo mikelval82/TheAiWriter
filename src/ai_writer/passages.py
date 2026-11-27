@@ -16,6 +16,7 @@ import json
 import re
 from bisect import bisect_right
 from collections import Counter
+from hashlib import sha256
 from pathlib import Path
 
 import fitz  # PyMuPDF
@@ -249,12 +250,14 @@ class PassageIndex:
         for work in self.pending(item_keys):
             passages, pages = [], 0
             try:
-                for pdf in work.pdfs:
+                for i, pdf in enumerate(work.pdfs):
+                    attachment = work.pdf_keys[i] if i < len(work.pdf_keys) else None
                     cut = cut_pdf(pdf)
                     pages += cut["paginas"]
                     for passage in cut["pasajes"]:
                         passages.append(
-                            {**passage, "archivo": pdf.name, "secciones_por": cut["secciones_por"]}
+                            {**passage, "archivo": pdf.name, "adjunto": attachment,
+                             "secciones_por": cut["secciones_por"]}
                         )
             except Exception as error:  # a damaged PDF must not stop the rest
                 failed.append(
@@ -294,6 +297,15 @@ class PassageIndex:
             self._loaded = (rows, matrix, BM25([p["texto"] for _, p in rows]))
         return self._loaded
 
+    @staticmethod
+    def _attachment_key(work: Work, passage: dict) -> str | None:
+        if attachment := passage.get("adjunto"):
+            return attachment if attachment in work.pdf_keys else None
+        # Older indices saved only the filename. Resolve it only when unambiguous.
+        matches = [key for pdf, key in zip(work.pdfs, work.pdf_keys)
+                   if pdf.name == passage.get("archivo")]
+        return matches[0] if len(matches) == 1 else None
+
     def _result(self, work: Work, passage: dict, score: float | None = None) -> dict:
         first, last = passage["paginas"]
         result = {
@@ -302,9 +314,13 @@ class PassageIndex:
             "titulo": work.title,
             "año": work.year,
             "seccion": passage["seccion"],
+            "archivo": passage.get("archivo", ""),
             "paginas": str(first) if first == last else f"{first}-{last}",
             "texto": passage["texto"],
         }
+        attachment = self._attachment_key(work, passage)
+        if attachment and re.fullmatch(r"[A-Z0-9]{8}", attachment):
+            result["zotero_url"] = f"zotero://open-pdf/library/items/{attachment}?page={first}"
         if score is not None:
             result["relevancia"] = round(float(score), 4)
         return result
@@ -340,6 +356,21 @@ class PassageIndex:
     def work_of(self, cite_key: str) -> Work | None:
         item = self._items.get(cite_key)
         return self.zotero.work(item) if item else None
+
+    def source_stamp(self, cite_key: str) -> str | None:
+        """Identify the PDFs and cut used for a verdict, without reading or embedding them."""
+        work = self.work_of(cite_key)
+        if not work or not work.pdfs:
+            return None
+        try:
+            files = _fingerprint(work)
+        except OSError:
+            return None
+        stored = self._stored(work.item_key)
+        if not stored or stored["huella"] != files or not stored["pasajes"]:
+            return None
+        identity = json.dumps([CUT_VERSION, work.item_key, work.pdf_keys, files])
+        return sha256(identity.encode("utf-8")).hexdigest()
 
     def passages_of(self, cite_key: str) -> list[dict]:
         """Every passage of a work, in reading order; empty if it is not indexed."""

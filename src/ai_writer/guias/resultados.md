@@ -9,4 +9,4 @@
 - Toda cifra propia sale de una tabla de `resultados/` o de una salida del análisis. Si el investigador autoriza un cálculo adicional, guarda el código en `analisis/` y la salida en `resultados/` (CSV o Markdown). Guarda también los recuentos y las diferencias que vayas a citar.
 - Para cada cifra, identifica la métrica, el grupo o subconjunto, la unidad y la salida de la que procede. Mantén la precisión que permitan los datos.
 - Usa «significativo» en sentido estadístico solo cuando los materiales documenten la prueba y su resultado.
-- En «Introducción» y «Discusión» se aplican las reglas de citas comunes y hay que volver a buscar por sección.
+- En «Introducción» y «Discusión», vuelve a buscar por sección. En «Discusión», distingue el hallazgo propio aprobado, la interpretación del investigador y la comparación con la literatura. Pon cada uno en su propia frase. Recupera el pasaje antes de hacer una afirmación sobre otro estudio y marca `[@?]` si queda pendiente su fuente.

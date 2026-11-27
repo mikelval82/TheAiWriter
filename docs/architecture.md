@@ -52,7 +52,7 @@ El MCP expone `diagnostico`, `probar_claude`, `crear_documento`, `colecciones_zo
 `guardar_hallazgos`, `decidir_hallazgos`, `comprobar_ficha`, `mostrar_ficha`, `confirmar_ficha`,
 `buscar_pasajes`, `leer_pasaje`, `leer_paginas`, `referencia`,
 `preparar_citas_vivas`, `comprobar_citas`, `comprobar_documento`, `estado_comprobacion`,
-`revisar_documento`, `estado_revision` y `exportar_documento`.
+`evidencia_citas`, `revisar_documento`, `estado_revision` y `exportar_documento`.
 La carpeta del documento se obtiene
 de `CLAUDE_PROJECT_DIR` o del directorio
 actual. Fuera de un documento, las consultas abarcan todo Zotero.
@@ -206,8 +206,12 @@ lista. El juez usa este registro para incluir contexto que vio Claude.
 
 `comprobacion.json` contiene la fecha `comprobado`, el resultado de `citas`, las `citas_literales`,
 la ruta de la `bibliografia`, el estado y progreso de `juez` y las entradas de `apoyo` por frase y
-obra. `comprobacion.md` presenta estos datos al usuario; `comprobacion.log` recoge la salida del
-proceso independiente. Solo en documentos de tipo `resultados` sin vínculos ni registro, la clave `cifras` añade las cifras
+obra. Cada veredicto guarda la huella de los PDF indexados. Cuando el juez señala un pasaje,
+el informe conserva su identificador, el adjunto y las páginas. Los índices anteriores recuperan
+la clave de adjunto cuando el nombre de archivo es inequívoco. `comprobacion.md` presenta estos
+datos al usuario, incluidos los pasajes de citas apoyadas. `comprobacion.log` recoge la salida
+del proceso independiente. En documentos de tipo `resultados` sin vínculos ni registro,
+la clave `cifras` añade las cifras
 `comprobadas`, las que tienen origen (`con_origen`), las entradas `sin_origen` con cifra, sección y
 frase, los `ficheros` leídos y un `aviso` si no hay resultados numéricos.
 Si hay un registro o vínculos a hallazgos, `hallazgos_borrador` incluye el estado de cada vínculo, la línea, el enunciado aprobado y su fuente. Las versiones de los hallazgos vinculados permiten detectar que el informe se ha quedado desactualizado aunque el borrador siga igual.

@@ -1,10 +1,11 @@
 """Cited sentences and paragraphs of a Markdown draft, without any model."""
 
 import re
+import unicodedata
 
 from ai_writer.citations import find_citations
 
-_HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _FINDING_MARKER = re.compile(r"<!--\s*hallazgo\s*:\s*\d+\s*-->", re.IGNORECASE)
 _CITE_MARKUP = re.compile(r"\[[^\[\]]*@[^\[\]]*\]|\[\[PENDIENTE[^\]]*\]\]")
 _ABBREVIATION = re.compile(r"\b(?:e\.g|i\.e|et al|cf|vs|pp?|fig|figs|no|dr|dra|sr|sra)\.", re.I)
@@ -22,7 +23,31 @@ _OTHERS_WORK = re.compile(  # a sentence that tells what somebody else's work sa
     r"|\b(?:has|have) been (?:shown|reported|described|proposed)\b",
     re.I,
 )
+_LITERATURE_SECTION = re.compile(
+    r"^(?:\d+(?:\.\d+)*[.)]?\s+)?(?:introduccion|introduction|discussion|discusion|background)\b"
+)
+_EMPIRICAL = re.compile(
+    r"\b(?:ensayos|estudios|metaanalisis|revisiones|evidencia|literatura|trials|studies|"
+    r"meta[- ]?analyses|reviews|evidence|literature)\b[^.!?]{0,100}\b"
+    r"(?:demuestran?|muestran?|indican?|sugier(?:e|en)|senalan?|mostr(?:o|aron)|observaron|"
+r"reportan?|documentan?|encontr(?:o|aron)|"
+    r"show(?:s|ed)?|demonstrat(?:e|es|ed)|suggest(?:s|ed)?|indicat(?:e|es|ed)|report(?:s|ed)?|found)\b"
+)
+_OWN = re.compile(
+    r"\b(?:nuestr[oa]s? (?:estudio|analisis|datos|resultados|hipotesis|muestra)|"
+    r"en (?:este|el presente) (?:estudio|analisis)|observamos|encontramos|proponemos|"
+    r"interpretamos|consideramos|planteamos|our (?:study|analysis|data|results|findings|"
+    r"sample|hypothesis)|in this study|we (?:observed|found|hypothesize|interpret|propose))\b"
+)
+_PERCENT = re.compile(r"\d\s*%|\d\s+(?:por ciento|per cent|percent)\b")
+
 MIN_SURNAME = 4  # shorter ones (Her, Li) are too easily ordinary words
+
+
+def fold_text(text: str) -> str:
+    """Compare section names and search words without case or accents."""
+    return "".join(char for char in unicodedata.normalize("NFD", text.casefold())
+                   if not unicodedata.combining(char))
 
 
 def split_sentences(paragraph: str) -> list[str]:
@@ -53,22 +78,28 @@ def split_sentences(paragraph: str) -> list[str]:
     return [restore(p).strip() for p in merged]
 
 
-def _blocks(text: str) -> list[tuple[str, str]]:
-    """Paragraphs as ``(section, text)``; headings only set the section."""
+def _blocks(text: str, *, literature_only: bool = False) -> list[tuple[str, str]]:
+    """Paragraphs with their nearest heading and optional introduction/discussion scope."""
     blocks: list[tuple[str, str]] = []
     section, lines = "", []
+    literature_level = None
 
     def flush() -> None:
-        if lines:
+        if lines and (not literature_only or literature_level is not None):
             blocks.append((section, " ".join(lines)))
-            lines.clear()
+        lines.clear()
 
     for line in text.splitlines():
         line = _FINDING_MARKER.sub("", line)
         heading = _HEADING.match(line)
         if heading:
             flush()
-            section = heading.group(1)
+            section = heading[2]
+            level = len(heading[1])
+            if _LITERATURE_SECTION.match(fold_text(section).lstrip("*_")):
+                literature_level = level
+            elif literature_level is not None and level <= literature_level:
+                literature_level = None
         elif not line.strip():
             flush()
         else:
@@ -112,6 +143,33 @@ def uncited_attributions(text: str, surnames: set[str]) -> list[dict]:
             if named or _OTHERS_WORK.search(sentence):
                 entries.append({"seccion": section, "frase": sentence})
     return entries
+
+
+def literature_gaps(text: str, known: list[dict]) -> list[dict]:
+    """Locate explicit placeholders and likely missing sources in introduction/discussion."""
+    gaps = {
+        (section, sentence): "fuente_pendiente"
+        for section, paragraph in _blocks(text)
+        for sentence in split_sentences(paragraph)
+        if find_citations(sentence)[2]
+    }
+    already_reported = {(entry["seccion"], entry["frase"]) for entry in known}
+    without_findings = "\n".join("" if _FINDING_MARKER.search(line) else line
+                               for line in text.splitlines())
+    for section, paragraph in _blocks(without_findings, literature_only=True):
+        if paragraph.startswith(("|", "!", "#", "<!--")):
+            continue
+        for sentence in split_sentences(paragraph):
+            position = section, sentence
+            folded = fold_text(sentence)
+            if position in gaps or position in already_reported or "[@" in sentence:
+                continue
+            if _EMPIRICAL.search(folded):
+                gaps[position] = "afirmacion_empirica"
+            elif _PERCENT.search(folded) and not _OWN.search(folded):
+                gaps[position] = "porcentaje"
+    return [{"seccion": section, "frase": sentence, "motivo": reason}
+            for (section, sentence), reason in gaps.items()]
 
 
 def sentence_query(sentence: str) -> str:

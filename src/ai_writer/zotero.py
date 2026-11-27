@@ -72,6 +72,7 @@ class Work:
     pages: str | None
     zotero_cite_key: str | None  # set in Zotero or by Better BibTeX, if any
     pdfs: tuple[Path, ...]
+    pdf_keys: tuple[str, ...] = ()  # attachment keys, in the same order
 
 
 @dataclass(frozen=True)
@@ -201,7 +202,7 @@ class Zotero:
                 if name:
                     creators.setdefault(item_id, []).append((role, name))
 
-            pdfs: dict[int, list[Path]] = {}
+            pdfs: dict[int, list[tuple[Path, str]]] = {}
             for item_id, parent_id, link_mode, stored in db.execute(
                 "SELECT itemID, parentItemID, linkMode, path FROM itemAttachments "
                 "WHERE contentType = 'application/pdf'"
@@ -210,7 +211,7 @@ class Zotero:
                     continue
                 file = self._attachment_file(kinds[item_id][0], link_mode, stored)
                 if file and file.exists():
-                    pdfs.setdefault(parent_id or item_id, []).append(file)
+                    pdfs.setdefault(parent_id or item_id, []).append((file, kinds[item_id][0]))
 
             self._works = {}
             for item_id, (key, kind) in kinds.items():
@@ -280,7 +281,7 @@ class Zotero:
         return None
 
     @staticmethod
-    def _work(key: str, kind: str, fields: dict, creators: list, pdfs: list[Path]) -> Work:
+    def _work(key: str, kind: str, fields: dict, creators: list, pdfs: list[tuple[Path, str]]) -> Work:
         authors = [name for role, name in creators if role == "author"] or [
             name for _, name in creators
         ]
@@ -289,7 +290,7 @@ class Zotero:
         if not cite_key:
             extra = _EXTRA_KEY.search(fields.get("extra", ""))  # where Better BibTeX pins its keys
             cite_key = extra.group(1) if extra else None
-        title = fields.get("title") or (pdfs[0].stem if pdfs else "")
+        title = fields.get("title") or (pdfs[0][0].stem if pdfs else "")
         return Work(
             item_key=key,
             kind=kind,
@@ -303,7 +304,8 @@ class Zotero:
             issue=fields.get("issue") or None,
             pages=fields.get("pages") or None,
             zotero_cite_key=cite_key,
-            pdfs=tuple(pdfs),
+            pdfs=tuple(path for path, _ in pdfs),
+            pdf_keys=tuple(key for _, key in pdfs),
         )
 
     # -- queries ---------------------------------------------------------

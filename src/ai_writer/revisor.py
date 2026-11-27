@@ -107,6 +107,7 @@ def _verification_summary(data: dict) -> dict:
         "sin_citar": citations.get("sin_citar", []),
         "citas_literales_no_encontradas": sum(not q["encontrada_en"]
                                              for q in data["citas_literales"]),
+        "fuentes_por_revisar": len(data.get("fuentes_por_revisar", [])),
     }
     if "convocatoria" in data:
         call = data["convocatoria"]
