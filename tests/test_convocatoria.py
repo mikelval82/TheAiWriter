@@ -329,6 +329,83 @@ def test_pdf_with_a_fixed_limit_waits_for_ficha_confirmation(modal_call, ficha):
     assert final["estado"] == "ok" and final["fuente"]["cita"] == quote
 
 
+BUDGET_QUOTE = (
+    "Si se solicitan al menos 100.000 euros en costes directos, "
+    "la memoria debe redactarse en inglés."
+)
+
+
+@pytest.fixture
+def budget_call(modal_call, ficha):
+    pdf = modal_call / "convocatoria/instrucciones.pdf"
+    make_pdf(pdf, [("Instructions", QUOTE), ("Límites", MODALITY_QUOTE),
+                   ("Idioma", BUDGET_QUOTE)])
+    ficha["idioma"] = {
+        "regla": "Inglés desde el umbral de costes directos",
+        "fuente": {**SOURCE, "pagina": 3, "cita": BUDGET_QUOTE},
+        "costes_directos": {"desde_eur": "100000", "idioma": "en"},
+    }
+    save_ficha(modal_call, ficha)
+    return modal_call
+
+
+def test_budget_threshold_is_inclusive_and_keeps_the_modality(budget_call):
+    from ai_writer import mcp_server, verificacion
+    from ai_writer.library import Project
+
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    assert mcp_server.fijar_modalidad_convocatoria("coordinado")["seleccion"] == "coordinado"
+    initial = mcp_server.comprobar_documento(juez=False)["ficha"]["idioma_por_presupuesto"]
+    assert initial["estado"] == "costes_pendientes" and "costes directos" in initial["pregunta"]
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:escribir presupuesto"
+
+    assert mcp_server.fijar_costes_directos_convocatoria("99999.99")["estado"] == "no_aplica"
+    before = mcp_server.comprobar_documento(juez=False)
+    assert before["ficha"]["idioma_por_presupuesto"]["estado"] == "no_aplica"
+    assert "error" in mcp_server.fijar_costes_directos_convocatoria("100000.001")
+    assert mcp_server.comprobar_ficha()["idioma_por_presupuesto"]["importe_eur"] == "99999.99"
+
+    active = mcp_server.fijar_costes_directos_convocatoria("100000")
+    assert active["estado"] == "idioma_distinto" and active["idioma_requerido"] == "en"
+    assert active["fuente"]["pagina"] == 3 and active["fuente"]["cita"] == BUDGET_QUOTE
+    assert mcp_server.estado_documento()["comprobacion"]["estado"] == "desactualizada"
+    previous = mcp_server.estado_comprobacion()["ficha"]["idioma_por_presupuesto"]
+    assert previous["estado"] == "desactualizado"
+    report = mcp_server.comprobar_documento(juez=False)
+    assert report["ficha"]["confirmada"]
+    assert report["ficha"]["modalidad"]["seleccion"] == "coordinado"
+    assert report["ficha"]["idioma_por_presupuesto"]["estado"] == "idioma_distinto"
+    markdown = (budget_call / verificacion.REPORT).read_text(encoding="utf-8")
+    assert "inglés" in markdown and BUDGET_QUOTE in markdown
+    assert Project.load(budget_call).idioma == "es"
+
+    project = Project.load(budget_call)
+    project.idioma = "en-GB"
+    project.save(budget_call)
+    assert mcp_server.comprobar_ficha()["idioma_por_presupuesto"]["estado"] == "ok"
+    mcp_server.fijar_modalidad_convocatoria("individual")
+    assert mcp_server.comprobar_ficha()["idioma_por_presupuesto"]["importe_eur"] == "100000.00"
+    assert mcp_server.fijar_costes_directos_convocatoria(None)["estado"] == "costes_pendientes"
+
+
+def test_budget_threshold_cannot_disagree_with_an_explicit_quote(budget_call, ficha):
+    from ai_writer import mcp_server
+
+    ficha["idioma"]["costes_directos"]["desde_eur"] = "90000"
+    save_ficha(budget_call, ficha)
+    failure, = mcp_server.comprobar_ficha()["fallidos"]
+    assert failure["id"] == "idioma"
+    assert failure["cita"] == BUDGET_QUOTE
+    assert not mcp_server.confirmar_ficha()["confirmada"]
+
+
+def test_budget_language_cannot_disagree_with_an_explicit_quote(budget_call, ficha):
+    ficha["idioma"]["costes_directos"]["idioma"] = "fr"
+    save_ficha(budget_call, ficha)
+    failure, = check_ficha(budget_call)["fallidos"]
+    assert failure["id"] == "idioma" and "inglés" in failure["motivo"]
+
+
 def test_page_limits_match_the_number_for_each_modality(modal_call, ficha):
     report = check_ficha(modal_call)
     rules = [rule for rule in report["reglas"] if rule["id"].startswith("paginas:")]

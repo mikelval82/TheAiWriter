@@ -5,6 +5,7 @@ import json
 import re
 import unicodedata
 from collections.abc import Iterable
+from decimal import Decimal
 from pathlib import Path
 from stat import S_ISREG
 from tempfile import NamedTemporaryFile
@@ -16,10 +17,18 @@ from pydantic import BaseModel, Field, model_validator
 
 from ai_writer.library import LibraryError, Project
 from ai_writer.passages import page_texts
+from ai_writer.presupuesto_convocatoria import (
+    BudgetLanguage,
+    budget_language_status,
+    language_name,
+    quoted_budget_language,
+    read_amount,
+)
 
 FICHA = Path("convocatoria") / "ficha.yaml"
 APPROVALS = FICHA.with_name("aprobaciones.json")
 PROPOSAL = FICHA.with_name("propuesta.json")
+COSTS = FICHA.with_name("costes-directos.json")
 JOURNAL_FICHA = Path("revista") / "ficha.yaml"
 FINAL_PDF = Path("exportacion") / "documento.pdf"
 _HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$")
@@ -93,6 +102,7 @@ class Limits(BaseModel):
 class LanguageRule(BaseModel):
     regla: str
     fuente: Source
+    costes_directos: BudgetLanguage | None = None
 
 
 class Criterion(BaseModel):
@@ -170,7 +180,10 @@ def _call_rules(ficha: CallFicha) -> Iterable[CallRule]:
                        field.fuente, field.model_dump(),
                        (field.caracteres, "caracteres", r"caracteres?|characters?"))
     if ficha.idioma is not None:
-        yield CallRule("idioma", "idioma.fuente", ficha.idioma.fuente, ficha.idioma.model_dump())
+        yield CallRule(
+            "idioma", "idioma.fuente", ficha.idioma.fuente,
+            ficha.idioma.model_dump(mode="json", exclude_none=True),
+        )
     for i, criterion in enumerate(ficha.criterios):
         yield CallRule(
             f"criterio:{criterion.nombre}", f"criterios[{i}].fuente ({criterion.nombre})",
@@ -216,6 +229,41 @@ def _saved_modality(folder: Path) -> str | None:
         return None
     choice = saved.get("modalidad") if isinstance(saved, dict) else None
     return choice if isinstance(choice, str) else None
+
+
+def _saved_costs(folder: Path) -> Decimal | None:
+    try:
+        saved = json.loads((folder / COSTS).read_text(encoding="utf-8"))
+        amount = saved.get("importe_eur") if isinstance(saved, dict) else None
+        return read_amount(amount) if isinstance(amount, str) else None
+    except (OSError, ValueError):
+        return None
+
+
+def budget_inputs_changed(folder: Path, budget: dict) -> bool:
+    """Check whether the recorded budget verdict describes the current project inputs."""
+    folder = Path(folder)
+    amount = _saved_costs(folder)
+    recorded = budget.get("importe_eur")
+    try:
+        return ((read_amount(recorded) if recorded is not None else None) != amount
+                or Project.load(folder).idioma != budget.get("idioma_declarado"))
+    except (LibraryError, OSError, ValueError, yaml.YAMLError):
+        return True
+
+
+def set_direct_costs(folder: Path, amount: str | None) -> dict:
+    """Save the researcher's amount without changing the modality or the approved rules."""
+    folder = Path(folder)
+    if Project.load(folder).tipo != "convocatoria":
+        raise LibraryError("Solo se pueden indicar costes directos en una convocatoria.")
+    ficha = CallFicha.load(folder)
+    if ficha.idioma is None or ficha.idioma.costes_directos is None:
+        raise LibraryError("La ficha no contiene una regla de idioma vinculada al presupuesto.")
+    costs = read_amount(amount) if amount is not None else None
+    if _saved_costs(folder) != costs:
+        _write_json(folder / COSTS, {"importe_eur": f"{costs:.2f}" if costs is not None else None})
+    return _check_call_ficha(folder, ficha)[0]["idioma_por_presupuesto"]
 
 
 def _modal_page_limit(limits: Limits, modality: str | None) -> ModalPageLimit | None:
@@ -299,6 +347,8 @@ def ficha_text(folder: Path) -> str:
             lines.append(
                 modality["pregunta"] or f"Modalidad de la propuesta: {modality['seleccion']}."
             )
+        if budget := report.get("idioma_por_presupuesto"):
+            lines.extend(_budget_report_lines(budget))
         if not report["confirmada"]:
             lines += ["", "Ficha por confirmar. Reglas por revisar:"]
             for rule in report["reglas"]:
@@ -311,7 +361,7 @@ def ficha_text(folder: Path) -> str:
                 lines.append("Cambió el orden, se retiró una regla o cambiaron datos de la ficha.")
         for rule in report["reglas"]:
             if rule.get("valor") == "revision_manual":
-                lines.append(f"- Cotejo manual del límite: {rule['donde']}.")
+                lines.append(f"- Cotejo manual de la regla: {rule['donde']}.")
     return "\n".join(lines)
 
 
@@ -407,6 +457,21 @@ def _normalize_pdf_spacing(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
 
 
+def _budget_rule_value(rule: BudgetLanguage, source: Source, exact: bool) -> tuple[str, str | None]:
+    amount, language = quoted_budget_language(source.cita) if exact else (None, None)
+    if amount is not None and amount != rule.desde_eur:
+        return "difiere", (
+            f"La ficha indica un umbral de {rule.desde_eur:.2f} EUR. "
+            f"La cita indica {amount:.2f} EUR."
+        )
+    if language is not None and language != rule.idioma.split("-", 1)[0]:
+        return "difiere", (
+            f"La ficha indica {language_name(rule.idioma)}. "
+            f"La cita exige {language_name(language)}."
+        )
+    return ("coincide" if amount is not None and language is not None else "revision_manual"), None
+
+
 def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
     rules = list(_call_rules(ficha))
     evidence = {}
@@ -418,11 +483,13 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
     current_keys = []
     summaries = []
     options = ficha.limites.paginas_por_modalidad
+    budget_rule = ficha.idioma.costes_directos if ficha.idioma is not None else None
     for rule in rules:
         item = {"id": rule.id, "donde": rule.location, **rule.source.model_dump()}
         if rule.modality is not None:
             item["modalidad"] = rule.modality
         matched = evidence.get(rule.location)
+        mismatch = None
         if rule.limit and matched is not None:
             declared, units, pattern = rule.limit
             quoted = None
@@ -433,12 +500,14 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
             item["valor"] = "revision_manual" if quoted is None else "coincide"
             if quoted is not None and quoted != declared:
                 item["valor"] = "difiere"
-                report["fallidos"].append({
-                    **item, "motivo": f"La ficha indica {declared} {units}. "
-                                      f"La cita indica un máximo de {quoted}.",
-                })
-                report["comprobados"] -= 1
-                matched = None
+                mismatch = (f"La ficha indica {declared} {units}. "
+                            f"La cita indica un máximo de {quoted}.")
+        if rule.id == "idioma" and budget_rule is not None and matched is not None:
+            item["valor"], mismatch = _budget_rule_value(budget_rule, rule.source, matched[1])
+        if mismatch is not None:
+            report["fallidos"].append({**item, "motivo": mismatch})
+            report["comprobados"] -= 1
+            matched = None
         if matched is not None:
             key = _fingerprint((rule.id, rule.source.model_dump(), rule.contents,
                                 matched[0]))
@@ -454,7 +523,7 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
     report["reglas"] = summaries
     report["confirmada"] = not report["fallidos"] and saved == snapshot
     report["cambio_estructura"] = bool(saved and saved.get("estructura") != structure)
-    ficha_data = ficha.model_dump(exclude={"confirmada"})
+    ficha_data = ficha.model_dump(mode="json", exclude={"confirmada"})
     revision = (snapshot, ficha_data)
     if options:
         modality = report["modalidad"] = _modality_status(ficha.limites, _saved_modality(folder))
@@ -462,6 +531,15 @@ def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
     else:
         # Keep the existing revision for calls with a single unconditional limit.
         del ficha_data["limites"]["paginas_por_modalidad"]
+    if budget_rule is not None:
+        budget = budget_language_status(
+            budget_rule, _saved_costs(folder), Project.load(folder).idioma, report["confirmada"],
+        )
+        budget["fuente"] = ficha.idioma.fuente.model_dump()
+        report["idioma_por_presupuesto"] = budget
+        revision += (budget["importe_eur"], budget["idioma_declarado"])
+    elif ficha_data["idioma"] is not None:
+        del ficha_data["idioma"]["costes_directos"]
     report["revision"] = _fingerprint(revision)
     return report, snapshot
 
@@ -471,9 +549,9 @@ def check_ficha(folder: Path, ficha: CallFicha | None = None) -> dict:
     try:
         if ficha is None:
             ficha = CallFicha.load(folder)
+        return _check_call_ficha(Path(folder), ficha)[0]
     except LibraryError as error:
         return {"error": str(error)}
-    return _check_call_ficha(Path(folder), ficha)[0]
 
 
 def check_journal_ficha(folder: Path) -> dict:
@@ -730,6 +808,29 @@ def final_pdf_is_stale(folder: Path, report: dict) -> bool:
     )
 
 
+def _budget_report_lines(budget: dict) -> list[str]:
+    source = budget["fuente"]
+    required = language_name(budget["idioma_requerido"])
+    declared = language_name(budget["idioma_declarado"])
+    lines = [
+        "", "### Idioma según los costes directos", "",
+        f"Desde {budget['desde_eur']} EUR, la memoria debe redactarse en {required}.",
+        f"Fuente: {source['fichero']}, p. {source['pagina']}. «{source['cita']}»",
+    ]
+    if budget["importe_eur"] is not None:
+        lines.append(f"Costes directos declarados: {budget['importe_eur']} EUR.")
+    messages = {
+        "ficha_pendiente": "Confirma la ficha para aplicar la condición.",
+        "costes_pendientes": budget["pregunta"],
+        "no_aplica": "El importe queda por debajo del umbral de esta regla.",
+        "idioma_distinto": f"El proyecto indica {declared} y esta regla exige {required}.",
+        "ok": f"El idioma declarado del proyecto coincide con el exigido ({required}).",
+        "desactualizado": "Los costes directos o el idioma cambiaron. Vuelve a comprobarlos.",
+    }
+    lines.append(messages[budget["estado"]])
+    return lines
+
+
 def report_lines(ficha: dict, call: dict) -> list[str]:
     """The call section of the verification report, including manual checks."""
     lines = ["", "## Convocatoria", ""]
@@ -755,7 +856,7 @@ def report_lines(ficha: dict, call: dict) -> list[str]:
                     f"- Por aprobar: {rule['donde']} ({rule['fichero']}, p. {rule['pagina']})."
                 )
             if rule.get("valor") == "revision_manual":
-                lines.append(f"- Cotejo manual del límite: {rule['donde']}.")
+                lines.append(f"- Cotejo manual de la regla: {rule['donde']}.")
         if question := ficha.get("modalidad", {}).get("pregunta"):
             lines.append(question)
     if "aviso" in call:
@@ -828,4 +929,6 @@ def report_lines(ficha: dict, call: dict) -> list[str]:
             "ok": "El PDF final está dentro del límite de páginas.",
         }
         lines.append(messages[final["estado"]])
+    if budget := ficha.get("idioma_por_presupuesto"):
+        lines.extend(_budget_report_lines(budget))
     return lines

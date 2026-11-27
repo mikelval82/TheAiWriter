@@ -97,6 +97,15 @@ def _next_action(
     if ficha is not None and ficha.get("confirmada"):
         if question := ficha.get("modalidad", {}).get("pregunta"):
             return navigation(f"{ESCRIBIR} modalidad", question)
+        budget = ficha.get("idioma_por_presupuesto", {})
+        if question := budget.get("pregunta"):
+            return navigation(f"{ESCRIBIR} presupuesto", question)
+        if budget.get("estado") == "idioma_distinto":
+            return navigation(
+                "Revisar el idioma de la memoria",
+                f"Los costes directos activan la regla de idioma ({budget['idioma_requerido']}).",
+                (f"{ESCRIBIR} presupuesto", "Consultar o corregir los costes directos declarados."),
+            )
     if not text.strip():
         return navigation(ESCRIBIR, "Los materiales básicos están listos.",
                           (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."))
@@ -239,6 +248,8 @@ def document_status(folder: Path) -> dict:
         "exportacion": export,
         **({"hallazgos": findings} if findings is not None else {}),
         **({"modalidad": ficha["modalidad"]} if ficha and "modalidad" in ficha else {}),
+        **({"idioma_por_presupuesto": ficha["idioma_por_presupuesto"]}
+           if ficha and "idioma_por_presupuesto" in ficha else {}),
         **_next_action(missing, text, verification, review, _problems(checks, text),
                        findings, export, ficha),
     }

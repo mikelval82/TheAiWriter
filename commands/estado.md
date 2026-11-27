@@ -8,6 +8,8 @@ Si falta `proyecto.yaml`, sugiere abrir la carpeta de trabajo y usar `/theaiwrit
 
 Si el proyecto de convocatoria devuelve `modalidad`, muestra la selección y el máximo de páginas o la pregunta pendiente. Para modificar la elección, indica `/theaiwriter:escribir modalidad`.
 
+Si devuelve `idioma_por_presupuesto`, muestra si el importe en costes directos activa la condición de idioma y si el idioma declarado coincide. Para consultar o corregir el importe, indica `/theaiwriter:escribir presupuesto`.
+
 Si `comprobacion.pdf_final` está disponible, muestra el recuento y el máximo, o explica por qué sigue pendiente. Si se guardó o sustituyó el PDF después del informe, indica que debe volver a comprobarse.
 
 Muestra **Siguiente** con `siguiente` y `motivo_siguiente`, y **También puedes** con `alternativas` cuando las haya. Si hace falta ayuda para exportar, enlaza [la guía](https://github.com/mikelval82/TheAiWriter/blob/master/docs/exportar.md).

@@ -67,6 +67,8 @@ Si las bases fijan máximos distintos por modalidad, el plugin te pide elegir an
 
 Para comprobar la extensión definitiva, guarda la memoria preparada con la plantilla oficial como `exportacion/documento.pdf` y ejecuta `/theaiwriter:comprobar sin juez`. El informe muestra las páginas reales y el máximo aplicable por separado de la estimación del borrador. Si sustituyes el PDF, vuelve a comprobarlo.
 
+Si el idioma exigido depende de un importe mínimo en euros, usa `/theaiwriter:escribir presupuesto` para registrar, corregir o dejar pendientes los costes directos. La comprobación muestra el umbral, su fuente y si el idioma declarado en el proyecto coincide con el exigido. Puedes decidir después si cambias el idioma del proyecto y si adaptas el texto ya redactado.
+
 **Qué gasta de tu cuenta.** La conversación con Claude, sobre todo al escribir. Además, el juez hace una llamada por cada párrafo con citas y el revisor una por revisión. «Comprobar sin juez», `estado` y el índice no lanzan llamadas aparte.
 
 ## Archivos de entrada

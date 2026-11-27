@@ -26,6 +26,7 @@ from ai_writer.citations import find_citations
 from ai_writer.consulta import BIBLIOGRAPHY, consulted, open_index, scope, write_bibliography
 from ai_writer.convocatoria import (
     CallFicha,
+    budget_inputs_changed,
     check_call,
     check_ficha,
     check_final_pdf,
@@ -579,7 +580,7 @@ def run_judge(folder: Path, llm=None) -> dict:
 
 
 def status(folder: Path, *, findings: list[dict] | None = None) -> dict:
-    """Read the report and flag interrupted runs, changed evidence and replaced PDFs."""
+    """Read the report and flag interrupted runs and changed verification inputs."""
     data = _load(folder)
     if not data:
         raise LibraryError("Este documento todavía no se ha comprobado.")
@@ -594,6 +595,9 @@ def status(folder: Path, *, findings: list[dict] | None = None) -> dict:
         if final_pdf_is_stale(folder, final):
             final.update(estado="desactualizado", paginas=None,
                          motivo="El PDF final cambió desde la última comprobación.")
+    if budget := data.get("ficha", {}).get("idioma_por_presupuesto"):
+        if budget_inputs_changed(folder, budget):
+            budget.update(estado="desactualizado", pregunta=None)
     return data
 
 

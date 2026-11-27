@@ -1,6 +1,6 @@
 ---
 description: Planifica y escribe el documento consultando los PDF de Zotero, y verifica las citas
-argument-hint: "[«con pausa», sección o «solo ficha» / «modalidad [opción]» en convocatorias]"
+argument-hint: "[«con pausa», sección, «solo ficha», «modalidad» o «presupuesto»]"
 ---
 
 Escribe el documento de la carpeta actual apoyándote en los PDF de sus colecciones de Zotero, con las herramientas del servidor MCP `theaiwriter`. Tú planificas y escribes; las herramientas te dan los pasajes. Responde al usuario siempre en español.
@@ -11,6 +11,7 @@ Petición del usuario: $ARGUMENTS
 
 1. Lee `proyecto.yaml`. Si no existe, explica que primero hay que crear el documento con `/theaiwriter:nuevo` y para.
    - En una convocatoria, si el usuario pide «modalidad» o «modalidad [opción]», llama a `comprobar_ficha`. Si la ficha falta o tiene errores, guía a `/theaiwriter:escribir solo ficha` y termina. Si la ficha carece de límites por modalidad, explícalo y termina. En otro caso, muestra las opciones y la selección actual si existe. Espera a que el usuario indique una opción, salvo que ya la haya indicado, y llama a `fijar_modalidad_convocatoria`. Muestra el límite y su cita. Indica como siguiente paso `/theaiwriter:comprobar sin juez` si hay borrador, o `/theaiwriter:escribir con pausa` para preparar el plan. Termina aquí y conserva el borrador y el plan.
+   - En una convocatoria, si pide «presupuesto», consulta `comprobar_ficha`. Si la ficha falta o tiene errores, guía a `/theaiwriter:escribir solo ficha` y termina. Si la ficha carece de una regla de idioma por costes directos, explícalo y termina. En otro caso, muestra los costes directos registrados y espera una cifra nueva o una solicitud explícita de dejarlos pendientes, salvo que el investigador ya la haya indicado. Llama entonces a `fijar_costes_directos_convocatoria` con el importe en euros sin separador de miles, o `null` para dejarlos pendientes. Muestra el efecto sobre el idioma y su fuente. Indica el siguiente paso y termina sin modificar el idioma, el plan ni el borrador.
 2. Llama obligatoriamente a `guia_escritura` y sigue la guía del tipo de documento. Completa sus preparativos antes de planificar.
    - Para «solo ficha» en una convocatoria, prepara o revisa la ficha siguiendo esa guía. Después resume su estado y termina indicando el siguiente paso, sin redactar ni modificar el borrador.
 3. Lee `materiales/abstract.md`. Si no existe, está vacío o `guia_escritura` devuelve `abstract_vacio` a verdadero (solo tiene preguntas en comentarios y encabezados), pide al usuario la idea y el objetivo, propón un abstract de 150 a 250 palabras, escríbelo ahí cuando lo confirme y sigue.

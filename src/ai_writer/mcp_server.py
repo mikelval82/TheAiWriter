@@ -282,6 +282,17 @@ def fijar_modalidad_convocatoria(modalidad: str) -> dict:
         return {"error": str(error)}
 
 
+@tool
+def fijar_costes_directos_convocatoria(importe_eur: str | None) -> dict:
+    """Guarda costes directos indicados por el investigador. Usa euros sin miles o null."""
+    from ai_writer.convocatoria import set_direct_costs
+
+    try:
+        return set_direct_costs(_document_folder(), importe_eur)
+    except (LibraryError, OSError, ValueError) as error:
+        return {"error": str(error)}
+
+
 # Zotero: passages to consult while writing
 
 
