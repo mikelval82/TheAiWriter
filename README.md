@@ -71,7 +71,7 @@ y se renombran sus informes `verificacion.*` a `comprobacion.*`, con un aviso un
 Las citas del borrador usan claves como `[@smith2020empathy]`. Si falta una fuente, Claude debe
 marcarla con `[@?]`.
 
-En documentos de tipo `resultados`, Claude lee las tablas y el código antes de planificar y usa
+En documentos de tipo `resultados`, `/theaiwriter:hallazgos` inventaría los archivos y permite aprobar hallazgos con su evidencia antes de escribir. Admite celdas CSV, salidas de texto y salidas guardadas de cuadernos Jupyter. Claude lee los materiales antes de planificar y usa
 Introducción, Métodos, Resultados, Discusión y Conclusión, en el idioma del documento. Las cifras
 propias no llevan cita: salen de tablas de `resultados/` o de scripts guardados en `analisis/`
 que escriben allí sus salidas CSV o Markdown, incluidos los recuentos y diferencias citados.

@@ -30,6 +30,7 @@ flowchart LR
 | Paso | Entra | Sale |
 | --- | --- | --- |
 | `/theaiwriter:nuevo` | Título, tipo, idioma y colecciones de Zotero | `proyecto.yaml`, carpetas y plantillas con preguntas |
+| `/theaiwriter:hallazgos` (Resultados) | Tablas, salidas guardadas y tu decisión | Hallazgos que has aprobado o dejado pendientes |
 | `/theaiwriter:escribir con pausa` | `materiales/abstract.md` y lo propio del tipo | `borrador/plan.md`, `documento.md`, `referencias.bib` |
 | `/theaiwriter:comprobar` | El borrador y los PDF de Zotero | `informes/comprobacion.md` |
 | `/theaiwriter:corregir` | El informe y tu elección: todas, «1, 3» o ninguna | `documento.md` corregido |
@@ -55,7 +56,7 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 
 1. **Crea el documento.** Abre Claude Code en una carpeta vacía y escribe `/theaiwriter:nuevo` con tu idea. Te propone título, tipo, idioma y colección; contesta «vale» o di qué cambias.
 2. **Rellena los materiales.** Contesta las preguntas de `materiales/abstract.md` y añade los archivos de tu tipo de documento. `/theaiwriter:estado` te dice lo que falta.
-3. **Escribe.** `/theaiwriter:escribir con pausa` deja el plan en `borrador/plan.md` y espera. Léelo, pide cambios y contesta «aprobado». Al acabar comprueba el borrador.
+3. **Escribe.** En un estudio con resultados propios, usa primero `/theaiwriter:hallazgos` para revisar los hallazgos. Luego `/theaiwriter:escribir con pausa` deja el plan en `borrador/plan.md` y espera. Léelo, pide cambios y contesta «aprobado». Al acabar comprueba el borrador.
 4. **Lee la comprobación y corrige.** Las comprobaciones sin modelo salen al momento. El juez tarda unos minutos y Claude te avisa en tu siguiente mensaje. Mira las frases tergiversadas, no apoyadas y parciales, y usa `/theaiwriter:corregir`. Después, `/theaiwriter:comprobar` vuelve a juzgar las frases cambiadas.
 5. **Revisa por criterios.** `/theaiwriter:revisar`, o con el nombre de una revista y sus normas en `revista/`. Si hay ficha de criterios, te la enseña y espera tu «sí».
 6. **Pásalo a Word** con la [guía de exportación](exportar.md).
@@ -69,11 +70,20 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 | Colección de Zotero | sí | sí | sí | Las obras que se pueden citar, con su PDF. Si no eliges ninguna, se usa todo Zotero |
 | `materiales/abstract.md` | sí | sí | sí | Tus respuestas a las preguntas de la plantilla |
 | Notas en `materiales/` | — | opcional | — | Detalles del estudio y decisiones del análisis |
-| `resultados/` | — | sí | — | Tablas CSV (al menos una), figuras y salidas en Markdown. De aquí salen todas tus cifras |
+| `resultados/` | — | si no usas salidas de un cuaderno | — | Tablas CSV, figuras y salidas en Markdown o texto |
 | `analisis/` | — | opcional | — | Los scripts y cuadernos que produjeron los resultados |
 | `materiales/equipo.md` | — | — | sí | Personas y papel, resultados previos, recursos, presupuesto y duración. Lo que falte se marca `[PENDIENTE]`, no se inventa |
 | `convocatoria/*.pdf` | — | — | sí | Convocatoria, instrucciones de la memoria y plantilla oficiales |
 | `revista/*.pdf` | opcional | opcional | — | Guía para revisores o normas de autores. Vale una web guardada con Ctrl+P, si el texto se puede seleccionar |
+
+## Cómo aprobar hallazgos de tu estudio
+
+1. Pon las notas en `materiales/`, las tablas y figuras en `resultados/` y los scripts y cuadernos en `analisis/`.
+2. Escribe `/theaiwriter:hallazgos`. Comprueba el valor, el grupo y la ubicación de cada propuesta. En un CSV, la fila 1 es el primer registro después de la cabecera. En un cuaderno se cuentan todas las celdas desde 1 y se usan sus salidas guardadas.
+3. Responde «aprobar 1 y 3», «editar 2» o «dejar pendiente 2». Puedes volver con `/theaiwriter:hallazgos ver` al abrir otra sesión. Si cambia una fuente, verás qué hallazgo vuelve a revisión.
+4. Usa `/theaiwriter:escribir` para redactar con los hallazgos aprobados o `/theaiwriter:escribir solo Métodos` para avanzar mientras los revisas.
+
+Si un cuaderno tiene solo una imagen como salida o todavía no se ha ejecutado, adjunta la tabla o guarda una salida de texto con el valor. La revisión del hallazgo incluye su significado y unidad.
 
 ## Archivos de salida
 
@@ -88,6 +98,8 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 | `informes/revision.md` | revisar | Tres prioridades y, por criterio, nivel (bien, mejorable o flojo), fortalezas, carencias y trabajo |
 | `exportacion/documento-zotero.md` | si pides «prepara las citas vivas» | Copia del borrador con las claves de Better BibTeX |
 | `exportacion/documento.docx` | Pandoc | El documento final (u `.odt`) |
+
+En `informes/hallazgos.sqlite` se guardan las propuestas y las decisiones. Consulta el registro con `/theaiwriter:hallazgos ver`.
 
 En `informes/` hay también archivos internos que no hace falta abrir: `consultas.json`, `avisos.json`, los `.json` de cada informe y los `.log`. El índice de pasajes está en `Documentos/TheAIWriter/indice`.
 

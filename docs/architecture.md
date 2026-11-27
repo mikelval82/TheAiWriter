@@ -16,6 +16,8 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `mcp_server.py` | Registra las herramientas de diagnóstico, proyecto, consulta y verificación. |
 | `library.py` | Proyecto, plantillas de materiales, migración de informes y carpeta de documentos. |
 | `estado.py` | Estado determinista del documento y siguiente paso, sin abrir el índice. |
+| `evidencia.py` | Inventaría los materiales y lee una celda CSV o un fragmento guardado en una salida de texto o Jupyter. |
+| `hallazgos.py` | Registra propuestas y decisiones en SQLite, con la huella de la evidencia aprobada. |
 | `avisos.py` | Añade y consume avisos pendientes en `informes/avisos.json`. |
 | `zotero.py` | Lee obras, colecciones y adjuntos desde una copia temporal de la base de Zotero; asigna claves. |
 | `passages.py` | Extrae y segmenta PDF, mantiene el índice incremental y busca o lee pasajes. |
@@ -44,7 +46,8 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `hooks/validar.py` | Tras una edición del borrador, bloquea claves desconocidas, mal formadas o fuera de las colecciones. |
 
 El MCP expone `diagnostico`, `probar_claude`, `crear_documento`, `colecciones_zotero`, `estado_indice`,
-`guia_escritura`, `estado_documento`, `comprobar_ficha`, `mostrar_ficha`, `confirmar_ficha`,
+`guia_escritura`, `estado_documento`, `estado_hallazgos`, `leer_evidencia_resultados`,
+`guardar_hallazgos`, `decidir_hallazgos`, `comprobar_ficha`, `mostrar_ficha`, `confirmar_ficha`,
 `buscar_pasajes`, `leer_pasaje`, `leer_paginas`, `referencia`,
 `preparar_citas_vivas`, `comprobar_citas`, `comprobar_documento`, `estado_comprobacion`,
 `revisar_documento` y `estado_revision`.
@@ -226,7 +229,8 @@ no carga embeddings ni llama a modelos.
 
 `estado_documento` lee los materiales y los informes. Compara la huella del borrador con la de cada
 informe y usa la fecha de modificación con informes anteriores que carecen de huella. En convocatorias
-comprueba que haya equipo y PDF oficiales. En resultados busca un CSV. La comprobación incluye el
+comprueba que haya equipo y PDF oficiales. En resultados busca una tabla, una salida de texto o
+una salida guardada de Jupyter y resume el estado de las aprobaciones. La comprobación incluye el
 total de pares de frase y obra, incluso mientras hay pares pendientes. `siguiente`,
 `motivo_siguiente` y `alternativas` orientan al usuario según el estado actual. La exportación se
 hace con la guía,

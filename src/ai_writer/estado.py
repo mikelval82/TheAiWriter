@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 
 from ai_writer import revisor, verificacion
+from ai_writer.evidencia import has_results, inventory
+from ai_writer.hallazgos import list_findings
 from ai_writer.library import Project, is_template
 
 ESCRIBIR = "/theaiwriter:escribir"
@@ -11,6 +13,7 @@ COMPROBAR = "/theaiwriter:comprobar"
 REVISAR = "/theaiwriter:revisar"
 CORREGIR = "/theaiwriter:corregir"
 ESTADO = "/theaiwriter:estado"
+HALLAZGOS = "/theaiwriter:hallazgos"
 WORD = "pasar a Word: guía en docs/exportar.md"
 
 
@@ -52,7 +55,10 @@ def _problems(checks: dict, text: str) -> bool:
     )
 
 
-def _next_action(missing: list[str], text: str, check: dict, review: dict, problems: bool) -> dict:
+def _next_action(
+    missing: list[str], text: str, check: dict, review: dict, problems: bool,
+    findings: dict[str, int] | None,
+) -> dict:
     def navigation(action: str, reason: str, *alternatives: tuple[str, str]) -> dict:
         return {
             "siguiente": action,
@@ -65,10 +71,21 @@ def _next_action(missing: list[str], text: str, check: dict, review: dict, probl
             "materiales/abstract.md": "Responde a las preguntas sobre tu estudio o idea.",
             "materiales/equipo.md": "Describe el equipo y los recursos de la propuesta.",
             "convocatoria/*.pdf": "Añade los PDF oficiales en convocatoria/.",
-            "resultados/*.csv": "Añade al menos una tabla de resultados en resultados/.",
+            "salidas del análisis": "Añade una tabla, una salida de texto o un cuaderno con salidas guardadas.",
         }[missing[0]]
         return navigation(f"Completar {missing[0]}", reason,
                           ("/theaiwriter:ayuda materiales", "Ver qué materiales admite el proyecto."))
+    if findings is not None and (
+        findings["por_revisar"] or not text.strip() and not findings["aprobado"]
+    ):
+        reason = ("Cambió la evidencia de un hallazgo aprobado." if findings["por_revisar"]
+                  else "Revisa los hallazgos que pueden entrar en Resultados.")
+        return navigation(HALLAZGOS, reason,
+                          (f"{ESCRIBIR} solo Métodos", "Avanzar con la descripción del estudio."))
+    if not text.strip() and findings:
+        return navigation(ESCRIBIR, "Ya hay hallazgos aprobados para el borrador.",
+                          (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."),
+                          (f"{HALLAZGOS} ver", "Volver a los hallazgos y decidir qué incluir."))
     if not text.strip():
         return navigation(ESCRIBIR, "Los materiales básicos están listos.",
                           (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."))
@@ -118,8 +135,14 @@ def document_status(folder: Path) -> dict:
     if project.tipo == "convocatoria":
         materials["materiales/equipo.md"] = _material(folder / "materiales/equipo.md")
         materials["convocatoria/*.pdf"] = _file_material(folder / "convocatoria", ".pdf")
+    findings = None
     if project.tipo == "resultados":
-        materials["resultados/*.csv"] = _file_material(folder / "resultados", ".csv")
+        materials["salidas del análisis"] = "escrito" if has_results(inventory(folder)) else "falta"
+        entries = list_findings(folder)
+        findings = {
+            state: sum(entry["estado"] == state for entry in entries)
+            for state in ("propuesto", "aprobado", "pendiente", "por_revisar")
+        }
 
     draft = folder / verificacion.DRAFT
     text = draft.read_text(encoding="utf-8") if draft.exists() else ""
@@ -157,5 +180,6 @@ def document_status(folder: Path) -> dict:
     return {
         "titulo": project.titulo, "tipo": project.tipo, "materiales": materials,
         "palabras": len(text.split()), "comprobacion": verification, "revision": review,
-        **_next_action(missing, text, verification, review, _problems(checks, text)),
+        **({"hallazgos": findings} if findings is not None else {}),
+        **_next_action(missing, text, verification, review, _problems(checks, text), findings),
     }

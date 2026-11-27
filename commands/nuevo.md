@@ -15,6 +15,6 @@ Idea del usuario: $ARGUMENTS
    - Colecciones de Zotero que usa, mostrando las que hay con sus obras y cuántas traen PDF. Una colección incluye sus subcolecciones; ninguna significa todo Zotero.
 3. Con sus respuestas, llama a `crear_documento` con el `tipo` elegido: «perspectiva», «resultados» o «convocatoria».
 4. Llama a `estado_indice` con `actualizar` a verdadero. Avisa antes de que no gasta llamadas a Claude y de que la primera vez tarda unos segundos por PDF.
-5. Resume lo creado, cuántas obras con PDF están indexadas y qué materiales siguen pendientes según `estado_documento`.
+5. Resume lo creado, cuántas obras con PDF están indexadas y qué materiales siguen pendientes según `estado_documento`. Para Resultados, usa también `estado_hallazgos` para indicar qué materiales ha detectado el plugin.
 
 Antes de cerrar, llama a `estado_documento`. Muestra **Siguiente** con `siguiente` y `motivo_siguiente`, y **También puedes** con `alternativas` cuando las haya. Si el paso es pasar a Word, enlaza [la guía](https://github.com/mikelval82/TheAiWriter/blob/master/docs/exportar.md).

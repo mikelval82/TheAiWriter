@@ -81,7 +81,7 @@ def test_guided_materials_are_empty_until_answered(document, kind, question):  #
                                        "materiales/equipo.md": "plantilla",
                                        "convocatoria/*.pdf": "falta"}
     if kind == "resultados":
-        assert status["materiales"]["resultados/*.csv"] == "falta"
+        assert status["materiales"]["salidas del análisis"] == "falta"
     with abstract.open("a", encoding="utf-8") as stream:
         stream.write("Mi idea y objetivo.\n")
     assert not is_template(abstract)
@@ -107,12 +107,13 @@ def test_extra_materials_in_subfolders(document, kind, extra):  # noqa: F811
         assert mcp_server.estado_documento()["siguiente"] == "Completar materiales/equipo.md"
         (document / "materiales/equipo.md").write_text("Equipo conocido.")
     status = mcp_server.estado_documento()
-    key = "resultados/*.csv" if kind == "resultados" else "convocatoria/*.pdf"
+    key = "salidas del análisis" if kind == "resultados" else "convocatoria/*.pdf"
     assert status["siguiente"] == f"Completar {key}"
     path = document / extra
     path.parent.mkdir()
     path.write_text("material")
-    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:escribir"
+    next_command = "hallazgos" if kind == "resultados" else "escribir"
+    assert mcp_server.estado_documento()["siguiente"] == f"/theaiwriter:{next_command}"
 
 
 def write_reports(

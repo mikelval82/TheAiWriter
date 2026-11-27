@@ -17,9 +17,12 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 
+from ai_writer.evidencia import Fuente
+from ai_writer.hallazgos import Propuesta, Seleccion
 from ai_writer.library import PROJECT_FILE, LibraryError, Project
 
 server = MCPServer("theaiwriter")
@@ -170,6 +173,64 @@ def estado_documento() -> dict:
         return _error(error)
     except ValueError as error:
         return {"error": f"Datos no válidos en el documento: {error}"}
+
+
+def _results_folder() -> Path:
+    folder = _document_folder()
+    if Project.load(folder).tipo != "resultados":
+        raise LibraryError("El registro de hallazgos está disponible en documentos de tipo resultados.")
+    return folder
+
+
+@tool
+def estado_hallazgos(incluir_materiales: bool = True) -> dict:
+    """Lista los hallazgos con su evidencia y versión. Puede incluir los archivos del estudio."""
+    from ai_writer.evidencia import inventory
+    from ai_writer.hallazgos import list_findings
+
+    try:
+        folder = _results_folder()
+        report = {"hallazgos": list_findings(folder)}
+        if incluir_materiales:
+            report["materiales"] = inventory(folder)
+        return report
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def leer_evidencia_resultados(fuente: Fuente) -> dict:
+    """Lee una celda CSV, un fragmento literal de una salida de Jupyter o una línea de resultados."""
+    from ai_writer.evidencia import read_source
+
+    try:
+        evidence = read_source(_results_folder(), fuente)
+        evidence.pop("codigo", None)
+        return evidence
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def guardar_hallazgos(propuestas: list[Propuesta]) -> dict:
+    """Registra propuestas sin aprobar. Para editar, usa el id y la versión en sustituye."""
+    from ai_writer.hallazgos import save_findings
+
+    try:
+        return {"hallazgos": save_findings(_results_folder(), propuestas)}
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def decidir_hallazgos(seleccion: list[Seleccion], decision: Literal["aprobado", "pendiente"]) -> dict:
+    """Guarda una decisión explícita del investigador usando el id y versión de cada hallazgo mostrado."""
+    from ai_writer.hallazgos import decide_findings
+
+    try:
+        return {"hallazgos": decide_findings(_results_folder(), seleccion, decision)}
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
 
 
 @tool

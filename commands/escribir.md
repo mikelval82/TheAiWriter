@@ -12,18 +12,18 @@ Petición del usuario: $ARGUMENTS
 1. Lee `proyecto.yaml`. Si no existe, explica que primero hay que crear el documento con `/theaiwriter:nuevo` y para.
 2. Llama obligatoriamente a `guia_escritura` y sigue la guía del tipo de documento. Completa sus preparativos antes de planificar.
 3. Lee `materiales/abstract.md`. Si no existe, está vacío o `guia_escritura` devuelve `abstract_vacio` a verdadero (solo tiene preguntas en comentarios y encabezados), pide al usuario la idea y el objetivo, propón un abstract de 150 a 250 palabras, escríbelo ahí cuando lo confirme y sigue.
-4. Llama a `estado_indice` con `actualizar` a verdadero. Si hay obras sin PDF, dilo en una línea.
+4. Llama a `estado_indice` con `actualizar` a verdadero. Si hay obras sin PDF, dilo en una línea. Si solo redactas Métodos o Resultados de un estudio y sus materiales son suficientes, puedes omitir la búsqueda bibliográfica.
 
 ## Plan
 
-5. Explora antes de planificar: haz entre 6 y 12 llamadas a `buscar_pasajes` sobre los temas del abstract. Busca en el idioma de los papers y con los términos que usarían.
+5. Para las secciones que requieren bibliografía, explora antes de planificar: haz entre 6 y 12 llamadas a `buscar_pasajes` sobre los temas del abstract. Busca en el idioma de los papers y con los términos que usarían.
 6. Escribe `borrador/plan.md`: el objetivo, las secciones y, para cada sección, qué va a sostener y qué obras lo apoyan. Si algo del abstract no tiene apoyo en las colecciones, dilo en el plan en vez de taparlo.
 7. Si el usuario pidió «con pausa», enséñale el plan y espera a que lo apruebe. Si no, sigue.
 
 ## Escritura
 
 8. Escribe `borrador/documento.md` sección a sección, en el idioma del documento. Para cada sección:
-   - Vuelve a buscar con consultas concretas de esa sección; no escribas solo con lo que encontraste al planificar.
+   - Si la sección usa bibliografía, vuelve a buscar con consultas concretas de esa sección.
    - Antes de citar un dato, un resultado o una cifra de una obra, lee su contexto con `leer_pasaje`.
    - Cita con `[@clave]`, usando solo claves que hayan salido en `buscar_pasajes`, `leer_pasaje` o `leer_paginas`.
 9. Reglas de las citas, sin excepciones:
