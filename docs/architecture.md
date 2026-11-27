@@ -18,6 +18,7 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `estado.py` | Estado determinista del documento y siguiente paso, sin abrir el índice. |
 | `evidencia.py` | Inventaría los materiales y lee una celda CSV o un fragmento guardado en una salida de texto o Jupyter. |
 | `hallazgos.py` | Registra propuestas y decisiones en SQLite, con la huella de la evidencia aprobada. |
+| `hallazgos_borrador.py` | Coteja los enunciados del manuscrito con los hallazgos aprobados y señala cifras por vincular. |
 | `avisos.py` | Añade y consume avisos pendientes en `informes/avisos.json`. |
 | `zotero.py` | Lee obras, colecciones y adjuntos desde una copia temporal de la base de Zotero; asigna claves. |
 | `passages.py` | Extrae y segmenta PDF, mantiene el índice incremental y busca o lee pasajes. |
@@ -205,9 +206,11 @@ lista. El juez usa este registro para incluir contexto que vio Claude.
 `comprobacion.json` contiene la fecha `comprobado`, el resultado de `citas`, las `citas_literales`,
 la ruta de la `bibliografia`, el estado y progreso de `juez` y las entradas de `apoyo` por frase y
 obra. `comprobacion.md` presenta estos datos al usuario; `comprobacion.log` recoge la salida del
-proceso independiente. Solo en documentos de tipo `resultados`, la clave `cifras` añade las cifras
+proceso independiente. Solo en documentos de tipo `resultados` sin vínculos ni registro, la clave `cifras` añade las cifras
 `comprobadas`, las que tienen origen (`con_origen`), las entradas `sin_origen` con cifra, sección y
 frase, los `ficheros` leídos y un `aviso` si no hay resultados numéricos.
+Si hay un registro o vínculos a hallazgos, `hallazgos_borrador` incluye el estado de cada vínculo, la línea, el enunciado aprobado y su fuente. Las versiones de los hallazgos vinculados permiten detectar que el informe se ha quedado desactualizado aunque el borrador siga igual.
+
 Solo para `convocatoria`, `ficha` añade requisitos comprobados, fallidos, avisos y confirmación;
 `convocatoria` añade apartados ausentes o sobrantes, orden, extensión, campos y pendientes.
 Si la ficha no valida o tiene citas fallidas, se devuelve un aviso en lugar de comprobar la

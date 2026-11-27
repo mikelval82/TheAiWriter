@@ -443,7 +443,8 @@ def comprobar_documento(juez: bool = True) -> dict:
     """Verifica el borrador `borrador/documento.md` de un documento sobre Zotero. Al momento
     y sin gastar llamadas: que cada `[@clave]` exista y esté en las colecciones, y que cada
     cita literal entre comillas esté tal cual en el PDF; en documentos de tipo resultados,
-    comprueba también que las cifras propias tengan origen en resultados/; en convocatorias,
+    coteja las frases enlazadas con los hallazgos aprobados o busca las cifras de borradores
+    anteriores en resultados/. En convocatorias,
     comprueba la ficha contra los PDF oficiales y la conformidad del borrador. Además escribe
     `borrador/referencias.bib`. Con `juez`, lanza en segundo plano el juez de apoyo, que
     compara cada frase citada con pasajes de la obra (una llamada a Claude por párrafo con

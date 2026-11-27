@@ -6,6 +6,7 @@ from pathlib import Path
 from ai_writer import revisor, verificacion
 from ai_writer.evidencia import has_results, inventory
 from ai_writer.hallazgos import list_findings
+from ai_writer.hallazgos_borrador import report_counts
 from ai_writer.library import Project, is_template
 
 ESCRIBIR = "/theaiwriter:escribir"
@@ -95,6 +96,11 @@ def _next_action(
     if check["estado"] in ("sin hacer", "desactualizada"):
         return navigation(COMPROBAR, "Hace falta una comprobación del borrador actual.",
                           (f"{COMPROBAR} sin juez", "Hacer solo las comprobaciones inmediatas."))
+    links = check.get("hallazgos", {})
+    if links.get("por_revisar") or links.get("sin_vinculo"):
+        return navigation(CORREGIR, "Hay frases del estudio cuyo vínculo requiere revisión.",
+                          (f"{HALLAZGOS} ver", "Consultar qué enunciados y fuentes están aprobados."),
+                          ("Leer informes/comprobacion.md", "Localizar cada frase y su fuente."))
     if problems:
         return navigation(CORREGIR, "Hay citas, cifras o datos pendientes que requieren una decisión.",
                           ("Leer informes/comprobacion.md", "Consultar los avisos y sus fuentes."),
@@ -135,7 +141,7 @@ def document_status(folder: Path) -> dict:
     if project.tipo == "convocatoria":
         materials["materiales/equipo.md"] = _material(folder / "materiales/equipo.md")
         materials["convocatoria/*.pdf"] = _file_material(folder / "convocatoria", ".pdf")
-    findings = None
+    findings = entries = None
     if project.tipo == "resultados":
         materials["salidas del análisis"] = "escrito" if has_results(inventory(folder)) else "falta"
         entries = list_findings(folder)
@@ -151,7 +157,7 @@ def document_status(folder: Path) -> dict:
     checks = {}
     verification = {"estado": "sin hacer"}
     if result.exists():
-        checks = verificacion.status(folder)
+        checks = verificacion.status(folder, findings=entries)
         judge = checks.get("juez", {})
         state = judge.get("estado", "sin_lanzar")
         stale = draft.exists() and _stale(checks, result, draft, fingerprint)
@@ -160,13 +166,15 @@ def document_status(folder: Path) -> dict:
         stats = verificacion.support_summary(checks)
         if state == "en_curso":
             state = "juez en curso"
-        elif stale or state == "desactualizado":
+        elif stale or checks.get("hallazgos_desactualizados") or state == "desactualizado":
             state = "desactualizada"
         elif state in ("sin_lanzar", "terminado"):
             state = "parcial" if stats["sin_juzgar"] else "terminado"
         verification = {
             "estado": state, "juez": judge, "recuento": stats, "informe": verificacion.REPORT,
         }
+        if "hallazgos_borrador" in checks:
+            verification["hallazgos"] = report_counts(checks["hallazgos_borrador"])
 
     review_path = folder / revisor.REVIEW
     review = revisor.review_status(folder) if review_path.exists() else {"estado": "sin hacer"}

@@ -47,8 +47,8 @@ def _sources(results_dir: Path) -> tuple[list[Decimal], list[str]]:
     return values, files
 
 
-def _prose(text: str) -> tuple[str, list[str]]:
-    """Hide code and link destinations before sentence splitting; retain them for reports."""
+def lines_without_code(text: str) -> list[str]:
+    """Keep source line positions while blanking fenced and indented code blocks."""
     lines, fence, width = [], "", 0
     for line in text.splitlines():
         marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
@@ -64,7 +64,12 @@ def _prose(text: str) -> tuple[str, list[str]]:
             lines.append("")
         else:
             lines.append(line)
-    text = "\n".join(lines)
+    return lines
+
+
+def _prose(text: str) -> tuple[str, list[str]]:
+    """Hide code and link destinations before sentence splitting; retain them for reports."""
+    text = "\n".join(lines_without_code(text))
     hidden = []
 
     def hide(match: re.Match) -> str:
@@ -80,6 +85,14 @@ def _prose(text: str) -> tuple[str, list[str]]:
     return text, hidden
 
 
+def restore_prose(text: str, hidden: list[str]) -> str:
+    def restore(match: re.Match) -> str:
+        index = int(match[1])
+        return hidden[index] if index < len(hidden) else match.group()
+
+    return re.sub(r"HIDDENFIGURETOKEN(\d{1,9})END", restore, text)
+
+
 def _sentences(text: str):
     text, hidden = _prose(text)
     section, excluded, lines = "", False, []
@@ -88,9 +101,7 @@ def _sentences(text: str):
         if not excluded:
             for sentence in split_sentences(" ".join(lines)):
                 if not _CITATION.search(sentence):
-                    original = re.sub(
-                        r"HIDDENFIGURETOKEN(\d+)END", lambda m: hidden[int(m[1])], sentence
-                    )
+                    original = restore_prose(sentence, hidden)
                     yield section, sentence, original
         lines.clear()
 

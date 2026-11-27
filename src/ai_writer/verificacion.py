@@ -25,6 +25,9 @@ from ai_writer.cifras import check_figures
 from ai_writer.citations import find_citations
 from ai_writer.consulta import BIBLIOGRAPHY, consulted, open_index, scope, write_bibliography
 from ai_writer.convocatoria import CallFicha, check_call, check_ficha, report_lines
+from ai_writer.hallazgos import list_findings
+from ai_writer.hallazgos_borrador import check_findings, findings_changed
+from ai_writer.hallazgos_borrador import report_lines as findings_report_lines
 from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 from ai_writer.passages import PassageIndex
@@ -409,7 +412,11 @@ def _check_document(
     }
     kind = Project.load(folder).tipo
     if kind == "resultados":
-        data["cifras"] = check_figures(text, Path(folder) / "resultados")
+        finding_report = check_findings(text, list_findings(folder))
+        if finding_report is None:
+            data["cifras"] = check_figures(text, Path(folder) / "resultados")
+        else:
+            data["hallazgos_borrador"] = finding_report
     if kind == "convocatoria":
         ficha = data["ficha"] = check_ficha(folder)
         data["convocatoria"] = (
@@ -481,14 +488,18 @@ def run_judge(folder: Path, llm=None) -> dict:
     return data
 
 
-def status(folder: Path) -> dict:
-    """The saved result, with a judge that died marked as interrupted."""
+def status(folder: Path, *, findings: list[dict] | None = None) -> dict:
+    """Read the report and mark interrupted runs and changed finding evidence."""
     data = _load(folder)
     if not data:
         raise LibraryError("Este documento todavía no se ha comprobado.")
     judge = data.get("juez", {})
     if judge.get("estado") == "en_curso" and not process_alive(judge.get("pid")):
         judge["estado"] = "interrumpido"
+    if findings is None and ("hallazgos_borrador" in data or "cifras" in data):
+        findings = list_findings(folder)
+    if findings is not None and findings_changed(data.get("hallazgos_borrador"), findings):
+        data["hallazgos_desactualizados"] = True
     return data
 
 
@@ -527,7 +538,7 @@ def overview(data: dict) -> dict:
         "informe": REPORT,
         "bibliografia": data.get("bibliografia"),
     }
-    for key in ("cifras", "ficha", "convocatoria"):
+    for key in ("cifras", "hallazgos_borrador", "hallazgos_desactualizados", "ficha", "convocatoria"):
         if key in data:
             report[key] = data[key]
     return report
@@ -617,6 +628,9 @@ def markdown(data: dict) -> str:
             "", "La comprobación confirma que la cifra existe en los resultados, "
             "no que la frase la describa bien.",
         ]
+
+    if "hallazgos_borrador" in data:
+        lines.extend(findings_report_lines(data["hallazgos_borrador"]))
 
     if "ficha" in data:
         lines.extend(report_lines(data["ficha"], data["convocatoria"]))

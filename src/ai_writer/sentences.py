@@ -5,6 +5,7 @@ import re
 from ai_writer.citations import find_citations
 
 _HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+_FINDING_MARKER = re.compile(r"<!--\s*hallazgo\s*:\s*\d+\s*-->", re.IGNORECASE)
 _CITE_MARKUP = re.compile(r"\[[^\[\]]*@[^\[\]]*\]|\[\[PENDIENTE[^\]]*\]\]")
 _ABBREVIATION = re.compile(r"\b(?:e\.g|i\.e|et al|cf|vs|pp?|fig|figs|no|dr|dra|sr|sra)\.", re.I)
 _GENUS = re.compile(r"\b[A-Z]\.(?=\*?\s+\*?[a-z])")  # *E. coli*, S. aureus
@@ -63,6 +64,7 @@ def _blocks(text: str) -> list[tuple[str, str]]:
             lines.clear()
 
     for line in text.splitlines():
+        line = _FINDING_MARKER.sub("", line)
         heading = _HEADING.match(line)
         if heading:
             flush()

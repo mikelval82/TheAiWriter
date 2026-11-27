@@ -19,6 +19,7 @@ from ai_writer.convocatoria import (
     check_ficha,
     check_journal_ficha,
 )
+from ai_writer.hallazgos_borrador import report_counts
 from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 
@@ -116,6 +117,8 @@ def _verification_summary(data: dict) -> dict:
         report["cifras"] = {k: figures[k] for k in ("comprobadas", "con_origen", "aviso")
                             if k in figures}
         report["cifras"]["sin_origen"] = len(figures["sin_origen"])
+    if "hallazgos_borrador" in data:
+        report["hallazgos_borrador"] = report_counts(data["hallazgos_borrador"])
     return report
 
 

@@ -3,6 +3,7 @@
 import json
 import re
 import sqlite3
+import unicodedata
 from contextlib import closing, contextmanager
 from hashlib import sha256
 from pathlib import Path
@@ -34,6 +35,15 @@ class Seleccion(BaseModel, extra="forbid"):
 class Propuesta(BaseModel, extra="forbid"):
     hallazgo: Hallazgo
     sustituye: Seleccion | None = None
+
+
+def normalize_statement(text: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", text).split())
+
+
+def draft_line(finding: dict) -> str:
+    """Line to copy into the manuscript after approval."""
+    return f"{normalize_statement(finding['enunciado'])} <!-- hallazgo:{finding['id']} -->"
 
 
 def _signature(*parts: object) -> str:
@@ -106,13 +116,16 @@ def _view(folder: Path, row: sqlite3.Row) -> tuple[dict, str | None]:
     state = row["decision"]
     if state == "aprobado" and (proof is None or proof != row["evidencia_aprobada"]):
         state = "por_revisar"
-    return {
+    entry = {
         "id": row["id"], "estado": state, **finding.model_dump(),
         "evidencia": evidence, "aviso": error,
         "version": _signature(
             row["id"], row["propuesta"], row["decision"], row["evidencia_aprobada"], proof, error
         ),
-    }, proof
+    }
+    if state == "aprobado":
+        entry["linea_borrador"] = draft_line(entry)
+    return entry, proof
 
 
 def list_findings(folder: Path) -> list[dict]:

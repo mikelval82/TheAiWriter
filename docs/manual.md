@@ -32,7 +32,7 @@ flowchart LR
 | `/theaiwriter:nuevo` | Título, tipo, idioma y colecciones de Zotero | `proyecto.yaml`, carpetas y plantillas con preguntas |
 | `/theaiwriter:hallazgos` (Resultados) | Tablas, salidas guardadas y tu decisión | Hallazgos que has aprobado o dejado pendientes |
 | `/theaiwriter:escribir con pausa` | `materiales/abstract.md` y lo propio del tipo | `borrador/plan.md`, `documento.md`, `referencias.bib` |
-| `/theaiwriter:comprobar` | El borrador y los PDF de Zotero | `informes/comprobacion.md` |
+| `/theaiwriter:comprobar` | El borrador, los hallazgos aprobados y los PDF de Zotero | `informes/comprobacion.md` |
 | `/theaiwriter:corregir` | El informe y tu elección: todas, «1, 3» o ninguna | `documento.md` corregido |
 | `/theaiwriter:revisar` | El borrador y los criterios de la convocatoria o revista | `informes/revision.md` |
 | Pandoc | `documento.md`, `referencias.bib`, estilo CSL y plantilla | `exportacion/documento.docx` u `.odt` |
@@ -81,9 +81,10 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 1. Pon las notas en `materiales/`, las tablas y figuras en `resultados/` y los scripts y cuadernos en `analisis/`.
 2. Escribe `/theaiwriter:hallazgos`. Comprueba el valor, el grupo y la ubicación de cada propuesta. En un CSV, la fila 1 es el primer registro después de la cabecera. En un cuaderno se cuentan todas las celdas desde 1 y se usan sus salidas guardadas.
 3. Responde «aprobar 1 y 3», «editar 2» o «dejar pendiente 2». Puedes volver con `/theaiwriter:hallazgos ver` al abrir otra sesión. Si cambia una fuente, verás qué hallazgo vuelve a revisión.
-4. Usa `/theaiwriter:escribir` para redactar con los hallazgos aprobados o `/theaiwriter:escribir solo Métodos` para avanzar mientras los revisas.
+4. Usa `/theaiwriter:escribir` para redactar con los hallazgos aprobados o `/theaiwriter:escribir solo Métodos` para avanzar mientras los revisas. Aprueba el plan antes de redactar. Si ya existe la sección, puedes revisar en bloque los cambios que propone.
+5. Usa `/theaiwriter:comprobar sin juez` para comprobar los vínculos con los hallazgos. El informe muestra la frase, el grupo y la ubicación del dato. Si la frase cambia, puedes restaurar la aprobada o volver a `/theaiwriter:hallazgos` para aprobar la nueva formulación.
 
-Si un cuaderno tiene solo una imagen como salida o todavía no se ha ejecutado, adjunta la tabla o guarda una salida de texto con el valor. La revisión del hallazgo incluye su significado y unidad.
+Si un cuaderno tiene solo una imagen como salida o todavía no se ha ejecutado, adjunta la tabla o guarda una salida de texto con el valor. La revisión del hallazgo incluye su significado y unidad. Al redactar, verás un comentario como `<!-- hallazgo:1 -->` al final de la línea del hallazgo en Markdown. El vínculo permite comprobar esa línea después de editarla.
 
 ## Archivos de salida
 
@@ -110,10 +111,13 @@ En `informes/` hay también archivos internos que no hace falta abrir: `consulta
 | Citas | No | Que la obra exista en Zotero y esté en tus colecciones, y cuáles no has citado |
 | Citas literales | No | Que lo que va entre «» esté palabra por palabra en el PDF (6 palabras o más) |
 | Frases sin cita | No | Las que parecen hablar de una obra y no la citan. Avisa de más y puede saltarse alguna |
-| Cifras propias | No | En resultados: decimales y porcentajes que no están en tus tablas |
+| Hallazgos del estudio | No | Coteja las frases vinculadas con lo aprobado y señala cifras sin vínculo en la prosa de Resultados, incluidos los enteros |
+| Cifras en borradores anteriores | No | Busca decimales y porcentajes en las tablas de proyectos que aún trabajan sin vínculos |
 | Convocatoria | No | Apartados, orden, extensión estimada y límites de caracteres |
 | Apoyo de las citas | Sí, el juez | Cuántos pares de frase y obra se han juzgado, cuáles están apoyados y cuántos siguen pendientes |
 | Revisión por criterios | Sí, el revisor | Dónde conviene trabajar más |
+
+La comprobación de hallazgos compara el enunciado con el que aprobaste. Revisa también el alcance científico de tus afirmaciones y el contenido de tablas y figuras.
 
 El juez y el revisor se equivocan a veces. Toma lo que señalan como una lista de cosas que mirar, y decide tú. Los veredictos de frases que no han cambiado no se rehacen.
 
