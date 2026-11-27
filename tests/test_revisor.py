@@ -173,6 +173,80 @@ def test_call_uses_its_ficha_and_conformity_summary(document, ficha):  # noqa: F
     assert mcp_server.comprobar_ficha()["comprobados"] == 8
 
 
+@pytest.fixture
+def proposal(document, ficha):  # noqa: F811
+    mcp_server.crear_documento("convocatoria", "Memoria de prueba")
+    make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
+    save_ficha(document, ficha)
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    text = ("## Objetivos\nO1. Cuantificar el cambio en la cobertura vegetal.\n\n"
+            "## Plan de trabajo\nT1. Recoger observaciones de referencia.\n\n"
+            "## Cronograma\nT1. Se realizará en el primer trimestre.\n\n"
+            "## Presupuesto\nSe solicitan 1.200 euros para licencias.\n\n"
+            "## Hitos\nT1. Se realizará en el segundo trimestre.\n")
+    (document / verificacion.DRAFT).write_text(text, encoding="utf-8")
+    return document
+
+
+def test_proposal_review_checks_named_links_and_locates_evidence(proposal):
+    findings = [
+        {"relacion": "objetivos_metodos", "estado": "evaluada", "hallazgos": [
+            {"tipo": "falta_vinculo", "problema": "O1 carece de un método asociado.",
+             "evidencias": [{"linea": 2, "fragmento": "Cuantificar el cambio en la cobertura vegetal."}],
+             "accion": "Indica con qué procedimiento se cuantificará O1."},
+        ]},
+        {"relacion": "actividades_cronograma", "estado": "evaluada", "hallazgos": [
+            {"tipo": "contradiccion", "problema": "T1 tiene dos plazos distintos.",
+             "evidencias": [{"linea": 8, "fragmento": "Se realizará en el primer trimestre."},
+                            {"linea": 14, "fragmento": "Se realizará en el segundo trimestre."}],
+             "accion": "Confirma cuál de los dos trimestres corresponde a T1."},
+        ]},
+        {"relacion": "actividades_presupuesto", "estado": "evaluada", "hallazgos": [
+            {"tipo": "falta_vinculo", "problema": "Las licencias carecen de una actividad asociada.",
+             "evidencias": [{"linea": 11, "fragmento": "Se solicitan 1.200 euros para licencias."}],
+             "accion": "Vincula el coste de las licencias con una tarea y explica su necesidad."},
+        ]},
+    ]
+    reviewer = Reviewer({"criterios": [review_row("Calidad", "bien")], "coherencia": findings})
+    original = (proposal / verificacion.DRAFT).read_bytes()
+    result = revisor.run_review(proposal, reviewer)
+
+    assert len(reviewer.prompts) == 1
+    assert "objetivos_metodos" in reviewer.prompts[0][0]
+    assert "2 | O1." in reviewer.prompts[0][1]
+    assert (proposal / verificacion.DRAFT).read_bytes() == original
+    coherence = result["coherencia"]
+    assert [section["estado"] for section in coherence] == ["evaluada"] * 3
+    assert [ref["apartado"] for ref in coherence[1]["hallazgos"][0]["evidencias"]] == [
+        "Cronograma", "Hitos",
+    ]
+    evidence, = coherence[2]["hallazgos"][0]["evidencias"]
+    assert evidence["apartado"] == "Presupuesto" and evidence["linea"] == 11
+    report = (proposal / revisor.REVIEW_REPORT).read_text(encoding="utf-8")
+    assert "Coherencia de la propuesta" in report and "línea 11" in report
+    assert mcp_server.estado_revision()["coherencia"] == coherence
+    (proposal / verificacion.DRAFT).write_bytes(original + b"\nTexto nuevo.\n")
+    assert mcp_server.estado_revision()["estado"] == "desactualizada"
+
+
+def test_proposal_review_rejects_ungrounded_or_incomplete_findings(proposal):
+    findings = [
+        {"relacion": "objetivos_metodos", "estado": "evaluada", "hallazgos": [
+            {"tipo": "falta_vinculo", "problema": "Falta un vínculo.",
+             "evidencias": [{"linea": 2, "fragmento": "Realizar un ensayo de campo inexistente."}],
+             "accion": "Vincula el objetivo y el método."},
+        ]},
+        {"relacion": "actividades_cronograma", "estado": "evaluada", "hallazgos": [
+            {"tipo": "contradiccion", "problema": "Los plazos se contradicen.",
+             "evidencias": [{"linea": 8, "fragmento": "Se realizará en el primer trimestre."}],
+             "accion": "Contrasta las fechas con el cronograma original."},
+        ]},
+    ]
+    result = revisor.run_review(proposal, Reviewer({"criterios": [], "coherencia": findings}))
+    assert [r["estado"] for r in result["coherencia"]] == ["parcial", "parcial", "sin_evaluar"]
+    assert all(r["hallazgos"] == [] for r in result["coherencia"])
+
+
 @pytest.mark.parametrize("state,message", [("absent", "falta"), ("unconfirmed", "Falta confirmar"),
                                           ("empty", "Falta al menos un criterio"),
                                           ("failed", "citas fallidas")])

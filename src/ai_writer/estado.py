@@ -162,6 +162,9 @@ def _next_action(
         }.get(review["estado"], "La revisión anterior quedó incompleta.")
         return navigation(REVISAR, reason,
                           ("Leer borrador/documento.md", "Hacer una revisión manual."))
+    if any(entry["hallazgos"] for entry in review.get("coherencia", [])):
+        return navigation(f"{CORREGIR} coherencia", "La revisión propone revisar vínculos de la memoria.",
+                          ("Leer informes/revision.md", "Contrastar los pasajes señalados."))
     if review.get("prioridades") or any(
         item.get("nivel") in ("mejorable", "flojo") for item in review.get("criterios", [])
     ):
@@ -251,7 +254,11 @@ def document_status(folder: Path) -> dict:
         )
         if ficha_changed or _stale(review, review_path, draft, fingerprint):
             review["estado"] = "desactualizada"
-        elif any(item.get("nivel") == "sin_evaluar" for item in review.get("criterios", [])):
+        elif (
+            any(item.get("nivel") == "sin_evaluar" for item in review.get("criterios", []))
+            or any(item["estado"] in ("sin_evaluar", "parcial")
+                   for item in review.get("coherencia", []))
+        ):
             review["estado"] = "parcial"
 
     missing = [name for name, state in materials.items() if state != "escrito"]

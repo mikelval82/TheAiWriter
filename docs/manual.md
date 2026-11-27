@@ -71,6 +71,8 @@ Si el idioma exigido depende de un importe mínimo en euros, usa `/theaiwriter:e
 
 En las fichas nuevas, los requisitos condicionales se guardan como reglas de la convocatoria, junto con la cita oficial. Usa `/theaiwriter:escribir datos` para aportar o corregir las respuestas y `/theaiwriter:comprobar sin juez` para ver qué requisitos aplican. El informe indica el alcance de cada prueba y qué queda para revisión manual.
 
+En convocatorias, `/theaiwriter:revisar` comprueba también cómo se conectan los objetivos con los métodos y las actividades con el cronograma y el presupuesto. Las observaciones de Claude incluyen pasajes y líneas del borrador para que puedas contrastarlas. Para trabajar sobre esas observaciones usa `/theaiwriter:corregir coherencia` y elige qué cambios aplicar.
+
 **Qué gasta de tu cuenta.** La conversación con Claude, sobre todo al escribir. Además, el juez hace una llamada por cada párrafo con citas y el revisor una por revisión. «Comprobar sin juez», `estado` y el índice no lanzan llamadas aparte.
 
 ## Archivos de entrada

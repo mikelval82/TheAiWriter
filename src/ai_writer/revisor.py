@@ -12,6 +12,12 @@ from pydantic import BaseModel, ValidationError
 from ai_writer import verificacion
 from ai_writer.avisos import add_notice
 from ai_writer.background import now, process_alive, spawn_cli
+from ai_writer.coherencia_convocatoria import (
+    COHERENCE_SYSTEM,
+    apply_coherence,
+    coherence_lines,
+    numbered_draft,
+)
 from ai_writer.convocatoria import (
     JOURNAL_FICHA,
     CallFicha,
@@ -188,6 +194,7 @@ def run_review(folder: Path, llm=None) -> dict:
     }
     if call_revision is not None:
         data["ficha_revision"] = call_revision
+        data["coherencia"] = apply_coherence(None, "")
     _save(folder, data)
     try:
         checks = verificacion.check_document(folder, bibliography=False)
@@ -195,15 +202,21 @@ def run_review(folder: Path, llm=None) -> dict:
             call_report = checks.get("ficha", {})
             if not call_report.get("confirmada") or call_report["revision"] != call_revision:
                 raise LibraryError("Cambió la ficha de la convocatoria. Revisa sus reglas y reintenta.")
+            if checks["borrador_sha256"] != data["borrador_sha256"]:
+                raise LibraryError("Cambió el borrador durante la comprobación. Vuelve a revisarlo.")
         prompt = (
             f"Origen de los criterios: {origin}\n\nCriterios:\n"
             + json.dumps(criteria, ensure_ascii=False)
             + "\n\nResumen de verificación:\n"
             + json.dumps(_verification_summary(checks), ensure_ascii=False)
-            + "\n\nBorrador completo:\n" + text
+            + "\n\nBorrador completo:\n"
+            + (numbered_draft(text) if call_revision is not None else text)
         )
-        answer = (llm or get_llm_client()).complete_json(REVIEW_SYSTEM, prompt)
+        system = REVIEW_SYSTEM + (COHERENCE_SYSTEM if call_revision is not None else "")
+        answer = (llm or get_llm_client()).complete_json(system, prompt)
         data["criterios"], data["prioridades"] = _apply_review(answer, criteria)
+        if call_revision is not None:
+            data["coherencia"] = apply_coherence(answer.get("coherencia"), text)
         data["estado"] = "terminado"
     except UsageLimitError as error:
         data.update(estado="limite_de_uso", error=str(error))
@@ -227,7 +240,7 @@ def run_review(folder: Path, llm=None) -> dict:
 def start_review(folder: Path) -> dict:
     """Check the criteria and launch a detached review for this document."""
     folder = Path(folder)
-    origin, criteria = review_criteria(folder)
+    origin, criteria, call_revision = _review_criteria(folder)
     if review_running(_load(folder)):
         raise LibraryError("La revisión ya está en marcha para este documento.")
     if not (folder / verificacion.DRAFT).exists():
@@ -238,6 +251,8 @@ def start_review(folder: Path) -> dict:
         "criterios": [_unevaluated(c["nombre"]) for c in criteria],
         "prioridades": [], "error": None,
     }
+    if call_revision is not None:
+        data["coherencia"] = apply_coherence(None, "")
     _save(folder, data)
     return data
 
@@ -247,12 +262,18 @@ def review_running(data: dict) -> bool:
 
 
 def review_status(folder: Path) -> dict:
-    """Read the saved review and mark a dead process as interrupted."""
+    """Read the saved review and flag interrupted or outdated proposal reviews."""
     data = _load(folder)
     if not data:
         raise LibraryError("Este documento todavía no se ha revisado.")
     if data.get("estado") == "en_curso" and not process_alive(data.get("pid")):
         data["estado"] = "interrumpido"
+    if data.get("estado") == "terminado" and data.get("coherencia"):
+        draft = Path(folder) / verificacion.DRAFT
+        if not draft.is_file() or verificacion.draft_fingerprint(
+            draft.read_text(encoding="utf-8")
+        ) != data["borrador_sha256"]:
+            data["estado"] = "desactualizada"
     return data
 
 
@@ -274,4 +295,6 @@ def markdown(data: dict) -> str:
         lines += ["", "### Carencias", ""]
         lines += [f"- {gap['apartado']}: {gap['problema']}" for gap in criterion["carencias"]]
         lines += ["", "### Trabajo", "", criterion["trabajo"]]
+    if coherence := data.get("coherencia"):
+        lines.extend(coherence_lines(coherence))
     return "\n".join(lines) + "\n"

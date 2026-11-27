@@ -36,6 +36,7 @@ Petición del usuario: $ARGUMENTS
 2. Recomienda haber pasado `/theaiwriter:comprobar` antes: la revisión usa su resultado de apoyo de las citas y actualiza las comprobaciones que no necesitan un modelo. No vuelve a juzgar las citas.
 3. Avisa en una línea de que hace una llamada a Claude con su cuenta y corre en segundo plano. Llama a `revisar_documento`; consulta `estado_revision` cuando el usuario lo pida o pasados unos minutos.
 4. Presenta las prioridades y, por criterio, su nivel y el trabajo que haría falta. Señala las carencias con el apartado del borrador; no des puntuaciones numéricas. Recuerda que la evaluación es automática y orientativa y no sustituye a la de la convocatoria o revista. Los `[PENDIENTE: …]` piden conseguir el dato, nunca inventarlo; reconocer limitaciones y riesgos es una fortaleza.
+   - En convocatorias, presenta también las observaciones de coherencia entre objetivos y métodos, actividades y cronograma y actividades y presupuesto. Indica el apartado, la línea y el pasaje del borrador para cada observación. Señala si alguna relación quedó pendiente o se revisó solo en parte. Para proponer cambios usa `/theaiwriter:corregir coherencia`.
 5. Conserva el borrador y resume el estado de la revisión.
 
 El informe completo queda en `informes/revision.md` y el resultado también en `informes/revision.json`.

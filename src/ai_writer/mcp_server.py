@@ -560,7 +560,7 @@ def revisar_documento() -> dict:
 
 @tool
 def estado_revision() -> dict:
-    """Devuelve el estado, las prioridades y la evaluación por criterios de la revisión."""
+    """Devuelve la revisión por criterios y las observaciones de coherencia de una convocatoria."""
     from ai_writer import revisor
 
     try:
