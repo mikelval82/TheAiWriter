@@ -1,10 +1,13 @@
 """Check official call requirements and draft conformity, without any model."""
 
+import hashlib
+import json
 import re
 import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from tempfile import NamedTemporaryFile
+from typing import Literal, NamedTuple
 
 import fitz
 import yaml
@@ -14,8 +17,20 @@ from ai_writer.library import LibraryError, Project
 from ai_writer.passages import page_texts
 
 FICHA = Path("convocatoria") / "ficha.yaml"
+APPROVALS = FICHA.with_name("aprobaciones.json")
 JOURNAL_FICHA = Path("revista") / "ficha.yaml"
 _HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$")
+_NUMBER = re.compile(r"(?<!\w)[0-9]+(?:[., \u00a0\u202f][0-9]+)*(?!\w)")
+_INTEGER = re.compile(r"(?:[0-9]+|[0-9]{1,3}(?:[., \u00a0\u202f][0-9]{3})+)")
+_MAXIMUM = re.compile(
+    r"\b(?:m[aá]xim[oa](?:\s+de)?|hasta|no\s+(?:m[aá]s\s+de|"
+    r"(?:(?:podr[aá]|deber[aá])\s+)?(?:exceder|superar)(?:\s+de)?)|"
+    r"maximum(?:\s+of)?|up\s+to|at\s+most|no\s+more\s+than|not\s+exceed)\s+$",
+    re.I,
+)
+_COMMENT = re.compile(r"<!--.*?(?:-->|$)", re.S)
+_PENDING = re.compile(r"\[PENDIENTE(?::[^\]\n]+)?\]", re.I)
+_FICHA_CHANGED = "La ficha cambió. Muéstrala y revísala otra vez."
 
 
 class Source(BaseModel):
@@ -103,6 +118,66 @@ class JournalFicha(BaseModel):
             raise LibraryError(f"La ficha {JOURNAL_FICHA} no es válida: {error}") from error
 
 
+class CallRule(NamedTuple):
+    id: str
+    location: str
+    source: Source
+    contents: dict
+    limit: tuple[int, str, str] | None = None
+
+
+def _call_rules(ficha: CallFicha) -> Iterable[CallRule]:
+    for i, section in enumerate(ficha.apartados):
+        yield CallRule(f"apartado:{section.titulo}", f"apartados[{i}].fuente ({section.titulo})",
+                       section.fuente, section.model_dump())
+    if ficha.limites.fuente is not None:
+        limit = None
+        if ficha.limites.paginas is not None:
+            limit = (ficha.limites.paginas, "páginas", r"p[aá]ginas?|pages?")
+        yield CallRule("paginas", "limites.fuente", ficha.limites.fuente,
+                       {"paginas": ficha.limites.paginas}, limit)
+    for i, field in enumerate(ficha.limites.campos):
+        yield CallRule(f"campo:{field.nombre}", f"limites.campos[{i}].fuente ({field.nombre})",
+                       field.fuente, field.model_dump(),
+                       (field.caracteres, "caracteres", r"caracteres?|characters?"))
+    if ficha.idioma is not None:
+        yield CallRule("idioma", "idioma.fuente", ficha.idioma.fuente, ficha.idioma.model_dump())
+    for i, criterion in enumerate(ficha.criterios):
+        yield CallRule(
+            f"criterio:{criterion.nombre}", f"criterios[{i}].fuente ({criterion.nombre})",
+            criterion.fuente, criterion.model_dump(),
+        )
+
+
+def _fingerprint(value: object) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _read_approvals(folder: Path) -> dict:
+    try:
+        saved = json.loads((folder / APPROVALS).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(saved, dict) or saved.get("version") != 1:
+        return {}
+    keys = saved.get("reglas")
+    return saved if isinstance(keys, list) and all(isinstance(key, str) for key in keys) else {}
+
+
+def _write_approvals(path: Path, snapshot: dict) -> None:
+    temp = None
+    try:
+        with NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+            temp = Path(stream.name)
+            json.dump(snapshot, stream, indent=2)
+            stream.write("\n")
+        temp.replace(path)
+    finally:
+        if temp is not None:
+            temp.unlink(missing_ok=True)
+
+
 def ficha_text(folder: Path) -> str:
     """Render the call or journal ficha in Spanish, without a model."""
     kind = Project.load(folder).tipo
@@ -131,20 +206,51 @@ def ficha_text(folder: Path) -> str:
                      f"Fuente: {criterion.fuente.fichero}, página {criterion.fuente.pagina}.")
     if not ficha.criterios:
         lines.append("No constan criterios de evaluación.")
+    if isinstance(ficha, CallFicha):
+        report, _ = _check_call_ficha(Path(folder), ficha)
+        if not report["confirmada"]:
+            lines += ["", "Ficha por confirmar. Reglas por revisar:"]
+            for rule in report["reglas"]:
+                if rule["estado"] != "aprobada":
+                    lines.append(
+                        f"- {rule['donde']}, {rule['fichero']}, p. {rule['pagina']}. "
+                        f"«{rule['cita']}»"
+                    )
+            if report["cambio_estructura"]:
+                lines.append("Cambió el orden, se retiró una regla o cambiaron datos de la ficha.")
+        for rule in report["reglas"]:
+            if rule.get("valor") == "revision_manual":
+                lines.append(f"- Cotejo manual del límite: {rule['donde']}.")
     return "\n".join(lines)
 
 
-def confirm_ficha(folder: Path) -> dict:
+def confirm_ficha(folder: Path, revision: str | None = None) -> dict:
     """Confirm checked sources while preserving the YAML layout and comments."""
     try:
         call = Project.load(folder).tipo == "convocatoria"
-        report = check_ficha(folder) if call else check_journal_ficha(folder)
-        if report.get("error") or report.get("fallidos"):
-            return {"confirmada": False, "motivo": report.get("error") or report["fallidos"]}
         path = Path(folder) / (FICHA if call else JOURNAL_FICHA)
+        if not path.exists():
+            return {"confirmada": False, "motivo": f"No hay ficha: falta {path.name}."}
         with path.open(encoding="utf-8", newline="") as stream:
             text = stream.read()
-        if not report["confirmada"]:
+        snapshot = None
+        if call:
+            ficha = CallFicha.load(folder)
+            report, snapshot = _check_call_ficha(Path(folder), ficha)
+            if revision is not None and revision != report["revision"]:
+                return {"confirmada": False, "motivo": _FICHA_CHANGED}
+            set_flag = not ficha.confirmada
+        else:
+            report = check_journal_ficha(folder)
+            set_flag = not report.get("confirmada")
+        if report.get("error") or report.get("fallidos"):
+            return {"confirmada": False, "motivo": report.get("error") or report["fallidos"]}
+        if report["confirmada"]:
+            return {"confirmada": True}
+        if path.read_bytes() != text.encode("utf-8"):
+            return {"confirmada": False, "motivo": _FICHA_CHANGED}
+        updated = text
+        if set_flag:
             updated, count = re.subn(
                 r"^(confirmada:[ \t]*)false(?=[ \t]*(?:#|\r?$))", r"\g<1>true", text,
                 flags=re.M,
@@ -158,33 +264,87 @@ def confirm_ficha(folder: Path) -> dict:
                 lines[0] = lines[0].rstrip("\r\n") + newline
                 lines.insert(1, "confirmada: true" + newline)
                 updated = "".join(lines)
+        if snapshot is not None:
+            _write_approvals(Path(folder) / APPROVALS, snapshot)
+        if updated != text:
             with path.open("w", encoding="utf-8", newline="") as stream:
                 stream.write(updated)
         return {"confirmada": True}
-    except LibraryError as error:
+    except (LibraryError, OSError) as error:
         return {"confirmada": False, "motivo": str(error)}
 
 
-def _sources(ficha: CallFicha):
-    for i, section in enumerate(ficha.apartados):
-        yield f"apartados[{i}].fuente ({section.titulo})", section.fuente
-    if ficha.limites.fuente is not None:
-        yield "limites.fuente", ficha.limites.fuente
-    for i, field in enumerate(ficha.limites.campos):
-        yield f"limites.campos[{i}].fuente ({field.nombre})", field.fuente
-    if ficha.idioma is not None:
-        yield "idioma.fuente", ficha.idioma.fuente
-    for i, criterion in enumerate(ficha.criterios):
-        yield f"criterios[{i}].fuente ({criterion.nombre})", criterion.fuente
+def _quoted_limit(quote: str, unit: str) -> int | None:
+    """Extract a single explicitly stated maximum, leaving ambiguous quotes for review."""
+    numbers = list(_NUMBER.finditer(quote))
+    if len(numbers) != 1:
+        return None
+    number, = numbers
+    suffix = re.match(rf"\s+(?:{unit})\b", quote[number.end():], re.I)
+    if suffix is None or not _INTEGER.fullmatch(number[0]):
+        return None
+    before, after = quote[:number.start()], quote[number.end() + suffix.end():]
+    if _MAXIMUM.search(before) or re.match(r"\s+(?:como\s+m[aá]ximo|max(?:imum)?)\b", after, re.I):
+        return int(re.sub(r"[^0-9]", "", number[0]))
+    return None
 
 
-def check_ficha(folder: Path) -> dict:
+def _normalize_pdf_spacing(text: str) -> str:
+    return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
+
+
+def _check_call_ficha(folder: Path, ficha: CallFicha) -> tuple[dict, dict]:
+    rules = list(_call_rules(ficha))
+    evidence = {}
+    report = check_sources(folder, "convocatoria",
+                           ((rule.location, rule.source) for rule in rules),
+                           False, evidence=evidence)
+    saved = _read_approvals(folder) if ficha.confirmada else {}
+    approved_keys = set(saved.get("reglas", []))
+    current_keys = []
+    summaries = []
+    for rule in rules:
+        item = {"id": rule.id, "donde": rule.location, **rule.source.model_dump()}
+        matched = evidence.get(rule.location)
+        if rule.limit and matched is not None:
+            declared, units, pattern = rule.limit
+            quoted = _quoted_limit(rule.source.cita, pattern) if matched[1] else None
+            item["valor"] = "revision_manual" if quoted is None else "coincide"
+            if quoted is not None and quoted != declared:
+                item["valor"] = "difiere"
+                report["fallidos"].append({
+                    **item, "motivo": f"La ficha indica {declared} {units}. "
+                                      f"La cita indica un máximo de {quoted}.",
+                })
+                report["comprobados"] -= 1
+                matched = None
+        if matched is not None:
+            key = _fingerprint((rule.id, rule.source.model_dump(), rule.contents,
+                                matched[0]))
+            current_keys.append(key)
+            item["estado"] = "aprobada" if key in approved_keys else "por_revisar"
+        else:
+            item["estado"] = "por_revisar"
+        summaries.append(item)
+
+    structure = _fingerprint((ficha.convocatoria, ficha.plazo, ficha.limites.palabras_por_pagina,
+                              [rule.id for rule in rules]))
+    snapshot = {"version": 1, "estructura": structure, "reglas": current_keys}
+    report["reglas"] = summaries
+    report["confirmada"] = not report["fallidos"] and saved == snapshot
+    report["cambio_estructura"] = bool(saved and saved.get("estructura") != structure)
+    report["revision"] = _fingerprint((snapshot, ficha.model_dump(exclude={"confirmada"})))
+    return report, snapshot
+
+
+def check_ficha(folder: Path, ficha: CallFicha | None = None) -> dict:
     """Validate a ficha and locate each requirement's quotation in its official PDF."""
     try:
-        ficha = CallFicha.load(folder)
+        if ficha is None:
+            ficha = CallFicha.load(folder)
     except LibraryError as error:
         return {"error": str(error)}
-    return check_sources(folder, "convocatoria", _sources(ficha), ficha.confirmada)
+    return _check_call_ficha(Path(folder), ficha)[0]
 
 
 def check_journal_ficha(folder: Path) -> dict:
@@ -199,7 +359,8 @@ def check_journal_ficha(folder: Path) -> dict:
 
 
 def check_sources(
-    folder: Path, subfolder: str, sources: Iterable[tuple[str, Source]], confirmada: bool
+    folder: Path, subfolder: str, sources: Iterable[tuple[str, Source]], confirmada: bool,
+    *, evidence: dict[str, tuple[str, bool]] | None = None,
 ) -> dict:
     """Locate each source's literal quotation inside its PDF folder."""
     from ai_writer.verificacion import verbatim
@@ -231,16 +392,33 @@ def check_sources(
             pages = texts[path]
             if isinstance(pages, str):
                 failure = pages
-            elif not verbatim(source.cita, "\n\n".join(pages))[0]:
+            elif not verbatim(source.cita, "\n\n".join(pages), explain=False)[0]:
                 failure = "La cita no aparece palabra por palabra en el PDF."
             else:
                 report["comprobados"] += 1
-                nearby = pages[max(0, source.pagina - 2):source.pagina + 1]
-                if not verbatim(source.cita, "\n\n".join(nearby))[0]:
+                nearby = range(max(0, source.pagina - 2), min(len(pages), source.pagina + 1))
+                near_text = "\n\n".join(pages[i] for i in nearby)
+                in_nearby = verbatim(source.cita, near_text, explain=False)[0]
+                if not in_nearby:
                     report["avisos"].append({
                         **entry,
                         "motivo": "La cita está en el PDF, pero no en la página indicada ±1.",
                     })
+                if evidence is not None:
+                    candidates = (sorted(nearby, key=lambda i: abs(i + 1 - source.pagina))
+                                  if in_nearby else range(len(pages)))
+                    found = next(
+                        (i for i in candidates if verbatim(source.cita, pages[i], explain=False)[0]),
+                        None,
+                    )
+                    scope = nearby if in_nearby else range(len(pages))
+                    if found is not None:
+                        scope = [found]
+                    page_context = [(i, _normalize_pdf_spacing(pages[i])) for i in scope]
+                    strict_quote = _normalize_pdf_spacing(source.cita)
+                    combined = " ".join(text for _, text in page_context)
+                    exact = re.search(rf"(?<!\w){re.escape(strict_quote)}(?!\w)", combined)
+                    evidence[location] = (_fingerprint(page_context), exact is not None)
         if failure:
             report["fallidos"].append({**entry, "motivo": failure})
     return report
@@ -273,11 +451,18 @@ def _draft_lines(text: str) -> list[str]:
     return lines
 
 
+def _section_body(lines: list[str], headings: list[dict], heading: dict) -> str:
+    end = next((h["line"] for h in headings
+                if h["line"] > heading["line"] and h["nivel"] <= heading["nivel"]), len(lines))
+    return "\n".join(line for line in lines[heading["line"] + 1:end]
+                     if not _HEADING.match(line)).strip()
+
+
 def check_call(text: str, ficha: CallFicha | dict) -> dict:
     """Compare headings, length, character limits and pending marks with a validated ficha."""
     if not isinstance(ficha, CallFicha):
         ficha = CallFicha.model_validate(ficha)
-    lines = _draft_lines(text)
+    lines = _COMMENT.sub("", "\n".join(_draft_lines(text))).splitlines()
     headings, words, pending = [], [], []
     section = ""
     for i, line in enumerate(lines):
@@ -294,9 +479,19 @@ def check_call(text: str, ficha: CallFicha | dict) -> dict:
 
     expected = {_normalize(s.titulo): i for i, s in enumerate(ficha.apartados)}
     present = [h for h in headings if h["nivel"] in (2, 3)]
-    titles = {_normalize(h["titulo"]) for h in present}
+    by_title = {}
+    for heading in present:
+        by_title.setdefault(_normalize(heading["titulo"]), heading)
+    titles = by_title.keys()
     missing = [s.titulo for s in ficha.apartados
                if s.obligatorio and _normalize(s.titulo) not in titles]
+    empty = []
+    for section in ficha.apartados:
+        heading = by_title.get(_normalize(section.titulo))
+        if section.obligatorio and heading is not None:
+            content = _PENDING.sub("", _section_body(lines, headings, heading))
+            if not content.strip():
+                empty.append(section.titulo)
     conditional = [{"titulo": s.titulo, "condicion": s.condicion} for s in ficha.apartados
                    if not s.obligatorio and _normalize(s.titulo) not in titles]
     extra = [h["titulo"] for h in present if _normalize(h["titulo"]) not in expected]
@@ -319,16 +514,8 @@ def check_call(text: str, ficha: CallFicha | dict) -> dict:
         if field.apartado is None:
             manual.append({"nombre": field.nombre, "maximo": field.caracteres})
             continue
-        heading = next((h for h in present
-                        if _normalize(h["titulo"]) == _normalize(field.apartado)), None)
-        characters = None
-        if heading is not None:
-            end = next((h["line"] for h in headings
-                        if h["line"] > heading["line"] and h["nivel"] <= heading["nivel"]),
-                       len(lines))
-            body = "\n".join(line for line in lines[heading["line"] + 1:end]
-                             if not _HEADING.match(line)).strip()
-            characters = len(body)
+        heading = by_title.get(_normalize(field.apartado))
+        characters = len(_section_body(lines, headings, heading)) if heading is not None else None
         fields.append({
             "nombre": field.nombre, "apartado": field.apartado,
             "caracteres": characters, "maximo": field.caracteres,
@@ -336,7 +523,7 @@ def check_call(text: str, ficha: CallFicha | dict) -> dict:
                        "excedido" if characters > field.caracteres else "ok"),
         })
     return {
-        "faltan": missing, "condicionales_ausentes": conditional, "sobran": extra,
+        "faltan": missing, "vacios": empty, "condicionales_ausentes": conditional, "sobran": extra,
         "orden": order,
         "extension": {"palabras": count,
                       "paginas_estimadas": round(count / ficha.limites.palabras_por_pagina, 1),
@@ -362,12 +549,25 @@ def report_lines(ficha: dict, call: dict) -> list[str]:
                     f"- **{label}** en {entry['donde']} ({entry['fichero']}, "
                     f"p. {entry['pagina']}): {entry['motivo']} Cita: «{entry['cita']}»"
                 )
+        if ficha.get("cambio_estructura"):
+            lines.append("Cambió el orden, se retiró una regla o cambiaron los datos de la ficha.")
+        for rule in ficha.get("reglas", []):
+            if rule["estado"] == "por_revisar":
+                lines.append(
+                    f"- Por aprobar: {rule['donde']} ({rule['fichero']}, p. {rule['pagina']})."
+                )
+            if rule.get("valor") == "revision_manual":
+                lines.append(f"- Cotejo manual del límite: {rule['donde']}.")
     if "aviso" in call:
         lines.append(call["aviso"])
     else:
         lines.append(
             "Apartados obligatorios que faltan: " + (", ".join(call["faltan"]) or "ninguno")
         )
+        if call.get("vacios"):
+            lines.append(
+                "Apartados obligatorios pendientes de contenido: " + ", ".join(call["vacios"])
+            )
         for entry in call["condicionales_ausentes"]:
             lines.append(
                 f"- Condicional ausente: {entry['titulo']}. "

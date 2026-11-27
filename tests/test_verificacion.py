@@ -330,7 +330,7 @@ def test_call_verification_with_and_without_valid_ficha(document, state):  # noq
     if state != "absent":
         make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
         ficha = {
-            "convocatoria": "Prueba", "confirmada": state == "confirmed",
+            "convocatoria": "Prueba", "confirmada": False,
             "apartados": [{"titulo": "Impacto", "nivel": 2, "obligatorio": True,
                            "pide": "Explicar impacto", "fuente": dict(SOURCE)}],
             "limites": {"paginas": 20, "fuente": dict(SOURCE)},
@@ -340,6 +340,8 @@ def test_call_verification_with_and_without_valid_ficha(document, state):  # noq
         if state == "failed":
             ficha["apartados"][0]["fuente"]["cita"] = "An invented requirement absent from this document"
         save_ficha(document, ficha)
+        if state == "confirmed":
+            assert mcp_server.confirmar_ficha()["confirmada"]
     data = verificacion.check_document(document)
     saved = json.loads((document / verificacion.RESULT).read_text(encoding="utf-8"))
     overview = verificacion.overview(data)

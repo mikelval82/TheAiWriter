@@ -67,21 +67,26 @@ class ReviewEntry(BaseModel):
 
 def review_criteria(folder: Path) -> tuple[str, list[dict]]:
     """Load generic criteria or confirmed criteria with checked PDF sources."""
+    origin, criteria, _ = _review_criteria(folder)
+    return origin, criteria
+
+
+def _review_criteria(folder: Path) -> tuple[str, list[dict], str | None]:
     folder = Path(folder)
     kind = Project.load(folder).tipo
     if kind == "convocatoria":
-        report, label = check_ficha(folder), "convocatoria"
-        model = CallFicha
+        ficha = CallFicha.load(folder)
+        report, label = check_ficha(folder, ficha), "convocatoria"
     elif (folder / JOURNAL_FICHA).exists():
         report, label = check_journal_ficha(folder), "revista"
-        model = JournalFicha
+        ficha = JournalFicha.load(folder)
     else:
         path = files("ai_writer").joinpath("guias", f"criterios-{kind}.yaml")
         criteria = yaml.safe_load(path.read_text(encoding="utf-8"))
         return f"genéricos ({kind})", [
             {"nombre": c["nombre"], "maximo": None, "umbral": None,
              "descripcion": c["descripcion"]} for c in criteria
-        ]
+        ], None
     if "error" in report:
         raise LibraryError(report["error"])
     if report["fallidos"]:
@@ -89,11 +94,10 @@ def review_criteria(folder: Path) -> tuple[str, list[dict]]:
         raise LibraryError(f"La ficha de la {label} tiene citas fallidas: {details}")
     if not report["confirmada"]:
         raise LibraryError(f"Falta confirmar la ficha de la {label} antes de revisar el borrador.")
-    ficha = model.load(folder)
     if not ficha.criterios:
         raise LibraryError(f"Falta al menos un criterio de evaluación en la ficha de la {label}.")
     origin = f"{label}: {getattr(ficha, label)}"
-    return origin, [c.model_dump(exclude={"fuente"}) for c in ficha.criterios]
+    return origin, [c.model_dump(exclude={"fuente"}) for c in ficha.criterios], report.get("revision")
 
 
 def _verification_summary(data: dict) -> dict:
@@ -111,7 +115,9 @@ def _verification_summary(data: dict) -> dict:
     }
     if "convocatoria" in data:
         call = data["convocatoria"]
-        report["convocatoria"] = {k: call[k] for k in ("faltan", "extension", "aviso") if k in call}
+        report["convocatoria"] = {
+            k: call[k] for k in ("faltan", "vacios", "extension", "aviso") if k in call
+        }
         report["convocatoria"]["pendientes"] = len(call.get("pendientes", []))
     if "cifras" in data:
         figures = data["cifras"]
@@ -168,7 +174,7 @@ def run_review(folder: Path, llm=None) -> dict:
     if not path.exists():
         raise LibraryError(f"Todavía no hay borrador en {verificacion.DRAFT}.")
     text = path.read_text(encoding="utf-8")
-    origin, criteria = review_criteria(folder)
+    origin, criteria, call_revision = _review_criteria(folder)
     previous = _load(folder)
     data = {
         "estado": "en_curso", "pid": os.getpid(),
@@ -178,9 +184,15 @@ def run_review(folder: Path, llm=None) -> dict:
         "criterios": [_unevaluated(c["nombre"]) for c in criteria],
         "prioridades": [], "error": None,
     }
+    if call_revision is not None:
+        data["ficha_revision"] = call_revision
     _save(folder, data)
     try:
         checks = verificacion.check_document(folder, bibliography=False)
+        if call_revision is not None:
+            call_report = checks.get("ficha", {})
+            if not call_report.get("confirmada") or call_report["revision"] != call_revision:
+                raise LibraryError("Cambió la ficha de la convocatoria. Revisa sus reglas y reintenta.")
         prompt = (
             f"Origen de los criterios: {origin}\n\nCriterios:\n"
             + json.dumps(criteria, ensure_ascii=False)

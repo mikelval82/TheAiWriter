@@ -61,6 +61,8 @@ Reinicia Claude Code y escribe `/theaiwriter:diagnostico`. La primera vez que se
 5. **Revisa por criterios.** `/theaiwriter:revisar`, o con el nombre de una revista y sus normas en `revista/`. Si hay ficha de criterios, te la enseña y espera tu «sí».
 6. **Pásalo a Word** con `/theaiwriter:exportar`. Para actualizar una copia anterior, usa `/theaiwriter:exportar reemplazar`. [Guía de exportación](exportar.md)
 
+En una convocatoria, `/theaiwriter:escribir solo ficha` permite revisar las reglas sin modificar el borrador. Si editas una regla o cambia su página de origen, vuelve a aprobar lo afectado. Las fichas anteriores se pueden abrir y requieren una confirmación inicial para guardar las aprobaciones por regla.
+
 **Qué gasta de tu cuenta.** La conversación con Claude, sobre todo al escribir. Además, el juez hace una llamada por cada párrafo con citas y el revisor una por revisión. «Comprobar sin juez», `estado` y el índice no lanzan llamadas aparte.
 
 ## Archivos de entrada

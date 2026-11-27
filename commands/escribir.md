@@ -1,6 +1,6 @@
 ---
 description: Planifica y escribe el documento consultando los PDF de Zotero, y verifica las citas
-argument-hint: "[«con pausa» para aprobar el plan antes de escribir, o la sección que quieres escribir]"
+argument-hint: "[«con pausa», sección que quieres escribir o «solo ficha» en convocatorias]"
 ---
 
 Escribe el documento de la carpeta actual apoyándote en los PDF de sus colecciones de Zotero, con las herramientas del servidor MCP `theaiwriter`. Tú planificas y escribes; las herramientas te dan los pasajes. Responde al usuario siempre en español.
@@ -11,6 +11,7 @@ Petición del usuario: $ARGUMENTS
 
 1. Lee `proyecto.yaml`. Si no existe, explica que primero hay que crear el documento con `/theaiwriter:nuevo` y para.
 2. Llama obligatoriamente a `guia_escritura` y sigue la guía del tipo de documento. Completa sus preparativos antes de planificar.
+   - Para «solo ficha» en una convocatoria, prepara o revisa la ficha siguiendo esa guía. Después resume su estado y termina indicando el siguiente paso, sin redactar ni modificar el borrador.
 3. Lee `materiales/abstract.md`. Si no existe, está vacío o `guia_escritura` devuelve `abstract_vacio` a verdadero (solo tiene preguntas en comentarios y encabezados), pide al usuario la idea y el objetivo, propón un abstract de 150 a 250 palabras, escríbelo ahí cuando lo confirme y sigue.
 4. Llama a `estado_indice` con `actualizar` a verdadero. Si hay obras sin PDF, dilo en una línea. Si solo redactas Métodos o Resultados de un estudio y sus materiales son suficientes, puedes omitir la búsqueda bibliográfica.
 

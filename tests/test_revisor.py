@@ -155,8 +155,8 @@ def test_journal_sources_stay_inside_journal_pdfs(draft, filename):  # noqa: F81
 def test_call_uses_its_ficha_and_conformity_summary(document, ficha):  # noqa: F811
     mcp_server.crear_documento("convocatoria", "T")
     make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
-    ficha["confirmada"] = True
     save_ficha(document, ficha)
+    assert mcp_server.confirmar_ficha()["confirmada"]
     save_journal(document, confirmed=False, quote="Invented words that are not in the PDF")
     (document / verificacion.DRAFT).write_text("## Motivación\n[PENDIENTE: equipo]")
     origin, criteria = revisor.review_criteria(document)
@@ -166,6 +166,7 @@ def test_call_uses_its_ficha_and_conformity_summary(document, ficha):  # noqa: F
     reviewer = Reviewer()
     data = revisor.run_review(document, reviewer)
     assert data["criterios"][0]["nombre"] == "Calidad"
+    assert data["ficha_revision"] == mcp_server.comprobar_ficha()["revision"]
     call = prompt_checks(reviewer)["convocatoria"]
     assert call["faltan"] == ["Impacto esperado"]
     assert call["pendientes"] == 1 and call["extension"]["maximo"] == 2
@@ -181,12 +182,13 @@ def test_call_requires_a_confirmed_ficha_with_criteria(
     mcp_server.crear_documento("convocatoria", "T")
     if state != "absent":
         make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
-        ficha["confirmada"] = state != "unconfirmed"
         if state == "empty":
             ficha["criterios"] = []
         if state == "failed":
             ficha["criterios"][0]["fuente"]["cita"] = "An invented criterion outside this PDF"
         save_ficha(document, ficha)
+        if state == "empty":
+            assert mcp_server.confirmar_ficha()["confirmada"]
     with pytest.raises(LibraryError, match=message):
         revisor.review_criteria(document)
 

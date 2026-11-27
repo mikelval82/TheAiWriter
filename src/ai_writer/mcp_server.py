@@ -247,16 +247,16 @@ def mostrar_ficha() -> str:
 
 
 @tool
-def confirmar_ficha() -> dict:
-    """Confirma la ficha tras comprobar sus citas. Solo se llama si el usuario ha dicho sí."""
+def confirmar_ficha(revision: str | None = None) -> dict:
+    """Confirma tras el sí. En convocatoria pasa la revisión devuelta por comprobar_ficha."""
     from ai_writer.convocatoria import confirm_ficha
 
-    return confirm_ficha(_document_folder())
+    return confirm_ficha(_document_folder(), revision)
 
 
 @tool
 def comprobar_ficha() -> dict:
-    """Comprueba las citas de la ficha de convocatoria o revista contra sus PDF, sin modelo."""
+    """Comprueba la ficha contra sus PDF, sin modelo. En convocatoria devuelve revisión y reglas."""
     from ai_writer.convocatoria import JOURNAL_FICHA, check_ficha, check_journal_ficha
 
     folder = _document_folder()

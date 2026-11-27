@@ -157,7 +157,7 @@ def check_quotes(text: str, index: PassageIndex) -> list[dict]:
     return entries
 
 
-def verbatim(quote: str, text: str) -> tuple[bool, dict | None]:
+def verbatim(quote: str, text: str, *, explain: bool = True) -> tuple[bool, dict | None]:
     """Is ``quote`` in ``text`` word for word? If not, the closest passage and what differs.
 
     Words the PDF splits or joins and footnote numbers in the paper are not differences;
@@ -174,7 +174,7 @@ def verbatim(quote: str, text: str) -> tuple[bool, dict | None]:
             position += len(needle)
         else:
             return True, None
-    return False, explain_mismatch(quote, text)
+    return False, explain_mismatch(quote, text) if explain else None
 
 
 # -- 3. support ------------------------------------------------------------
@@ -492,11 +492,17 @@ def _check_document(
         else:
             data["hallazgos_borrador"] = finding_report
     if kind == "convocatoria":
-        ficha = data["ficha"] = check_ficha(folder)
+        try:
+            call_ficha = CallFicha.load(folder)
+        except LibraryError as error:
+            ficha = {"error": str(error)}
+        else:
+            ficha = check_ficha(folder, call_ficha)
+        data["ficha"] = ficha
         data["convocatoria"] = (
             {"aviso": "No se puede comprobar el borrador: se necesita una ficha sin errores."}
             if "error" in ficha or ficha["fallidos"]
-            else check_call(text, CallFicha.load(folder))
+            else check_call(text, call_ficha)
         )
     _save(folder, data)
     return data

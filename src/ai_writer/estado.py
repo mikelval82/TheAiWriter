@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from ai_writer import revisor, verificacion
+from ai_writer.convocatoria import check_ficha
 from ai_writer.evidencia import has_results, inventory
 from ai_writer.exportacion import export_status
 from ai_writer.hallazgos import list_findings
@@ -49,7 +50,7 @@ def _problems(checks: dict, text: str) -> bool:
         or any(e["veredicto"] in ("tergiversada", "no_apoyada", "parcial")
                for e in checks.get("apoyo", []))
         or checks.get("cifras", {}).get("sin_origen")
-        or any(call.get(key) for key in ("faltan", "sobran", "pendientes"))
+        or any(call.get(key) for key in ("faltan", "vacios", "sobran", "pendientes"))
         or call.get("orden", True) is not True
         or call.get("extension", {}).get("estado") == "excedido"
         or any(field["estado"] == "excedido" for field in call.get("campos", []))
@@ -59,7 +60,7 @@ def _problems(checks: dict, text: str) -> bool:
 
 def _next_action(
     missing: list[str], text: str, check: dict, review: dict, problems: bool,
-    findings: dict[str, int] | None, export: dict,
+    findings: dict[str, int] | None, export: dict, ficha: dict | None,
 ) -> dict:
     def navigation(action: str, reason: str, *alternatives: tuple[str, str]) -> dict:
         return {
@@ -91,6 +92,10 @@ def _next_action(
     if not text.strip():
         return navigation(ESCRIBIR, "Los materiales básicos están listos.",
                           (f"{ESCRIBIR} con pausa", "Aprobar el plan antes de redactar."))
+    if ficha is not None and not ficha.get("confirmada"):
+        return navigation(f"{ESCRIBIR} solo ficha",
+                          "La ficha de la convocatoria necesita corrección o confirmación.",
+                          (f"{COMPROBAR} sin juez", "Ver las reglas pendientes y sus fuentes."))
     if check["estado"] == "juez en curso" or review["estado"] == "en_curso":
         return navigation(ESTADO, "Hay un informe en preparación.",
                           ("Leer borrador/documento.md", "Revisar el texto mientras se prepara."))
@@ -159,6 +164,7 @@ def document_status(folder: Path) -> dict:
 
     draft = folder / verificacion.DRAFT
     text = draft.read_text(encoding="utf-8") if draft.exists() else ""
+    ficha = check_ficha(folder) if project.tipo == "convocatoria" and text.strip() else None
     fingerprint = verificacion.draft_fingerprint(text)
     result = folder / verificacion.RESULT
     checks = {}
@@ -168,6 +174,10 @@ def document_status(folder: Path) -> dict:
         judge = checks.get("juez", {})
         state = judge.get("estado", "sin_lanzar")
         stale = draft.exists() and _stale(checks, result, draft, fingerprint)
+        if ficha is not None and ficha.get("confirmada"):
+            saved_ficha = checks.get("ficha", {})
+            stale |= (not saved_ficha.get("confirmada")
+                      or saved_ficha.get("revision") != ficha["revision"])
         if "total_pares_citados" not in checks and not stale:
             checks["total_pares_citados"] = verificacion.count_cited_pairs(text)
         stats = verificacion.support_summary(checks)
@@ -187,7 +197,10 @@ def document_status(folder: Path) -> dict:
     review_path = folder / revisor.REVIEW
     review = revisor.review_status(folder) if review_path.exists() else {"estado": "sin hacer"}
     if review["estado"] == "terminado" and draft.exists():
-        if _stale(review, review_path, draft, fingerprint):
+        ficha_changed = ficha is not None and (
+            not ficha.get("confirmada") or ficha["revision"] != review.get("ficha_revision")
+        )
+        if ficha_changed or _stale(review, review_path, draft, fingerprint):
             review["estado"] = "desactualizada"
         elif any(item.get("nivel") == "sin_evaluar" for item in review.get("criterios", [])):
             review["estado"] = "parcial"
@@ -199,5 +212,6 @@ def document_status(folder: Path) -> dict:
         "palabras": len(text.split()), "comprobacion": verification, "revision": review,
         "exportacion": export,
         **({"hallazgos": findings} if findings is not None else {}),
-        **_next_action(missing, text, verification, review, _problems(checks, text), findings, export),
+        **_next_action(missing, text, verification, review, _problems(checks, text),
+                       findings, export, ficha),
     }

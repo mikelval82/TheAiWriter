@@ -5,7 +5,7 @@ import copy
 import pytest
 import yaml
 
-from ai_writer.convocatoria import CallFicha, check_call, check_ficha
+from ai_writer.convocatoria import CallFicha, check_call, check_ficha, confirm_ficha
 from tests.fake_zotero import make_pdf
 from tests.test_passages import library  # noqa: F401
 from tests.test_zotero_tools import document  # noqa: F401
@@ -55,12 +55,162 @@ def official(tmp_path, ficha):
     return tmp_path
 
 
-def test_ficha_checks_every_source_and_keeps_confirmation(official, ficha):
+def test_official_limit_mismatch_reaches_the_document_report(document, ficha):  # noqa: F811
+    from ai_writer import mcp_server, verificacion
+
+    mcp_server.crear_documento("convocatoria", "T")
+    quote = "La memoria admite un máximo de 20 páginas"
+    make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE + "\n" + quote)])
+    ficha["limites"].update(paginas=25, fuente={**SOURCE, "cita": quote})
+    save_ficha(document, ficha)
+    (document / verificacion.DRAFT).write_text("## Motivación\nTexto", encoding="utf-8")
+
+    report = mcp_server.comprobar_documento(juez=False)
+    failure, = report["ficha"]["fallidos"]
+    assert failure["donde"] == "limites.fuente" and failure["cita"] == quote
+    assert "25" in failure["motivo"] and "20" in failure["motivo"]
+    assert "aviso" in report["convocatoria"]
+    assert quote in (document / verificacion.REPORT).read_text(encoding="utf-8")
+    assert mcp_server.confirmar_ficha()["confirmada"] is False
+
+
+def test_only_changed_rule_requires_confirmation(official, ficha):
+    from ai_writer.library import Project
+
+    Project(tipo="convocatoria", titulo="T").save(official)
+    assert confirm_ficha(official)["confirmada"] is True
+    ficha["confirmada"] = True
+    ficha["apartados"][1]["pide"] = "Describir el impacto científico esperado"
+    save_ficha(official, ficha)
+
     data = check_ficha(official)
-    assert data == {"requisitos": 8, "comprobados": 8, "fallidos": [], "avisos": [],
-                    "confirmada": False}
+    assert data["confirmada"] is False
+    assert data["fallidos"] == []
+    pending = [rule for rule in data["reglas"] if rule["estado"] == "por_revisar"]
+    assert [rule["donde"] for rule in pending] == ["apartados[1].fuente (Impacto esperado)"]
+    assert sum(rule["estado"] == "aprobada" for rule in data["reglas"]) == 7
+    assert confirm_ficha(official)["confirmada"] is True
+    assert check_ficha(official)["confirmada"] is True
+
+
+def test_confirm_ficha_rejects_a_revision_the_investigator_did_not_see(official, ficha):
+    from ai_writer.library import Project
+
+    Project(tipo="convocatoria", titulo="T").save(official)
+    shown = check_ficha(official)["revision"]
+    ficha["apartados"][1]["pide"] = "Explicar el impacto y cómo se medirá"
+    save_ficha(official, ficha)
+
+    assert "cambió" in confirm_ficha(official, revision=shown)["motivo"]
+    current = check_ficha(official)
+    assert current["confirmada"] is False
+    assert confirm_ficha(official, revision=current["revision"]) == {"confirmada": True}
+
+
+def test_change_on_a_cited_page_only_invalidates_rules_sourced_there(official, ficha):
+    from ai_writer.library import Project
+
+    Project(tipo="convocatoria", titulo="T").save(official)
+    quote = "The team should document the expected impact of the project"
+    pdf = official / "convocatoria/instrucciones.pdf"
+    make_pdf(pdf, [("Instructions", QUOTE), ("Impact", quote)])
+    ficha["apartados"][1]["fuente"] = {**SOURCE, "pagina": 2, "cita": quote}
+    save_ficha(official, ficha)
+    assert confirm_ficha(official)["confirmada"]
+    make_pdf(pdf, [("Instructions", QUOTE), ("Impact", quote + "\nAlso include outreach plans.")])
+
+    report = check_ficha(official)
+    assert report["fallidos"] == [] and report["confirmada"] is False
+    assert [rule["id"] for rule in report["reglas"] if rule["estado"] == "por_revisar"] == [
+        "apartado:Impacto esperado",
+    ]
+
+
+@pytest.mark.parametrize("quote,declared,status", [
+    ("The proposal must not exceed 20 pages in total", 20, "coincide"),
+    ("La memoria tendrá 20 páginas como máximo", 25, "difiere"),
+    ("La memoria individual admite hasta 20 páginas y la coordinada hasta 35 páginas",
+     20, "revision_manual"),
+    ("El apartado describe resultados de las últimas 20 páginas", 25, "revision_manual"),
+])
+def test_page_limits_only_check_an_unambiguous_maximum(official, ficha, quote, declared, status):
+    make_pdf(official / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE + "\n" + quote)])
+    ficha["limites"].update(paginas=declared, fuente={**SOURCE, "cita": quote})
+    save_ficha(official, ficha)
+
+    report = check_ficha(official)
+    limit = next(rule for rule in report["reglas"] if rule["id"] == "paginas")
+    assert limit["valor"] == status
+    assert bool(report["fallidos"]) == (status == "difiere")
+
+
+def test_character_limit_compares_grouped_number_in_source(official, ficha):
+    quote = "El resumen admite un máximo de 3.500 caracteres"
+    make_pdf(official / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE + "\n" + quote)])
+    ficha["limites"]["campos"][1]["fuente"] = {**SOURCE, "cita": quote}
+    ficha["limites"]["campos"][1]["caracteres"] = 3500
+    save_ficha(official, ficha)
+    assert check_ficha(official)["fallidos"] == []
+    ficha["limites"]["campos"][1]["caracteres"] = 5000
+    save_ficha(official, ficha)
+    failure, = check_ficha(official)["fallidos"]
+    assert "5000" in failure["motivo"] and "3500" in failure["motivo"]
+
+
+def test_page_limit_does_not_trust_a_repunctuated_number(official, ficha):
+    quote = "La memoria admite un máximo de 20,0 páginas"
+    make_pdf(official / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE + "\n" + quote)])
+    ficha["limites"].update(paginas=200, fuente={**SOURCE, "cita": quote.replace(",", "")})
+    save_ficha(official, ficha)
+
+    limit = next(rule for rule in check_ficha(official)["reglas"] if rule["id"] == "paginas")
+    assert limit["valor"] == "revision_manual"
+
+
+def test_call_reports_empty_required_sections_separately(ficha):
+    text = "## Motivación\n<!-- Completar -->\n### Impacto esperado\n\n"
+    data = check_call(text, ficha)
+    assert data["faltan"] == []
+    assert data["vacios"] == ["Motivación", "Impacto esperado"]
+    text += "#### Plan\nResultados que se usarán para definir el calendario.\n"
+    assert check_call(text, ficha)["vacios"] == []
+
+
+def test_estado_guides_to_ficha_and_then_to_a_fresh_check(document, ficha):  # noqa: F811
+    from ai_writer import mcp_server, verificacion
+
+    mcp_server.crear_documento("convocatoria", "T")
+    make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
+    for name in ("abstract.md", "equipo.md"):
+        (document / "materiales" / name).write_text("Datos de la propuesta.", encoding="utf-8")
+    (document / verificacion.DRAFT).write_text("## Motivación\nTexto", encoding="utf-8")
+    save_ficha(document, ficha)
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    mcp_server.comprobar_documento(juez=False)
+
+    ficha["confirmada"] = True
+    ficha["apartados"][1]["pide"] = "Explicar el impacto y cómo se medirá"
+    save_ficha(document, ficha)
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:escribir solo ficha"
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:comprobar"
+
+
+def test_ficha_checks_every_source_and_keeps_confirmation(official, ficha):
+    from ai_writer.library import Project
+
+    Project(tipo="convocatoria", titulo="T").save(official)
+    data = check_ficha(official)
+    assert {key: data[key] for key in ("requisitos", "comprobados", "fallidos", "avisos",
+                                      "confirmada")} == {
+        "requisitos": 8, "comprobados": 8, "fallidos": [], "avisos": [], "confirmada": False,
+    }
+    assert all(rule["estado"] == "por_revisar" for rule in data["reglas"])
+    # Old files are readable, but the flag alone cannot certify their current contents.
     ficha["confirmada"] = True
     save_ficha(official, ficha)
+    assert check_ficha(official)["confirmada"] is False
+    assert confirm_ficha(official)["confirmada"] is True
     assert check_ficha(official)["confirmada"] is True
 
 
@@ -186,7 +336,7 @@ def test_pending_marks_retain_their_section(ficha):
 
 def test_readable_call_ficha_and_confirmation_preserve_yaml(official, monkeypatch):
     from ai_writer import mcp_server
-    from ai_writer.convocatoria import confirm_ficha, ficha_text
+    from ai_writer.convocatoria import ficha_text
     from ai_writer.library import Project
 
     Project(tipo="convocatoria", titulo="T").save(official)
@@ -212,7 +362,6 @@ def test_readable_call_ficha_and_confirmation_preserve_yaml(official, monkeypatc
 
 @pytest.mark.parametrize("failure", ["missing", "invalid", "failed"])
 def test_confirmation_refuses_bad_sources_without_touching_yaml(official, ficha, failure):
-    from ai_writer.convocatoria import confirm_ficha
     from ai_writer.library import Project
 
     Project(tipo="convocatoria", titulo="T").save(official)
@@ -232,7 +381,6 @@ def test_confirmation_refuses_bad_sources_without_touching_yaml(official, ficha,
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
 def test_confirmation_adds_missing_key_after_first_line(official, newline):
-    from ai_writer.convocatoria import confirm_ficha
     from ai_writer.library import Project
 
     Project(tipo="convocatoria", titulo="T").save(official)
@@ -247,7 +395,7 @@ def test_confirmation_adds_missing_key_after_first_line(official, newline):
 
 def test_journal_text_and_confirmation(document):  # noqa: F811
     from ai_writer import mcp_server
-    from ai_writer.convocatoria import confirm_ficha, ficha_text
+    from ai_writer.convocatoria import ficha_text
     from tests.test_revisor import save_journal
 
     mcp_server.crear_documento("perspectiva", "T")

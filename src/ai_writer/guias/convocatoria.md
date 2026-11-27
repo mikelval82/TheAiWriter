@@ -41,7 +41,9 @@ criterios:
 
 Los valores del ejemplo son ilustrativos: sustitúyelos por los de los PDF. `fuente` es obligatoria en cada apartado, en `limites` si hay `paginas`, en cada campo, en la regla de `idioma` si la hay y en cada criterio. Si no hay campos o criterios, usa una lista vacía.
 
-Llama a `comprobar_ficha`, corrige todos los fallidos y revisa los avisos de página. Si no hay fallidos, enseña el texto de `mostrar_ficha` y pregunta «¿Confirmas la ficha? (sí/no)». Llama a `confirmar_ficha` solo tras el sí. No enseñes el YAML salvo que el usuario lo pida. Si ya existe, compruébala igualmente y, si no está confirmada, muestra `mostrar_ficha`, pregunta «¿Confirmas la ficha? (sí/no)» y llama a `confirmar_ficha` solo tras el sí antes de escribir. Respeta también su regla de idioma y su plazo.
+Llama a `comprobar_ficha` aunque la ficha ya exista. Revisa los fallidos y los avisos de página. Si el límite exige cotejo manual, muestra el valor registrado y la cita para que el investigador los compare. Si hay varias modalidades en la cita, pregunta cuál aplica antes de elegir un valor.
+
+Cuando la ficha requiera confirmación y pase las comprobaciones, muestra `mostrar_ficha` y pregunta «¿Confirmas la ficha? (sí/no)». Llama a `confirmar_ficha` solo tras el sí y pasa `revision` del `comprobar_ficha` que precedió al texto mostrado. Si cambió entretanto, vuelve a mostrar la ficha y pide confirmación otra vez. Las reglas ya aprobadas se conservan. Una ficha antigua sin registro de aprobación se confirma una vez con este procedimiento. Respeta el idioma y el plazo recogidos en la ficha.
 
 ## Plan
 
