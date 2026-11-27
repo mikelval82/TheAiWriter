@@ -24,7 +24,14 @@ from ai_writer.background import now, process_alive, spawn_cli
 from ai_writer.cifras import check_figures, lines_without_code
 from ai_writer.citations import find_citations
 from ai_writer.consulta import BIBLIOGRAPHY, consulted, open_index, scope, write_bibliography
-from ai_writer.convocatoria import CallFicha, check_call, check_ficha, report_lines
+from ai_writer.convocatoria import (
+    CallFicha,
+    check_call,
+    check_ficha,
+    check_final_pdf,
+    final_pdf_is_stale,
+    report_lines,
+)
 from ai_writer.hallazgos import list_findings
 from ai_writer.hallazgos_borrador import check_findings, findings_changed
 from ai_writer.hallazgos_borrador import report_lines as findings_report_lines
@@ -499,11 +506,14 @@ def _check_document(
         else:
             ficha = check_ficha(folder, call_ficha)
         data["ficha"] = ficha
-        data["convocatoria"] = (
-            {"aviso": "No se puede comprobar el borrador: se necesita una ficha sin errores."}
-            if "error" in ficha or ficha["fallidos"]
-            else check_call(text, call_ficha, modalidad=ficha.get("modalidad", {}).get("seleccion"))
-        )
+        if "error" in ficha or ficha["fallidos"]:
+            data["convocatoria"] = {
+                "aviso": "No se puede comprobar el borrador: se necesita una ficha sin errores."
+            }
+        else:
+            call = check_call(text, call_ficha, modalidad=ficha.get("modalidad", {}).get("seleccion"))
+            call["pdf_final"] = check_final_pdf(folder, call_ficha, ficha, call["extension"])
+            data["convocatoria"] = call
     _save(folder, data)
     return data
 
@@ -569,7 +579,7 @@ def run_judge(folder: Path, llm=None) -> dict:
 
 
 def status(folder: Path, *, findings: list[dict] | None = None) -> dict:
-    """Read the report and mark interrupted runs and changed finding evidence."""
+    """Read the report and flag interrupted runs, changed evidence and replaced PDFs."""
     data = _load(folder)
     if not data:
         raise LibraryError("Este documento todavía no se ha comprobado.")
@@ -580,6 +590,10 @@ def status(folder: Path, *, findings: list[dict] | None = None) -> dict:
         findings = list_findings(folder)
     if findings is not None and findings_changed(data.get("hallazgos_borrador"), findings):
         data["hallazgos_desactualizados"] = True
+    if final := data.get("convocatoria", {}).get("pdf_final"):
+        if final_pdf_is_stale(folder, final):
+            final.update(estado="desactualizado", paginas=None,
+                         motivo="El PDF final cambió desde la última comprobación.")
     return data
 
 

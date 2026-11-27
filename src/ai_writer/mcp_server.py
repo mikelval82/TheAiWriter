@@ -475,7 +475,8 @@ def comprobar_documento(juez: bool = True) -> dict:
     cita literal entre comillas esté tal cual en el PDF; en documentos de tipo resultados,
     coteja las frases enlazadas con los hallazgos aprobados o busca las cifras de borradores
     anteriores en resultados/. En convocatorias,
-    comprueba la ficha contra los PDF oficiales y la conformidad del borrador. Además escribe
+    comprueba la ficha, el borrador y las páginas reales de `exportacion/documento.pdf` si existe.
+    Además escribe
     `borrador/referencias.bib`. Con `juez`, lanza en segundo plano el juez de apoyo, que
     compara cada frase citada con pasajes de la obra (una llamada a Claude por párrafo con
     citas; el resultado se consulta con `estado_comprobacion`). El informe queda en

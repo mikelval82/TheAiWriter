@@ -2,6 +2,7 @@
 
 import copy
 
+import fitz
 import pytest
 import yaml
 
@@ -252,6 +253,80 @@ def test_call_asks_for_modality_and_recalculates_the_limit(modal_call):
     assert not coordinated["ficha"]["fallidos"]
     markdown = (modal_call / verificacion.REPORT).read_text()
     assert "coordinado" in markdown and "p. 2" in markdown and MODALITY_QUOTE in markdown
+
+
+def write_final_pdf(folder, pages):
+    path = folder / "exportacion/documento.pdf"
+    with fitz.open() as pdf:
+        for _ in range(pages):
+            pdf.new_page()
+        pdf.save(path)
+    return path
+
+
+def test_final_pdf_uses_actual_pages_and_selected_limit(modal_call):
+    from ai_writer import mcp_server, verificacion
+
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    path = write_final_pdf(modal_call, 35)
+    pending = mcp_server.comprobar_documento(juez=False)["convocatoria"]
+    assert pending["pdf_final"]["paginas"] == 35
+    assert pending["pdf_final"]["estado"] == "modalidad_pendiente"
+
+    for mode, maximum, state in (("individual", 20, "excedido"), ("coordinado", 35, "ok")):
+        mcp_server.fijar_modalidad_convocatoria(mode)
+        report = mcp_server.comprobar_documento(juez=False)["convocatoria"]
+        assert report["extension"]["paginas_estimadas"] != 35
+        final = report["pdf_final"]
+        assert final["paginas"] == 35 and final["maximo"] == maximum and final["estado"] == state
+        assert final["archivo"] == path.relative_to(modal_call).as_posix()
+        assert final["fuente"]["pagina"] == 2 and final["fuente"]["cita"] == MODALITY_QUOTE
+        markdown = (modal_call / verificacion.REPORT).read_text(encoding="utf-8")
+        assert "35 páginas reales" in markdown and "páginas estimadas" in markdown
+
+
+def test_missing_added_and_replaced_pdf_invalidate_the_previous_check(modal_call):
+    from ai_writer import mcp_server
+
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    mcp_server.fijar_modalidad_convocatoria("individual")
+    assert mcp_server.comprobar_documento(juez=False)["convocatoria"]["pdf_final"]["estado"] == (
+        "pendiente"
+    )
+    path = write_final_pdf(modal_call, 20)
+    assert mcp_server.estado_comprobacion()["convocatoria"]["pdf_final"]["estado"] == (
+        "desactualizado"
+    )
+    status = mcp_server.estado_documento()
+    assert status["comprobacion"]["estado"] == "desactualizada"
+    assert status["siguiente"] == "/theaiwriter:comprobar sin juez"
+    assert mcp_server.comprobar_documento(juez=False)["convocatoria"]["pdf_final"]["estado"] == "ok"
+
+    path.write_text("Este archivo no es un PDF.", encoding="utf-8")
+    assert mcp_server.estado_documento()["comprobacion"]["estado"] == "desactualizada"
+    final = mcp_server.comprobar_documento(juez=False)["convocatoria"]["pdf_final"]
+    assert final["estado"] == "error" and final["paginas"] is None
+    path.unlink()
+    assert mcp_server.comprobar_documento(juez=False)["convocatoria"]["pdf_final"]["estado"] == (
+        "pendiente"
+    )
+
+
+def test_pdf_with_a_fixed_limit_waits_for_ficha_confirmation(modal_call, ficha):
+    from ai_writer import mcp_server
+
+    ficha["limites"]["paginas_por_modalidad"] = []
+    quote = "La memoria admitirá un máximo de 20 páginas"
+    make_pdf(modal_call / "convocatoria/instrucciones.pdf",
+             [("Instructions", QUOTE), ("Límites de la memoria", quote)])
+    ficha["limites"].update(paginas=20, fuente={**SOURCE, "pagina": 2, "cita": quote})
+    save_ficha(modal_call, ficha)
+    write_final_pdf(modal_call, 20)
+    pending = mcp_server.comprobar_documento(juez=False)["convocatoria"]["pdf_final"]
+    assert pending["estado"] == "ficha_pendiente" and pending["paginas"] == 20
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    final = mcp_server.comprobar_documento(juez=False)["convocatoria"]["pdf_final"]
+    assert final["estado"] == "ok" and final["fuente"]["cita"] == quote
 
 
 def test_page_limits_match_the_number_for_each_modality(modal_call, ficha):

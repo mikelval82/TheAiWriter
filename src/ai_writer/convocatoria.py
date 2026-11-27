@@ -6,6 +6,7 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
+from stat import S_ISREG
 from tempfile import NamedTemporaryFile
 from typing import Literal, NamedTuple
 
@@ -20,6 +21,7 @@ FICHA = Path("convocatoria") / "ficha.yaml"
 APPROVALS = FICHA.with_name("aprobaciones.json")
 PROPOSAL = FICHA.with_name("propuesta.json")
 JOURNAL_FICHA = Path("revista") / "ficha.yaml"
+FINAL_PDF = Path("exportacion") / "documento.pdf"
 _HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$")
 _NUMBER = re.compile(r"(?<!\w)[0-9]+(?:[., \u00a0\u202f][0-9]+)*(?!\w)")
 _INTEGER = re.compile(r"(?:[0-9]+|[0-9]{1,3}(?:[., \u00a0\u202f][0-9]{3})+)")
@@ -667,6 +669,67 @@ def check_call(text: str, ficha: CallFicha | dict, *, modalidad: str | None = No
     }
 
 
+def _final_pdf_file(folder: Path) -> tuple[Path | None, list[int] | str | None]:
+    """Locate the final PDF within the project and identify its current file version."""
+    root = folder.resolve()
+    try:
+        path = (root / FINAL_PDF).resolve()
+        if not path.is_relative_to(root) or path.suffix.lower() != ".pdf":
+            return None, "El PDF final debe estar dentro del proyecto y tener extensión .pdf."
+        info = path.stat()
+        if not S_ISREG(info.st_mode):
+            return None, "La ruta del PDF final debe corresponder a un archivo."
+    except FileNotFoundError:
+        return None, None
+    except (OSError, RuntimeError, ValueError):
+        return None, "No se puede acceder al PDF final."
+    return path, [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns]
+
+
+def check_final_pdf(folder: Path, ficha: CallFicha, rules: dict, extension: dict) -> dict:
+    """Count real PDF pages and compare them with the applicable confirmed maximum."""
+    path, version = _final_pdf_file(Path(folder))
+    report = {
+        "archivo": FINAL_PDF.as_posix(), "paginas": None, "maximo": extension["maximo"],
+        "version_archivo": version,
+    }
+    if source := extension.get("fuente"):
+        report.update(modalidad=extension["modalidad"], fuente=source)
+    elif ficha.limites.fuente is not None and extension["maximo"] is not None:
+        report["fuente"] = ficha.limites.fuente.model_dump()
+    if isinstance(version, str):
+        return {**report, "estado": "error", "motivo": version}
+    if path is None:
+        return {**report, "estado": "pendiente"}
+
+    try:
+        with fitz.open(path) as pdf:
+            if not pdf.is_pdf or pdf.needs_pass or not pdf.page_count:
+                raise ValueError("PDF ilegible, vacío o protegido por contraseña")
+            pages = pdf.page_count
+    except (OSError, RuntimeError, ValueError):
+        return {**report, "estado": "error", "motivo": "No se puede leer el PDF final."}
+    if _final_pdf_file(Path(folder))[1] != version:
+        return {**report, "estado": "desactualizado", "motivo": "El PDF cambió durante la lectura."}
+    report["paginas"] = pages
+    if not rules["confirmada"]:
+        state = "ficha_pendiente"
+    elif extension["estado"] == "modalidad_pendiente":
+        state = "modalidad_pendiente"
+    elif report["maximo"] is None:
+        state = "sin_limite"
+    else:
+        state = "excedido" if pages > report["maximo"] else "ok"
+    return {**report, "estado": state}
+
+
+def final_pdf_is_stale(folder: Path, report: dict) -> bool:
+    """Detect when the saved count belongs to a previous file or a missing one."""
+    return report.get("estado") == "desactualizado" or (
+        _final_pdf_file(Path(folder))[1] != report.get("version_archivo")
+    )
+
+
 def report_lines(ficha: dict, call: dict) -> list[str]:
     """The call section of the verification report, including manual checks."""
     lines = ["", "## Convocatoria", ""]
@@ -744,8 +807,25 @@ def report_lines(ficha: dict, call: dict) -> list[str]:
         lines.append(f"Pendientes: {len(call['pendientes'])}.")
         for entry in call["pendientes"]:
             lines.append(f"- {entry['seccion'] or 'sin sección'}: {entry['marca']}")
-    lines += [
-        "", "La extensión es una estimación por palabras: hay que comprobar las páginas reales "
-        "en la plantilla oficial.",
-    ]
+    lines += ["", "La extensión del borrador se estima por palabras. "
+              "El recuento real usa el PDF preparado con la plantilla oficial."]
+    if final := call.get("pdf_final"):
+        lines += ["", "### PDF final", "", f"Archivo: `{final['archivo']}`."]
+        if final["paginas"] is not None:
+            lines.append(f"Recuento: {final['paginas']} páginas reales.")
+        if final["maximo"] is not None:
+            lines.append(f"Máximo aplicable: {final['maximo']} páginas.")
+        if (source := final.get("fuente")) and not final.get("modalidad"):
+            lines.append(f"Fuente: {source['fichero']}, p. {source['pagina']}. «{source['cita']}»")
+        messages = {
+            "pendiente": "Guarda aquí el PDF de la memoria con la plantilla oficial.",
+            "error": final.get("motivo", ""),
+            "desactualizado": "El PDF cambió. Vuelve a ejecutar /theaiwriter:comprobar sin juez.",
+            "ficha_pendiente": "Confirma la ficha para contrastar el recuento con el límite.",
+            "modalidad_pendiente": "Elige la modalidad para determinar el límite.",
+            "sin_limite": "La ficha no recoge un máximo de páginas.",
+            "excedido": "El PDF final supera el máximo de páginas.",
+            "ok": "El PDF final está dentro del límite de páginas.",
+        }
+        lines.append(messages[final["estado"]])
     return lines

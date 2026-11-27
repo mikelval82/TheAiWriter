@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from ai_writer import revisor, verificacion
-from ai_writer.convocatoria import FICHA, check_ficha
+from ai_writer.convocatoria import FICHA, FINAL_PDF, check_ficha
 from ai_writer.evidencia import has_results, inventory
 from ai_writer.exportacion import export_status
 from ai_writer.hallazgos import list_findings
@@ -41,6 +41,7 @@ def _stale(data: dict, report: Path, draft: Path, fingerprint: str) -> bool:
 def _problems(checks: dict, text: str) -> bool:
     citations = checks.get("citas", {})
     call = checks.get("convocatoria", {})
+    pdf_state = call.get("pdf_final", {}).get("estado")
     return bool(
         any(citations.get(key) for key in (
             "desconocidas", "fuera_de_las_colecciones", "mal_formadas", "sin_pdf", "pendientes"
@@ -52,7 +53,7 @@ def _problems(checks: dict, text: str) -> bool:
         or checks.get("cifras", {}).get("sin_origen")
         or any(call.get(key) for key in ("faltan", "vacios", "sobran", "pendientes"))
         or call.get("orden", True) is not True
-        or call.get("extension", {}).get("estado") == "excedido"
+        or (pdf_state != "ok" and call.get("extension", {}).get("estado") == "excedido")
         or any(field["estado"] == "excedido" for field in call.get("campos", []))
         or re.search(r"\[PENDIENTE(?::[^\]\n]+)?\]", text, flags=re.IGNORECASE)
     )
@@ -102,6 +103,9 @@ def _next_action(
     if check["estado"] == "juez en curso" or review["estado"] == "en_curso":
         return navigation(ESTADO, "Hay un informe en preparación.",
                           ("Leer borrador/documento.md", "Revisar el texto mientras se prepara."))
+    pdf_state = check.get("pdf_final", {}).get("estado")
+    if pdf_state == "desactualizado":
+        return navigation(f"{COMPROBAR} sin juez", "El PDF final cambió desde el último informe.")
     if check["estado"] in ("sin hacer", "desactualizada"):
         return navigation(COMPROBAR, "Hace falta una comprobación del borrador actual.",
                           (f"{COMPROBAR} sin juez", "Hacer solo las comprobaciones inmediatas."))
@@ -110,6 +114,13 @@ def _next_action(
         return navigation(CORREGIR, "Hay frases del estudio cuyo vínculo requiere revisión.",
                           (f"{HALLAZGOS} ver", "Consultar qué enunciados y fuentes están aprobados."),
                           ("Leer informes/comprobacion.md", "Localizar cada frase y su fuente."))
+    if pdf_state in ("error", "excedido"):
+        reason = ("El PDF final supera el máximo de páginas." if pdf_state == "excedido"
+                  else "No se pudo leer el PDF final.")
+        return navigation(
+            f"Actualizar {FINAL_PDF.as_posix()}", reason,
+            ("Leer informes/comprobacion.md", "Consultar el recuento y la regla aplicable."),
+        )
     if problems:
         return navigation(CORREGIR, "Hay citas, cifras o datos pendientes que requieren una decisión.",
                           ("Leer informes/comprobacion.md", "Consultar los avisos y sus fuentes."),
@@ -139,6 +150,12 @@ def _next_action(
                           ("Leer informes/revision.md", "Decidir qué cambios tienen sentido."),
                           (EXPORTAR, "Exportar si ya has valorado las sugerencias."))
     if export["estado"] == "terminada":
+        if pdf_state == "pendiente":
+            return navigation(
+                f"Guardar {FINAL_PDF.as_posix()}",
+                "Exporta la memoria definitiva a PDF y comprueba sus páginas.",
+                (f"{COMPROBAR} sin juez", "Recontar las páginas al guardar el PDF."),
+            )
         return navigation(f"Abrir {export['documento']}", "El documento de Word está disponible.",
                           (f"{EXPORTAR} reemplazar", "Generar de nuevo la copia de Word."))
     if export["estado"] == "desactualizada":
@@ -179,6 +196,8 @@ def document_status(folder: Path) -> dict:
         judge = checks.get("juez", {})
         state = judge.get("estado", "sin_lanzar")
         stale = draft.exists() and _stale(checks, result, draft, fingerprint)
+        final = checks.get("convocatoria", {}).get("pdf_final")
+        stale |= bool(final and final["estado"] == "desactualizado")
         if ficha is not None and ficha.get("confirmada"):
             saved_ficha = checks.get("ficha", {})
             stale |= (not saved_ficha.get("confirmada")
@@ -198,6 +217,8 @@ def document_status(folder: Path) -> dict:
         }
         if "hallazgos_borrador" in checks:
             verification["hallazgos"] = report_counts(checks["hallazgos_borrador"])
+        if final:
+            verification["pdf_final"] = final
 
     review_path = folder / revisor.REVIEW
     review = revisor.review_status(folder) if review_path.exists() else {"estado": "sin hacer"}
