@@ -113,7 +113,10 @@ def test_search_scopes_and_caps_per_work(library, tmp_path):
     index.update()
     top = index.search("lidar outcomes of the robot", n=4)
     assert top[0]["clave"] == "lee2021robots" and top[0]["seccion"] == "Results"
-    assert set(top[0]) == {"id", "clave", "titulo", "año", "seccion", "paginas", "texto", "relevancia"}
+    assert set(top[0]) == {
+        "id", "clave", "titulo", "año", "seccion", "paginas", "texto", "relevancia",
+        "archivo", "zotero_url",
+    }
     assert top[0]["id"].startswith("lee2021robots#") and top[0]["paginas"] == "3"
 
     scope = Zotero(library.root).item_keys(["Empatía"])

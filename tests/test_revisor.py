@@ -75,7 +75,8 @@ def test_perspective_uses_generic_criteria_in_one_call(draft):  # noqa: F811
     assert all(c["maximo"] is c["umbral"] is None for c in criteria)
     assert prompt.endswith((draft / verificacion.DRAFT).read_text(encoding="utf-8"))
     checks = prompt_checks(reviewer)
-    assert checks["apoyo"] is None and checks["frases_a_revisar"] == 0
+    assert checks["apoyo"]["juzgadas"] == checks["frases_a_revisar"] == 0
+    assert checks["apoyo"]["total"] == checks["apoyo"]["sin_juzgar"] == 5
     assert not (draft / "borrador/referencias.bib").exists()
 
 
@@ -154,8 +155,8 @@ def test_journal_sources_stay_inside_journal_pdfs(draft, filename):  # noqa: F81
 def test_call_uses_its_ficha_and_conformity_summary(document, ficha):  # noqa: F811
     mcp_server.crear_documento("convocatoria", "T")
     make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
-    ficha["confirmada"] = True
     save_ficha(document, ficha)
+    assert mcp_server.confirmar_ficha()["confirmada"]
     save_journal(document, confirmed=False, quote="Invented words that are not in the PDF")
     (document / verificacion.DRAFT).write_text("## Motivación\n[PENDIENTE: equipo]")
     origin, criteria = revisor.review_criteria(document)
@@ -165,10 +166,85 @@ def test_call_uses_its_ficha_and_conformity_summary(document, ficha):  # noqa: F
     reviewer = Reviewer()
     data = revisor.run_review(document, reviewer)
     assert data["criterios"][0]["nombre"] == "Calidad"
+    assert data["ficha_revision"] == mcp_server.comprobar_ficha()["revision"]
     call = prompt_checks(reviewer)["convocatoria"]
     assert call["faltan"] == ["Impacto esperado"]
     assert call["pendientes"] == 1 and call["extension"]["maximo"] == 2
     assert mcp_server.comprobar_ficha()["comprobados"] == 8
+
+
+@pytest.fixture
+def proposal(document, ficha):  # noqa: F811
+    mcp_server.crear_documento("convocatoria", "Memoria de prueba")
+    make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
+    save_ficha(document, ficha)
+    assert mcp_server.confirmar_ficha()["confirmada"]
+    text = ("## Objetivos\nO1. Cuantificar el cambio en la cobertura vegetal.\n\n"
+            "## Plan de trabajo\nT1. Recoger observaciones de referencia.\n\n"
+            "## Cronograma\nT1. Se realizará en el primer trimestre.\n\n"
+            "## Presupuesto\nSe solicitan 1.200 euros para licencias.\n\n"
+            "## Hitos\nT1. Se realizará en el segundo trimestre.\n")
+    (document / verificacion.DRAFT).write_text(text, encoding="utf-8")
+    return document
+
+
+def test_proposal_review_checks_named_links_and_locates_evidence(proposal):
+    findings = [
+        {"relacion": "objetivos_metodos", "estado": "evaluada", "hallazgos": [
+            {"tipo": "falta_vinculo", "problema": "O1 carece de un método asociado.",
+             "evidencias": [{"linea": 2, "fragmento": "Cuantificar el cambio en la cobertura vegetal."}],
+             "accion": "Indica con qué procedimiento se cuantificará O1."},
+        ]},
+        {"relacion": "actividades_cronograma", "estado": "evaluada", "hallazgos": [
+            {"tipo": "contradiccion", "problema": "T1 tiene dos plazos distintos.",
+             "evidencias": [{"linea": 8, "fragmento": "Se realizará en el primer trimestre."},
+                            {"linea": 14, "fragmento": "Se realizará en el segundo trimestre."}],
+             "accion": "Confirma cuál de los dos trimestres corresponde a T1."},
+        ]},
+        {"relacion": "actividades_presupuesto", "estado": "evaluada", "hallazgos": [
+            {"tipo": "falta_vinculo", "problema": "Las licencias carecen de una actividad asociada.",
+             "evidencias": [{"linea": 11, "fragmento": "Se solicitan 1.200 euros para licencias."}],
+             "accion": "Vincula el coste de las licencias con una tarea y explica su necesidad."},
+        ]},
+    ]
+    reviewer = Reviewer({"criterios": [review_row("Calidad", "bien")], "coherencia": findings})
+    original = (proposal / verificacion.DRAFT).read_bytes()
+    result = revisor.run_review(proposal, reviewer)
+
+    assert len(reviewer.prompts) == 1
+    assert "objetivos_metodos" in reviewer.prompts[0][0]
+    assert "2 | O1." in reviewer.prompts[0][1]
+    assert (proposal / verificacion.DRAFT).read_bytes() == original
+    coherence = result["coherencia"]
+    assert [section["estado"] for section in coherence] == ["evaluada"] * 3
+    assert [ref["apartado"] for ref in coherence[1]["hallazgos"][0]["evidencias"]] == [
+        "Cronograma", "Hitos",
+    ]
+    evidence, = coherence[2]["hallazgos"][0]["evidencias"]
+    assert evidence["apartado"] == "Presupuesto" and evidence["linea"] == 11
+    report = (proposal / revisor.REVIEW_REPORT).read_text(encoding="utf-8")
+    assert "Coherencia de la propuesta" in report and "línea 11" in report
+    assert mcp_server.estado_revision()["coherencia"] == coherence
+    (proposal / verificacion.DRAFT).write_bytes(original + b"\nTexto nuevo.\n")
+    assert mcp_server.estado_revision()["estado"] == "desactualizada"
+
+
+def test_proposal_review_rejects_ungrounded_or_incomplete_findings(proposal):
+    findings = [
+        {"relacion": "objetivos_metodos", "estado": "evaluada", "hallazgos": [
+            {"tipo": "falta_vinculo", "problema": "Falta un vínculo.",
+             "evidencias": [{"linea": 2, "fragmento": "Realizar un ensayo de campo inexistente."}],
+             "accion": "Vincula el objetivo y el método."},
+        ]},
+        {"relacion": "actividades_cronograma", "estado": "evaluada", "hallazgos": [
+            {"tipo": "contradiccion", "problema": "Los plazos se contradicen.",
+             "evidencias": [{"linea": 8, "fragmento": "Se realizará en el primer trimestre."}],
+             "accion": "Contrasta las fechas con el cronograma original."},
+        ]},
+    ]
+    result = revisor.run_review(proposal, Reviewer({"criterios": [], "coherencia": findings}))
+    assert [r["estado"] for r in result["coherencia"]] == ["parcial", "parcial", "sin_evaluar"]
+    assert all(r["hallazgos"] == [] for r in result["coherencia"])
 
 
 @pytest.mark.parametrize("state,message", [("absent", "falta"), ("unconfirmed", "Falta confirmar"),
@@ -180,12 +256,13 @@ def test_call_requires_a_confirmed_ficha_with_criteria(
     mcp_server.crear_documento("convocatoria", "T")
     if state != "absent":
         make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
-        ficha["confirmada"] = state != "unconfirmed"
         if state == "empty":
             ficha["criterios"] = []
         if state == "failed":
             ficha["criterios"][0]["fuente"]["cita"] = "An invented criterion outside this PDF"
         save_ficha(document, ficha)
+        if state == "empty":
+            assert mcp_server.confirmar_ficha()["confirmada"]
     with pytest.raises(LibraryError, match=message):
         revisor.review_criteria(document)
 
@@ -310,3 +387,19 @@ def test_cli_dispatches_review(tmp_path, monkeypatch, capsys, explicit_folder):
     main(["documento", "revisar"] + ([str(tmp_path)] if explicit_folder else []))
     assert calls == [tmp_path if explicit_folder else Path(".")]
     assert capsys.readouterr().out.strip() == "terminado"
+
+
+def test_review_is_stale_if_draft_changed_during_generation(draft):  # noqa: F811
+    (draft / "materiales/abstract.md").write_text("Mi estudio.")
+    path = draft / verificacion.DRAFT
+    path.write_text("Versión anterior.")
+
+    class EditingReviewer(Reviewer):
+        def complete_json(self, system, user):
+            path.write_text("Versión nueva.")
+            return super().complete_json(system, user)
+
+    assert revisor.run_review(draft, EditingReviewer())["estado"] == "terminado"
+    assert mcp_server.estado_documento()["revision"]["estado"] == "desactualizada"
+    verificacion.check_document(draft)
+    assert mcp_server.estado_documento()["siguiente"] == "/theaiwriter:revisar"

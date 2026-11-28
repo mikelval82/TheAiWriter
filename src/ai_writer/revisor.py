@@ -12,6 +12,12 @@ from pydantic import BaseModel, ValidationError
 from ai_writer import verificacion
 from ai_writer.avisos import add_notice
 from ai_writer.background import now, process_alive, spawn_cli
+from ai_writer.coherencia_convocatoria import (
+    COHERENCE_SYSTEM,
+    apply_coherence,
+    coherence_lines,
+    numbered_draft,
+)
 from ai_writer.convocatoria import (
     JOURNAL_FICHA,
     CallFicha,
@@ -19,6 +25,7 @@ from ai_writer.convocatoria import (
     check_ficha,
     check_journal_ficha,
 )
+from ai_writer.hallazgos_borrador import report_counts
 from ai_writer.library import LibraryError, Project
 from ai_writer.llm import LLMError, UsageLimitError, get_llm_client
 
@@ -66,21 +73,26 @@ class ReviewEntry(BaseModel):
 
 def review_criteria(folder: Path) -> tuple[str, list[dict]]:
     """Load generic criteria or confirmed criteria with checked PDF sources."""
+    origin, criteria, _ = _review_criteria(folder)
+    return origin, criteria
+
+
+def _review_criteria(folder: Path) -> tuple[str, list[dict], str | None]:
     folder = Path(folder)
     kind = Project.load(folder).tipo
     if kind == "convocatoria":
-        report, label = check_ficha(folder), "convocatoria"
-        model = CallFicha
+        ficha = CallFicha.load(folder)
+        report, label = check_ficha(folder, ficha), "convocatoria"
     elif (folder / JOURNAL_FICHA).exists():
         report, label = check_journal_ficha(folder), "revista"
-        model = JournalFicha
+        ficha = JournalFicha.load(folder)
     else:
         path = files("ai_writer").joinpath("guias", f"criterios-{kind}.yaml")
         criteria = yaml.safe_load(path.read_text(encoding="utf-8"))
         return f"genéricos ({kind})", [
             {"nombre": c["nombre"], "maximo": None, "umbral": None,
              "descripcion": c["descripcion"]} for c in criteria
-        ]
+        ], None
     if "error" in report:
         raise LibraryError(report["error"])
     if report["fallidos"]:
@@ -88,34 +100,40 @@ def review_criteria(folder: Path) -> tuple[str, list[dict]]:
         raise LibraryError(f"La ficha de la {label} tiene citas fallidas: {details}")
     if not report["confirmada"]:
         raise LibraryError(f"Falta confirmar la ficha de la {label} antes de revisar el borrador.")
-    ficha = model.load(folder)
+    if question := report.get("modalidad", {}).get("pregunta"):
+        raise LibraryError(f"{question} Usa /theaiwriter:escribir modalidad.")
     if not ficha.criterios:
         raise LibraryError(f"Falta al menos un criterio de evaluación en la ficha de la {label}.")
     origin = f"{label}: {getattr(ficha, label)}"
-    return origin, [c.model_dump(exclude={"fuente"}) for c in ficha.criterios]
+    return origin, [c.model_dump(exclude={"fuente"}) for c in ficha.criterios], report.get("revision")
 
 
 def _verification_summary(data: dict) -> dict:
     citations = data["citas"]
     entries = data.get("apoyo", [])
     report = {
-        "apoyo": verificacion.summary(entries) if entries else None,
+        "apoyo": verificacion.support_summary(data),
         "frases_a_revisar": len({(e["seccion"], e["frase"]) for e in entries
                                   if e["veredicto"] in ("parcial", "tergiversada", "no_apoyada")}),
         "citas": {k: len(v) if isinstance(v, list) else v for k, v in citations.items()},
         "sin_citar": citations.get("sin_citar", []),
         "citas_literales_no_encontradas": sum(not q["encontrada_en"]
                                              for q in data["citas_literales"]),
+        "fuentes_por_revisar": len(data.get("fuentes_por_revisar", [])),
     }
     if "convocatoria" in data:
         call = data["convocatoria"]
-        report["convocatoria"] = {k: call[k] for k in ("faltan", "extension", "aviso") if k in call}
+        report["convocatoria"] = {
+            k: call[k] for k in ("faltan", "vacios", "extension", "aviso") if k in call
+        }
         report["convocatoria"]["pendientes"] = len(call.get("pendientes", []))
     if "cifras" in data:
         figures = data["cifras"]
         report["cifras"] = {k: figures[k] for k in ("comprobadas", "con_origen", "aviso")
                             if k in figures}
         report["cifras"]["sin_origen"] = len(figures["sin_origen"])
+    if "hallazgos_borrador" in data:
+        report["hallazgos_borrador"] = report_counts(data["hallazgos_borrador"])
     return report
 
 
@@ -164,27 +182,41 @@ def run_review(folder: Path, llm=None) -> dict:
     if not path.exists():
         raise LibraryError(f"Todavía no hay borrador en {verificacion.DRAFT}.")
     text = path.read_text(encoding="utf-8")
-    origin, criteria = review_criteria(folder)
+    origin, criteria, call_revision = _review_criteria(folder)
     previous = _load(folder)
     data = {
         "estado": "en_curso", "pid": os.getpid(),
         "inicio": previous.get("inicio", now()) if previous.get("estado") == "en_curso" else now(),
         "fin": None, "origen": origin,
+        "borrador_sha256": verificacion.draft_fingerprint(text),
         "criterios": [_unevaluated(c["nombre"]) for c in criteria],
         "prioridades": [], "error": None,
     }
+    if call_revision is not None:
+        data["ficha_revision"] = call_revision
+        data["coherencia"] = apply_coherence(None, "")
     _save(folder, data)
     try:
         checks = verificacion.check_document(folder, bibliography=False)
+        if call_revision is not None:
+            call_report = checks.get("ficha", {})
+            if not call_report.get("confirmada") or call_report["revision"] != call_revision:
+                raise LibraryError("Cambió la ficha de la convocatoria. Revisa sus reglas y reintenta.")
+            if checks["borrador_sha256"] != data["borrador_sha256"]:
+                raise LibraryError("Cambió el borrador durante la comprobación. Vuelve a revisarlo.")
         prompt = (
             f"Origen de los criterios: {origin}\n\nCriterios:\n"
             + json.dumps(criteria, ensure_ascii=False)
             + "\n\nResumen de verificación:\n"
             + json.dumps(_verification_summary(checks), ensure_ascii=False)
-            + "\n\nBorrador completo:\n" + text
+            + "\n\nBorrador completo:\n"
+            + (numbered_draft(text) if call_revision is not None else text)
         )
-        answer = (llm or get_llm_client()).complete_json(REVIEW_SYSTEM, prompt)
+        system = REVIEW_SYSTEM + (COHERENCE_SYSTEM if call_revision is not None else "")
+        answer = (llm or get_llm_client()).complete_json(system, prompt)
         data["criterios"], data["prioridades"] = _apply_review(answer, criteria)
+        if call_revision is not None:
+            data["coherencia"] = apply_coherence(answer.get("coherencia"), text)
         data["estado"] = "terminado"
     except UsageLimitError as error:
         data.update(estado="limite_de_uso", error=str(error))
@@ -208,7 +240,7 @@ def run_review(folder: Path, llm=None) -> dict:
 def start_review(folder: Path) -> dict:
     """Check the criteria and launch a detached review for this document."""
     folder = Path(folder)
-    origin, criteria = review_criteria(folder)
+    origin, criteria, call_revision = _review_criteria(folder)
     if review_running(_load(folder)):
         raise LibraryError("La revisión ya está en marcha para este documento.")
     if not (folder / verificacion.DRAFT).exists():
@@ -219,6 +251,8 @@ def start_review(folder: Path) -> dict:
         "criterios": [_unevaluated(c["nombre"]) for c in criteria],
         "prioridades": [], "error": None,
     }
+    if call_revision is not None:
+        data["coherencia"] = apply_coherence(None, "")
     _save(folder, data)
     return data
 
@@ -228,12 +262,18 @@ def review_running(data: dict) -> bool:
 
 
 def review_status(folder: Path) -> dict:
-    """Read the saved review and mark a dead process as interrupted."""
+    """Read the saved review and flag interrupted or outdated proposal reviews."""
     data = _load(folder)
     if not data:
         raise LibraryError("Este documento todavía no se ha revisado.")
     if data.get("estado") == "en_curso" and not process_alive(data.get("pid")):
         data["estado"] = "interrumpido"
+    if data.get("estado") == "terminado" and data.get("coherencia"):
+        draft = Path(folder) / verificacion.DRAFT
+        if not draft.is_file() or verificacion.draft_fingerprint(
+            draft.read_text(encoding="utf-8")
+        ) != data["borrador_sha256"]:
+            data["estado"] = "desactualizada"
     return data
 
 
@@ -255,4 +295,6 @@ def markdown(data: dict) -> str:
         lines += ["", "### Carencias", ""]
         lines += [f"- {gap['apartado']}: {gap['problema']}" for gap in criterion["carencias"]]
         lines += ["", "### Trabajo", "", criterion["trabajo"]]
+    if coherence := data.get("coherencia"):
+        lines.extend(coherence_lines(coherence))
     return "\n".join(lines) + "\n"

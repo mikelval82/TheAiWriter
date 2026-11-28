@@ -1,13 +1,15 @@
 ---
-description: Muestra materiales pendientes, borrador, informes y el siguiente paso
+description: Muestra materiales pendientes, borrador, informes y las acciones disponibles
 ---
 
-Informa del estado del documento de la carpeta actual con las herramientas MCP de `theaiwriter`. Responde siempre en español y de forma breve.
+Llama a `estado_documento` y responde en español. Muestra el título, el tipo, los materiales pendientes, el avance del borrador y el estado de los informes. Si hay una copia de Word, muestra dónde está y si hay que actualizarla. En documentos de tipo Resultados, muestra los recuentos de hallazgos, incluidas las fuentes que han cambiado. Si ya hay una comprobación de hallazgos, indica cuántas frases coinciden y cuáles requieren revisar el vínculo o añadirlo. Si hay comprobación, usa el recuento de pares de frase y obra para explicar cuántos se han juzgado del total y cuántos quedan pendientes. Si hay fuentes por revisar, indica cuántas y dónde verlas. Llama a `estado_indice` solo si el usuario pregunta por Zotero o si la indexación afecta al siguiente paso.
 
-1. Llama a `estado_documento`: muestra el tipo, los materiales que faltan o siguen como plantilla, las palabras del borrador y el estado de comprobación y revisión. No hace llamadas a modelos.
-2. Llama a `estado_indice` para resumir obras, PDF e indexación.
-3. Termina con «Siguiente: <valor de siguiente>», usando el `siguiente` de `estado_documento`. Si es completar un fichero o pasar a Word, la línea final conserva ese paso; para Word, enlaza `docs/exportar.md` del plugin. Para un comando, usa «Siguiente: /theaiwriter:…».
+Si falta `proyecto.yaml`, sugiere abrir la carpeta de trabajo y usar `/theaiwriter:nuevo`. Ante otro error, indica cómo resolverlo antes de avanzar.
 
-Empieza la respuesta final con un resumen de 3 a 5 líneas; el detalle está en el informe. Termina con una línea «Siguiente: /theaiwriter:…» con el paso que toca.
+Si el proyecto de convocatoria devuelve `modalidad`, muestra la selección y el máximo de páginas o la pregunta pendiente. Para modificar la elección, indica `/theaiwriter:escribir modalidad`.
 
-Cuando `siguiente` es un material por completar o la guía de Word, prevalece ese valor literal en la línea final.
+Si devuelve `idioma_por_presupuesto`, muestra si el importe en costes directos activa la condición de idioma y si el idioma declarado coincide. Para consultar o corregir el importe, indica `/theaiwriter:escribir presupuesto`.
+
+Si `comprobacion.pdf_final` está disponible, muestra el recuento y el máximo, o explica por qué sigue pendiente. Si se guardó o sustituyó el PDF después del informe, indica que debe volver a comprobarse.
+
+Muestra **Siguiente** con `siguiente` y `motivo_siguiente`, y **También puedes** con `alternativas` cuando las haya. Si hace falta ayuda para exportar, enlaza [la guía](https://github.com/mikelval82/TheAiWriter/blob/master/docs/exportar.md).

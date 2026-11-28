@@ -25,12 +25,15 @@ limites:
   paginas: null             # máximo si consta; con páginas, fuente es obligatoria
   palabras_por_pagina: 500
   fuente: null              # {fichero: ..., pagina: ..., cita: ...}
+  paginas_por_modalidad: [] # si varía, deja paginas y fuente en null
   campos:
     - nombre: "Nombre del campo"
       caracteres: 3500      # solo si consta ese máximo en el PDF
       apartado: null       # título del apartado, o null para comprobar a mano
       fuente: {fichero: "instrucciones.pdf", pagina: 2, cita: "Copia aquí la cita literal del límite de caracteres"}
-idioma: null                # o {regla: "...", fuente: {fichero: ..., pagina: ..., cita: ...}}
+idioma: null                # o {regla: "...", fuente: {...}, costes_directos: null}
+datos_propuesta: {}          # solo datos que necesitas para evaluar reglas aplicables
+reglas_aplicables: []
 criterios:
   - nombre: "Nombre del criterio"
     maximo: 30              # puntuación si consta; si no, null
@@ -41,7 +44,39 @@ criterios:
 
 Los valores del ejemplo son ilustrativos: sustitúyelos por los de los PDF. `fuente` es obligatoria en cada apartado, en `limites` si hay `paginas`, en cada campo, en la regla de `idioma` si la hay y en cada criterio. Si no hay campos o criterios, usa una lista vacía.
 
-Llama a `comprobar_ficha`, corrige todos los fallidos y revisa los avisos de página. Si no hay fallidos, enseña el texto de `mostrar_ficha` y pregunta «¿Confirmas la ficha? (sí/no)». Llama a `confirmar_ficha` solo tras el sí. No enseñes el YAML salvo que el usuario lo pida. Si ya existe, compruébala igualmente y, si no está confirmada, muestra `mostrar_ficha`, pregunta «¿Confirmas la ficha? (sí/no)» y llama a `confirmar_ficha` solo tras el sí antes de escribir. Respeta también su regla de idioma y su plazo.
+Para condiciones de una ficha nueva, usa `datos_propuesta` y `reglas_aplicables`. Define los datos a partir de las bases con un identificador en minúsculas, `tipo` (`texto`, `numero` o `booleano`), `pregunta` y, para textos, `opciones` si procede. El investigador confirma sus valores. Explicita la unidad en la pregunta para los datos numéricos.
+
+Cada regla incluye `id`, `requisito`, `fuente` y una lista `cuando`. Todas las condiciones de la lista deben cumplirse. Una lista vacía significa que aplica siempre. Una condición es `{dato: ..., operador: ..., valor: ...}`. Usa `igual` o `distinto` con texto y booleanos. Los números admiten también `mayor`, `mayor_o_igual`, `menor` y `menor_o_igual`.
+
+En `comprobar` puedes usar una comparación sobre un dato declarado, `idioma_proyecto`, `paginas_pdf` o `palabras_borrador`. Para un documento obligatorio usa `{archivo: "exportacion/anexo.pdf"}` y explica el nombre de archivo esperado. Este control comprueba la presencia del archivo. Si el requisito precisa juicio humano o queda fuera de estas comprobaciones, omite `comprobar` y conserva la condición y la fuente para revisión manual.
+
+Por ejemplo, este fragmento usa datos declarados en la ficha y una comprobación que sirve para cualquier límite de páginas. Sustituye valores, preguntas y cita por los de la convocatoria. Para agrupar alternativas, usa una regla por alternativa cuando cada una tenga un requisito distinto.
+
+```yaml
+datos_propuesta:
+  modalidad:
+    tipo: texto
+    pregunta: "¿Qué modalidad has elegido?"
+    opciones: [individual, coordinada]
+reglas_aplicables:
+  - id: extension_individual
+    requisito: "Límite de páginas para propuestas individuales"
+    cuando: [{dato: modalidad, operador: igual, valor: individual}]
+    comprobar: {dato: paginas_pdf, operador: menor_o_igual, valor: 20}
+    fuente: {fichero: "instrucciones.pdf", pagina: 2, cita: "Copia aquí el pasaje literal de la convocatoria"}
+```
+
+Las fichas antiguas con `paginas_por_modalidad` o `idioma.costes_directos` siguen admitidas. Evita duplicar en ambos formatos el mismo requisito.
+
+Llama a `comprobar_ficha` aunque la ficha ya exista. Revisa los fallidos y los avisos de página. Si el límite exige cotejo manual, muestra el valor registrado y la cita para que el investigador los compare.
+
+Cuando la ficha requiera confirmación y pase las comprobaciones, muestra `mostrar_ficha` y pregunta «¿Confirmas la ficha? (sí/no)». Llama a `confirmar_ficha` solo tras el sí y pasa `revision` del `comprobar_ficha` que precedió al texto mostrado. Si cambió entretanto, vuelve a mostrar la ficha y pide confirmación otra vez. Las reglas ya aprobadas se conservan. Una ficha antigua sin registro de aprobación se confirma una vez con este procedimiento. Respeta el idioma y el plazo recogidos en la ficha.
+
+Si `comprobar_ficha` devuelve `modalidad.pregunta`, usa esa pregunta y espera la respuesta antes de hacer el plan. Llama a `fijar_modalidad_convocatoria` solo con una opción que el investigador haya indicado expresamente. Muestra el límite, el PDF, la página y la cita que devuelve. Usa ese máximo en el plan. Cambiar la modalidad deja vigentes las aprobaciones de las reglas y requiere una nueva comprobación del borrador.
+
+Si `idioma_por_presupuesto` devuelve una pregunta, pide los costes directos exactos en euros. Llama a `fijar_costes_directos_convocatoria` solo tras una respuesta explícita. Normaliza el importe sin separador de miles, por ejemplo `"100000.00"`. Si el investigador aún no lo conoce, deja la decisión pendiente y ofrece hacer solo un plan provisional. Si la condición se activa y el idioma declarado difiere, muestra el idioma requerido y su fuente. Pide confirmación antes de cambiar `idioma` en `proyecto.yaml` y antes de redactar o traducir un borrador existente.
+
+Para las reglas de `reglas_aplicables`, pide los datos con `solicitar: true` de `comprobar_ficha`. Llama a `fijar_dato_convocatoria` solo tras la respuesta explícita. Si falta un dato, señala qué regla queda pendiente. Usa las reglas con `aplica: true` para orientar el plan aunque solo puedan comprobarse en el documento final. Consulta el informe automático tras redactar.
 
 ## Plan
 

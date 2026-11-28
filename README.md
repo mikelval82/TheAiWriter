@@ -30,7 +30,7 @@ cientos de MB. Después se calcula la búsqueda en el ordenador.
 
 Abre Claude Code en la carpeta donde vas a escribir el documento.
 
-El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → pasar a Word**.
+El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → exportar**.
 
 1. `/theaiwriter:nuevo`: elige tipo, título, idioma y colecciones de Zotero. Una colección incluye
    sus subcolecciones; sin elegir ninguna se usa todo Zotero. Crea `proyecto.yaml`, `materiales/`,
@@ -39,17 +39,16 @@ El camino tiene cinco pasos: **nuevo → escribir → comprobar → revisar → 
    completa las respuestas antes de escribir. Resultados añade `resultados/` (CSV y figuras) y
    `analisis/` (código); convocatoria añade `convocatoria/` (PDF oficiales) y `materiales/equipo.md`.
 2. `/theaiwriter:escribir`: Claude lee `guia_escritura`, explora los artículos, deja el plan en
-   `borrador/plan.md` y escribe `borrador/documento.md`, consultando pasajes por sección. Con
-   «con pausa» espera tu aprobación del plan. Registra las lecturas en `informes/consultas.json`.
+   `borrador/plan.md` y escribe `borrador/documento.md`, consultando pasajes por sección. En
+   proyectos de Resultados o con «con pausa» espera tu aprobación del plan. Registra las lecturas en `informes/consultas.json`.
    Al terminar comprueba el borrador y resume lo señalado; las correcciones se proponen aparte.
 3. `/theaiwriter:comprobar`: comprueba el borrador, actualiza `borrador/referencias.bib` y escribe
    `informes/comprobacion.md` y `.json`. El juez corre en segundo plano; con «sin juez» solo hace
-   las comprobaciones sin modelo. Los cambios del borrador pueden dejar el informe desactualizado.
+   las comprobaciones sin modelo. Con «evidencia» puedes consultar el pasaje de una cita, incluidas las apoyadas. Los cambios del borrador o de los PDF pueden dejar el informe desactualizado.
 4. `/theaiwriter:revisar`: evalúa por criterios con una llamada a Claude en segundo plano y deja
    prioridades, fortalezas, carencias y trabajo concreto en `informes/revision.md` y `.json`.
    No cambia el borrador ni da una nota. Conviene comprobar antes: usa el apoyo previo de las citas.
-5. Pasa a Word siguiendo la [guía de exportación](docs/exportar.md), con Pandoc y bibliografía o
-   con citas vivas de Zotero. La carpeta `exportacion/` está preparada para el documento final.
+5. `/theaiwriter:exportar` genera `exportacion/documento.docx` con Pandoc y bibliografía. Consulta la [guía de exportación](docs/exportar.md) para elegir un estilo o usar citas vivas de Zotero.
 
 Cuatro ayudas acompañan el camino:
 
@@ -62,8 +61,7 @@ Cuatro ayudas acompañan el camino:
 - `/theaiwriter:ayuda` explica los comandos y qué toca ahora; con una duda («cómo paso a Word»)
   contesta a partir del manual. No escribe nada ni lanza comprobaciones.
 
-Los comandos empiezan su respuesta final con un resumen de 3 a 5 líneas y terminan con el siguiente
-paso. Antes de escribir, comprobar con juez o revisar, avisan del gasto con tu cuenta de Claude.
+Los comandos resumen el resultado e indican el siguiente paso, su motivo y las alternativas disponibles. Antes de escribir, comprobar con juez o revisar, avisan del gasto con tu cuenta de Claude.
 Cuando el juez o el revisor terminan, se detienen por límite de uso o fallan, dejan un aviso en
 `informes/avisos.json`: el hook lo recoge en tu siguiente mensaje y Claude te lo menciona al principio.
 Al abrir un documento antiguo se migra `revision/` a `informes/` si esta última no existe,
@@ -72,7 +70,7 @@ y se renombran sus informes `verificacion.*` a `comprobacion.*`, con un aviso un
 Las citas del borrador usan claves como `[@smith2020empathy]`. Si falta una fuente, Claude debe
 marcarla con `[@?]`.
 
-En documentos de tipo `resultados`, Claude lee las tablas y el código antes de planificar y usa
+En documentos de tipo `resultados`, `/theaiwriter:hallazgos` inventaría los archivos y permite aprobar hallazgos con su evidencia antes de escribir. Admite celdas CSV, salidas de texto y salidas guardadas de cuadernos Jupyter. El informe de comprobación coteja las frases vinculadas con los enunciados aprobados y muestra la ubicación de cada fuente. Claude lee los materiales antes de planificar y usa
 Introducción, Métodos, Resultados, Discusión y Conclusión, en el idioma del documento. Las cifras
 propias no llevan cita: salen de tablas de `resultados/` o de scripts guardados en `analisis/`
 que escriben allí sus salidas CSV o Markdown, incluidos los recuentos y diferencias citados.

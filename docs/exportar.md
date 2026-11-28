@@ -1,21 +1,30 @@
 # Pasar el borrador a Word
 
-## Pandoc con bibliografía
+## Exportación estándar
 
-Instala [Pandoc](https://pandoc.org/installing.html). Descarga el estilo CSL de la revista desde
-[Zotero](https://www.zotero.org/styles) o el [repositorio CSL](https://github.com/citation-style-language/styles),
-y deja el estilo y la plantilla oficial de Word junto al documento. Desde la carpeta del documento:
+Instala Pandoc y comprueba que `/theaiwriter:diagnostico` lo encuentra. Si ya lo tienes en otro
+entorno, añade su carpeta al `PATH` o define `THEAIWRITER_PANDOC` con la ruta al ejecutable antes de
+abrir Claude Code. [Instalar Pandoc](https://pandoc.org/installing.html)
+
+Usa `/theaiwriter:exportar` cuando hayas revisado el borrador. El comando escribe
+`exportacion/documento.docx` e indica los avisos de Pandoc. Puedes pedir «provisional» para obtener
+una copia mientras sigues revisando. Si el archivo de Word ya existe, pide «reemplazar» para
+actualizarlo. Guarda aparte cualquier cambio que hayas hecho en Word antes de reemplazarlo.
+
+La exportación usa la bibliografía de `/theaiwriter:comprobar sin juez`. Busca las figuras en
+`borrador/`, la raíz del proyecto y `resultados/`. Si quieres un estilo de citas concreto, copia su CSL al
+proyecto y pásale su nombre al comando. Para aplicar los estilos de una revista, indica también la
+plantilla DOCX. La plantilla aporta sus estilos y propiedades de página. Revisa en Word las
+figuras, las citas, los campos y los límites de páginas. [Manual de Pandoc](https://pandoc.org/MANUAL.html#option--reference-doc)
+
+Para convertir manualmente desde la carpeta del proyecto, puedes usar:
 
 ```bash
-pandoc borrador/documento.md --citeproc --bibliography borrador/referencias.bib --csl <estilo>.csl --reference-doc <plantilla>.docx --resource-path borrador -M lang=es -M reference-section-title=Referencias -o exportacion/documento.docx
+pandoc borrador/documento.md --citeproc --bibliography borrador/referencias.bib --strip-comments --resource-path borrador:.:resultados -M lang=es -M reference-section-title=Referencias -o exportacion/documento.docx
 ```
 
-Sustituye `<estilo>` y `<plantilla>` por los nombres reales; sin plantilla, quita `--reference-doc`.
-Los estilos que ya usas en Zotero están en la carpeta `styles` de sus datos (`~/Zotero/styles`).
-`--resource-path` permite encontrar las figuras, `reference-section-title` titula la bibliografía y
-`lang` pone el idioma del documento (`en` en inglés). `--reference-doc` toma los estilos y
-las propiedades de página de la plantilla oficial, pero no su contenido. Revisa las páginas y los
-campos en Word antes de entregar. Consulta el [manual de Pandoc](https://pandoc.org/MANUAL.html#option--reference-doc).
+En Windows, usa punto y coma como separador de las carpetas de recursos, entre comillas.
+Para elegir formato, añade `--csl estilo.csl` o `--reference-doc plantilla.docx`.
 
 ## Citas vivas de Zotero
 

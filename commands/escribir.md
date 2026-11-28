@@ -1,6 +1,6 @@
 ---
 description: Planifica y escribe el documento consultando los PDF de Zotero, y verifica las citas
-argument-hint: "[«con pausa» para aprobar el plan antes de escribir, o la sección que quieres escribir]"
+argument-hint: "[«con pausa», sección, «solo ficha», «modalidad» o «presupuesto»]"
 ---
 
 Escribe el documento de la carpeta actual apoyándote en los PDF de sus colecciones de Zotero, con las herramientas del servidor MCP `theaiwriter`. Tú planificas y escribes; las herramientas te dan los pasajes. Responde al usuario siempre en español.
@@ -10,20 +10,24 @@ Petición del usuario: $ARGUMENTS
 ## Antes de empezar
 
 1. Lee `proyecto.yaml`. Si no existe, explica que primero hay que crear el documento con `/theaiwriter:nuevo` y para.
+   - En una convocatoria, si el usuario pide «modalidad» o «modalidad [opción]», llama a `comprobar_ficha`. Si la ficha falta o tiene errores, guía a `/theaiwriter:escribir solo ficha` y termina. Si la ficha carece de límites por modalidad, explícalo y termina. En otro caso, muestra las opciones y la selección actual si existe. Espera a que el usuario indique una opción, salvo que ya la haya indicado, y llama a `fijar_modalidad_convocatoria`. Muestra el límite y su cita. Indica como siguiente paso `/theaiwriter:comprobar sin juez` si hay borrador, o `/theaiwriter:escribir con pausa` para preparar el plan. Termina aquí y conserva el borrador y el plan.
+   - En una convocatoria, si pide «presupuesto», consulta `comprobar_ficha`. Si la ficha falta o tiene errores, guía a `/theaiwriter:escribir solo ficha` y termina. Si la ficha carece de una regla de idioma por costes directos, explícalo y termina. En otro caso, muestra los costes directos registrados y espera una cifra nueva o una solicitud explícita de dejarlos pendientes, salvo que el investigador ya la haya indicado. Llama entonces a `fijar_costes_directos_convocatoria` con el importe en euros sin separador de miles, o `null` para dejarlos pendientes. Muestra el efecto sobre el idioma y su fuente. Indica el siguiente paso y termina sin modificar el idioma, el plan ni el borrador.
+   - En una convocatoria, si pide «datos», consulta `comprobar_ficha`. Si la ficha falta o tiene errores, guía a `/theaiwriter:escribir solo ficha` y termina. Muestra las preguntas y opciones de los datos solicitados, o los valores que el investigador quiera cambiar. Llama a `fijar_dato_convocatoria` solo con una respuesta explícita. Para dejar un dato pendiente usa `null`. Indica el siguiente paso sin editar el borrador.
 2. Llama obligatoriamente a `guia_escritura` y sigue la guía del tipo de documento. Completa sus preparativos antes de planificar.
+   - Para «solo ficha» en una convocatoria, prepara o revisa la ficha siguiendo esa guía. Después resume su estado y termina indicando el siguiente paso, sin redactar ni modificar el borrador.
 3. Lee `materiales/abstract.md`. Si no existe, está vacío o `guia_escritura` devuelve `abstract_vacio` a verdadero (solo tiene preguntas en comentarios y encabezados), pide al usuario la idea y el objetivo, propón un abstract de 150 a 250 palabras, escríbelo ahí cuando lo confirme y sigue.
-4. Llama a `estado_indice` con `actualizar` a verdadero. Si hay obras sin PDF, dilo en una línea.
+4. Llama a `estado_indice` con `actualizar` a verdadero. Si hay obras sin PDF, dilo en una línea. Si solo redactas Métodos o Resultados de un estudio y sus materiales son suficientes, puedes omitir la búsqueda bibliográfica.
 
 ## Plan
 
-5. Explora antes de planificar: haz entre 6 y 12 llamadas a `buscar_pasajes` sobre los temas del abstract. Busca en el idioma de los papers y con los términos que usarían.
-6. Escribe `borrador/plan.md`: el objetivo, las secciones y, para cada sección, qué va a sostener y qué obras lo apoyan. Si algo del abstract no tiene apoyo en las colecciones, dilo en el plan en vez de taparlo.
-7. Si el usuario pidió «con pausa», enséñale el plan y espera a que lo apruebe. Si no, sigue.
+5. Para las secciones que requieren bibliografía, explora antes de planificar: haz entre 6 y 12 llamadas a `buscar_pasajes` sobre los temas del abstract. Busca en el idioma de los papers y con los términos que usarían.
+6. Escribe `borrador/plan.md`: el objetivo, las secciones y, para cada sección, qué va a sostener y qué obras lo apoyan. Para cada afirmación central de Introducción y Discusión, indica la obra, la página y el pasaje, o déjala con una fuente pendiente. Si falta apoyo para una parte del abstract, señálalo.
+7. En un proyecto de Resultados, enseña el plan con los hallazgos por sección y pide aprobación antes de redactar. Aplica la misma pausa en los otros tipos si el usuario pidió «con pausa».
 
 ## Escritura
 
-8. Escribe `borrador/documento.md` sección a sección, en el idioma del documento. Para cada sección:
-   - Vuelve a buscar con consultas concretas de esa sección; no escribas solo con lo que encontraste al planificar.
+8. Escribe `borrador/documento.md` sección a sección, en el idioma del documento. Si una sección de Métodos o Resultados ya existe, agrupa el antes y después de esa sección y espera a que el investigador elija qué cambios aplicar. Para cada sección:
+   - Si la sección usa bibliografía, vuelve a buscar con consultas concretas de esa sección.
    - Antes de citar un dato, un resultado o una cifra de una obra, lee su contexto con `leer_pasaje`.
    - Cita con `[@clave]`, usando solo claves que hayan salido en `buscar_pasajes`, `leer_pasaje` o `leer_paginas`.
 9. Reglas de las citas, sin excepciones:
@@ -38,11 +42,11 @@ Petición del usuario: $ARGUMENTS
 
 ## Comprobación
 
-10. Al terminar, llama a `comprobar_documento`. Resume las claves que no existan o estén fuera de las colecciones y las citas literales que no coincidan.
-11. El juez de apoyo corre en segundo plano y hace una llamada a Claude por cada párrafo con citas. Avisa al usuario y consulta el resultado con `estado_comprobacion` cuando lo pida o al cabo de unos minutos.
-12. Con el resultado del juez, resume las frases tergiversadas, no apoyadas y parciales y lo señalado en cifras o convocatoria. Las correcciones se proponen con `/theaiwriter:corregir`, con el visto bueno del usuario.
-13. Resume dónde está el borrador, las frases apoyadas y las que quedan por revisar, las obras sin citar que podrían aportar algo, el informe `informes/comprobacion.md` y la bibliografía `borrador/referencias.bib`. Termina con «Siguiente: /theaiwriter:corregir» si hay algo señalado; si no, «Siguiente: /theaiwriter:revisar».
-
-Empieza la respuesta final con un resumen de 3 a 5 líneas; el detalle está en el informe. Termina con una línea «Siguiente: /theaiwriter:…» con el paso que toca.
+10. Al terminar, avisa del coste del juez y llama a `comprobar_documento`. Resume las claves que no existan o estén fuera de las colecciones y las citas literales que no coincidan.
+11. El juez de apoyo corre en segundo plano y hace una llamada a Claude por cada párrafo con citas. Consulta el resultado con `estado_comprobacion` cuando lo pida o al cabo de unos minutos.
+12. Con el resultado del juez, resume las frases tergiversadas, no apoyadas y parciales y los avisos sobre hallazgos, cifras o convocatoria. Las correcciones se proponen con `/theaiwriter:corregir`, con el visto bueno del usuario.
+13. Resume dónde están el borrador, el informe `informes/comprobacion.md` y la bibliografía `borrador/referencias.bib`. Indica cuántos pares de frase y obra se han juzgado del total y cuántos quedan pendientes. Si hay obras sin citar que podrían aportar algo, indícalas.
 
 Antes de empezar, avisa en una línea de lo que gasta con la cuenta de Claude del usuario.
+
+Antes de cerrar, llama a `estado_documento`. Muestra **Siguiente** con `siguiente` y `motivo_siguiente`, y **También puedes** con `alternativas` cuando las haya. Si el paso es pasar a Word, enlaza [la guía](https://github.com/mikelval82/TheAiWriter/blob/master/docs/exportar.md).

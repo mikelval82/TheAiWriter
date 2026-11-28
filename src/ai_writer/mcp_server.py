@@ -17,10 +17,14 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 
+from ai_writer.evidencia import Fuente
+from ai_writer.hallazgos import Propuesta, Seleccion
 from ai_writer.library import PROJECT_FILE, LibraryError, Project
+from ai_writer.reglas_convocatoria import Value
 
 server = MCPServer("theaiwriter")
 
@@ -48,6 +52,7 @@ def _error(error: LibraryError) -> dict:
 @tool
 def diagnostico() -> dict:
     """Informa de dónde corre el plugin: sistema, Python, carpetas y si `claude` está disponible."""
+    from ai_writer.exportacion import pandoc_executable
     from ai_writer.zotero import Zotero, default_index_dir
 
     is_document = (_document_folder() / PROJECT_FILE).exists()
@@ -68,6 +73,7 @@ def diagnostico() -> dict:
         "zotero": found,
         "indice_de_pasajes": str(default_index_dir()),
         "claude_en_path": shutil.which("claude"),
+        "pandoc": pandoc_executable(),
     }
 
 
@@ -172,6 +178,64 @@ def estado_documento() -> dict:
         return {"error": f"Datos no válidos en el documento: {error}"}
 
 
+def _results_folder() -> Path:
+    folder = _document_folder()
+    if Project.load(folder).tipo != "resultados":
+        raise LibraryError("El registro de hallazgos está disponible en documentos de tipo resultados.")
+    return folder
+
+
+@tool
+def estado_hallazgos(incluir_materiales: bool = True) -> dict:
+    """Lista los hallazgos con su evidencia y versión. Puede incluir los archivos del estudio."""
+    from ai_writer.evidencia import inventory
+    from ai_writer.hallazgos import list_findings
+
+    try:
+        folder = _results_folder()
+        report = {"hallazgos": list_findings(folder)}
+        if incluir_materiales:
+            report["materiales"] = inventory(folder)
+        return report
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def leer_evidencia_resultados(fuente: Fuente) -> dict:
+    """Lee una celda CSV, un fragmento literal de una salida de Jupyter o una línea de resultados."""
+    from ai_writer.evidencia import read_source
+
+    try:
+        evidence = read_source(_results_folder(), fuente)
+        evidence.pop("codigo", None)
+        return evidence
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def guardar_hallazgos(propuestas: list[Propuesta]) -> dict:
+    """Registra propuestas sin aprobar. Para editar, usa el id y la versión en sustituye."""
+    from ai_writer.hallazgos import save_findings
+
+    try:
+        return {"hallazgos": save_findings(_results_folder(), propuestas)}
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def decidir_hallazgos(seleccion: list[Seleccion], decision: Literal["aprobado", "pendiente"]) -> dict:
+    """Guarda una decisión explícita del investigador usando el id y versión de cada hallazgo mostrado."""
+    from ai_writer.hallazgos import decide_findings
+
+    try:
+        return {"hallazgos": decide_findings(_results_folder(), seleccion, decision)}
+    except (LibraryError, ValueError) as error:
+        return {"error": str(error)}
+
+
 @tool
 def mostrar_ficha() -> str:
     """Muestra la ficha de convocatoria o revista como texto legible, sin modelo."""
@@ -184,16 +248,16 @@ def mostrar_ficha() -> str:
 
 
 @tool
-def confirmar_ficha() -> dict:
-    """Confirma la ficha tras comprobar sus citas. Solo se llama si el usuario ha dicho sí."""
+def confirmar_ficha(revision: str | None = None) -> dict:
+    """Confirma tras el sí. En convocatoria pasa la revisión devuelta por comprobar_ficha."""
     from ai_writer.convocatoria import confirm_ficha
 
-    return confirm_ficha(_document_folder())
+    return confirm_ficha(_document_folder(), revision)
 
 
 @tool
 def comprobar_ficha() -> dict:
-    """Comprueba las citas de la ficha de convocatoria o revista contra sus PDF, sin modelo."""
+    """Comprueba la ficha contra sus PDF, sin modelo. En convocatoria devuelve revisión y reglas."""
     from ai_writer.convocatoria import JOURNAL_FICHA, check_ficha, check_journal_ficha
 
     folder = _document_folder()
@@ -206,6 +270,39 @@ def comprobar_ficha() -> dict:
     if project.tipo != "convocatoria" and (folder / JOURNAL_FICHA).exists():
         return check_journal_ficha(folder)
     return check_ficha(folder)
+
+
+@tool
+def fijar_modalidad_convocatoria(modalidad: str) -> dict:
+    """Guarda la modalidad de la propuesta indicada explícitamente por el investigador."""
+    from ai_writer.convocatoria import set_call_modality
+
+    try:
+        return set_call_modality(_document_folder(), modalidad)
+    except (LibraryError, OSError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def fijar_costes_directos_convocatoria(importe_eur: str | None) -> dict:
+    """Guarda costes directos indicados por el investigador. Usa euros sin miles o null."""
+    from ai_writer.convocatoria import set_direct_costs
+
+    try:
+        return set_direct_costs(_document_folder(), importe_eur)
+    except (LibraryError, OSError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
+def fijar_dato_convocatoria(dato: str, valor: Value | None) -> dict:
+    """Guarda un dato definido en la ficha tras la respuesta explícita del investigador."""
+    from ai_writer.convocatoria import set_proposal_value
+
+    try:
+        return set_proposal_value(_document_folder(), dato, valor)
+    except (LibraryError, OSError, ValueError) as error:
+        return {"error": str(error)}
 
 
 # Zotero: passages to consult while writing
@@ -348,6 +445,23 @@ def referencia(clave: str) -> dict:
 
 
 @tool
+def exportar_documento(
+    estilo_csl: str | None = None, plantilla_docx: str | None = None, reemplazar: bool = False,
+) -> dict:
+    """Genera exportacion/documento.docx desde el borrador con Pandoc, sin modelo.
+    El estilo y la plantilla son archivos del proyecto. Reemplaza solo cuando se indica."""
+    from ai_writer.exportacion import export_document
+
+    try:
+        return export_document(
+            _document_folder(), style=estilo_csl, template=plantilla_docx,
+            replace_existing=reemplazar,
+        )
+    except (LibraryError, OSError, ValueError) as error:
+        return {"error": str(error)}
+
+
+@tool
 def preparar_citas_vivas() -> dict:
     """Escribe `exportacion/documento-zotero.md`, una copia del borrador con las claves que cada
     obra tiene guardadas en Zotero (las de Better BibTeX), para pasarla a Word con citas vivas
@@ -382,8 +496,10 @@ def comprobar_documento(juez: bool = True) -> dict:
     """Verifica el borrador `borrador/documento.md` de un documento sobre Zotero. Al momento
     y sin gastar llamadas: que cada `[@clave]` exista y esté en las colecciones, y que cada
     cita literal entre comillas esté tal cual en el PDF; en documentos de tipo resultados,
-    comprueba también que las cifras propias tengan origen en resultados/; en convocatorias,
-    comprueba la ficha contra los PDF oficiales y la conformidad del borrador. Además escribe
+    coteja las frases enlazadas con los hallazgos aprobados o busca las cifras de borradores
+    anteriores en resultados/. En convocatorias,
+    comprueba la ficha, el borrador y las páginas reales de `exportacion/documento.pdf` si existe.
+    Además escribe
     `borrador/referencias.bib`. Con `juez`, lanza en segundo plano el juez de apoyo, que
     compara cada frase citada con pasajes de la obra (una llamada a Claude por párrafo con
     citas; el resultado se consulta con `estado_comprobacion`). El informe queda en
@@ -415,6 +531,20 @@ def estado_comprobacion() -> dict:
 
 
 @tool
+def evidencia_citas(frase: str = "", seccion: str = "", desde: int = 0, limite: int = 12) -> dict:
+    """Muestra los veredictos guardados y sus pasajes de Zotero, incluidas las citas apoyadas.
+    Filtra por un fragmento de la frase o por el nombre del apartado. No lanza el juez."""
+    from ai_writer.verificacion import citation_evidence
+
+    try:
+        return citation_evidence(
+            _document_folder(), phrase=frase, section=seccion, offset=desde, limit=limite
+        )
+    except (LibraryError, ValueError, OSError) as error:
+        return {"error": str(error)}
+
+
+@tool
 def revisar_documento() -> dict:
     """Evalúa el borrador por criterios en segundo plano con una llamada a Claude.
     No cambia el borrador. El resultado se consulta con `estado_revision` y queda en
@@ -430,7 +560,7 @@ def revisar_documento() -> dict:
 
 @tool
 def estado_revision() -> dict:
-    """Devuelve el estado, las prioridades y la evaluación por criterios de la revisión."""
+    """Devuelve la revisión por criterios y las observaciones de coherencia de una convocatoria."""
     from ai_writer import revisor
 
     try:

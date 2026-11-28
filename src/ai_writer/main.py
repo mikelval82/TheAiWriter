@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> None:
             print(data["estado"])
         else:
             data = verificacion.run_judge(args.folder)
-            print(verificacion.summary(data["apoyo"]))
+            print(verificacion.support_summary(data))
     except LibraryError as error:
         parser.exit(1, f"{error}\n")
 

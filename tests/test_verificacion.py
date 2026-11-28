@@ -147,7 +147,11 @@ def test_judge_sees_passages_of_the_cited_work(draft):
 def test_judge_resumes_after_the_usage_limit(draft):
     data = verificacion.run_judge(draft, Judge(fail_after=1))
     assert data["juez"]["estado"] == "limite_de_uso" and data["juez"]["hechos"] == 1
-    assert verificacion.summary(data["apoyo"])["apoyada"] == 2
+    stats = verificacion.overview(data)["apoyo"]
+    assert (stats["total"], stats["juzgadas"], stats["sin_juzgar"], stats["apoyada"]) == (5, 2, 3, 2)
+    report = (draft / verificacion.REPORT).read_text(encoding="utf-8")
+    assert "2 de 5 pares de frase y obra juzgados. 3 pendientes." in report
+    assert "100%" not in report
 
     second = Judge()
     data = verificacion.run_judge(draft, second)
@@ -326,7 +330,7 @@ def test_call_verification_with_and_without_valid_ficha(document, state):  # noq
     if state != "absent":
         make_pdf(document / "convocatoria/instrucciones.pdf", [("Instructions", QUOTE)])
         ficha = {
-            "convocatoria": "Prueba", "confirmada": state == "confirmed",
+            "convocatoria": "Prueba", "confirmada": False,
             "apartados": [{"titulo": "Impacto", "nivel": 2, "obligatorio": True,
                            "pide": "Explicar impacto", "fuente": dict(SOURCE)}],
             "limites": {"paginas": 20, "fuente": dict(SOURCE)},
@@ -336,6 +340,8 @@ def test_call_verification_with_and_without_valid_ficha(document, state):  # noq
         if state == "failed":
             ficha["apartados"][0]["fuente"]["cita"] = "An invented requirement absent from this document"
         save_ficha(document, ficha)
+        if state == "confirmed":
+            assert mcp_server.confirmar_ficha()["confirmada"]
     data = verificacion.check_document(document)
     saved = json.loads((document / verificacion.RESULT).read_text(encoding="utf-8"))
     overview = verificacion.overview(data)

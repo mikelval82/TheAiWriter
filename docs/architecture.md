@@ -16,6 +16,10 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `mcp_server.py` | Registra las herramientas de diagnóstico, proyecto, consulta y verificación. |
 | `library.py` | Proyecto, plantillas de materiales, migración de informes y carpeta de documentos. |
 | `estado.py` | Estado determinista del documento y siguiente paso, sin abrir el índice. |
+| `exportacion.py` | Convierte el borrador y la bibliografía en DOCX con Pandoc y conserva la copia previa si la conversión falla. |
+| `evidencia.py` | Inventaría los materiales y lee una celda CSV o un fragmento guardado en una salida de texto o Jupyter. |
+| `hallazgos.py` | Registra propuestas y decisiones en SQLite, con la huella de la evidencia aprobada. |
+| `hallazgos_borrador.py` | Coteja los enunciados del manuscrito con los hallazgos aprobados y señala cifras por vincular. |
 | `avisos.py` | Añade y consume avisos pendientes en `informes/avisos.json`. |
 | `zotero.py` | Lee obras, colecciones y adjuntos desde una copia temporal de la base de Zotero; asigna claves. |
 | `passages.py` | Extrae y segmenta PDF, mantiene el índice incremental y busca o lee pasajes. |
@@ -44,19 +48,20 @@ Las rutas siguientes son relativas a `src/ai_writer/`, salvo donde se indica otr
 | `hooks/validar.py` | Tras una edición del borrador, bloquea claves desconocidas, mal formadas o fuera de las colecciones. |
 
 El MCP expone `diagnostico`, `probar_claude`, `crear_documento`, `colecciones_zotero`, `estado_indice`,
-`guia_escritura`, `estado_documento`, `comprobar_ficha`, `mostrar_ficha`, `confirmar_ficha`,
+`guia_escritura`, `estado_documento`, `estado_hallazgos`, `leer_evidencia_resultados`,
+`guardar_hallazgos`, `decidir_hallazgos`, `comprobar_ficha`, `mostrar_ficha`, `confirmar_ficha`,
 `buscar_pasajes`, `leer_pasaje`, `leer_paginas`, `referencia`,
 `preparar_citas_vivas`, `comprobar_citas`, `comprobar_documento`, `estado_comprobacion`,
-`revisar_documento` y `estado_revision`.
+`evidencia_citas`, `revisar_documento`, `estado_revision` y `exportar_documento`.
 La carpeta del documento se obtiene
 de `CLAUDE_PROJECT_DIR` o del directorio
 actual. Fuera de un documento, las consultas abarcan todo Zotero.
 
-El camino de cinco verbos es `nuevo`, `escribir`, `comprobar`, `revisar` y pasar a Word según
+El camino de cinco verbos es `nuevo`, `escribir`, `comprobar`, `revisar` y `exportar` según
 [exportar.md](exportar.md). Las ayudas son `estado`, `corregir`, `diagnostico`, que también
 atiende consultas sobre la biblioteca, y `ayuda`, que explica los comandos a partir del manual. `corregir` muestra antes y después y solo aplica los cambios
 aceptados; vuelve a comprobar sin juez. `escribir` comprueba al terminar y resume lo señalado.
-Cada comando resume en 3 a 5 líneas, indica el siguiente paso y avisa del gasto cuando corresponde.
+Los comandos usan `estado_documento` para proponer el siguiente paso, su motivo y las alternativas. Avisa del gasto cuando corresponde.
 
 ## Flujo de datos
 
@@ -176,7 +181,7 @@ ignoran campos adicionales de proyectos antiguos, incluido `fuente`.
 
 Claude escribe `abstract.md`, `plan.md` y `documento.md` siguiendo los comandos. El plugin escribe
 `referencias.bib` al verificar, con las obras citadas válidas y sus claves del índice.
-`exportacion/` se crea vacía; no hay un exportador en el código.
+`exportacion/` se crea vacía. `exportar_documento` genera allí `documento.docx` al pedir la exportación.
 
 Tras leer `proyecto.yaml`, el comando de escritura llama obligatoriamente a `guia_escritura`.
 La herramienta lee con `importlib.resources` el Markdown del tipo en `guias/`; el paquete instalado
@@ -201,10 +206,16 @@ lista. El juez usa este registro para incluir contexto que vio Claude.
 
 `comprobacion.json` contiene la fecha `comprobado`, el resultado de `citas`, las `citas_literales`,
 la ruta de la `bibliografia`, el estado y progreso de `juez` y las entradas de `apoyo` por frase y
-obra. `comprobacion.md` presenta estos datos al usuario; `comprobacion.log` recoge la salida del
-proceso independiente. Solo en documentos de tipo `resultados`, la clave `cifras` añade las cifras
+obra. Cada veredicto guarda la huella de los PDF indexados. Cuando el juez señala un pasaje,
+el informe conserva su identificador, el adjunto y las páginas. Los índices anteriores recuperan
+la clave de adjunto cuando el nombre de archivo es inequívoco. `comprobacion.md` presenta estos
+datos al usuario, incluidos los pasajes de citas apoyadas. `comprobacion.log` recoge la salida
+del proceso independiente. En documentos de tipo `resultados` sin vínculos ni registro,
+la clave `cifras` añade las cifras
 `comprobadas`, las que tienen origen (`con_origen`), las entradas `sin_origen` con cifra, sección y
 frase, los `ficheros` leídos y un `aviso` si no hay resultados numéricos.
+Si hay un registro o vínculos a hallazgos, `hallazgos_borrador` incluye el estado de cada vínculo, la línea, el enunciado aprobado y su fuente. Las versiones de los hallazgos vinculados permiten detectar que el informe se ha quedado desactualizado aunque el borrador siga igual.
+
 Solo para `convocatoria`, `ficha` añade requisitos comprobados, fallidos, avisos y confirmación;
 `convocatoria` añade apartados ausentes o sobrantes, orden, extensión, campos y pendientes.
 Si la ficha no valida o tiene citas fallidas, se devuelve un aviso en lugar de comprobar la
@@ -224,13 +235,12 @@ y vacía. El hook `UserPromptSubmit` usa el `cwd` de la entrada, exige `proyecto
 avisos y los añade a `additionalContext`. Sin avisos o ante un fallo sale silencioso con código 0;
 no carga embeddings ni llama a modelos.
 
-`estado_documento` lee materiales, palabras y estados guardados; marca la comprobación desactualizada
-si el borrador tiene una fecha posterior al JSON. Devuelve recuentos del juez, el estado de revisión
-y `siguiente`: completar materiales, escribir, comprobar, corregir problemas, revisar o pasar a
-Word con `docs/exportar.md`, en ese orden. En convocatorias exige equipo y PDF oficiales; en resultados,
-CSV. Con el juez o el revisor en marcha, `siguiente` es volver a `estado`. La exportación es una guía,
-sin dependencias ni exportador propio; `preparar_citas_vivas` solo copia el borrador con las claves
-que Zotero guarda en `citationKey` o en `extra`, las de Better BibTeX.
+`estado_documento` lee los materiales y los informes. Compara la huella del borrador con la de cada
+informe y usa la fecha de modificación con informes anteriores que carecen de huella. En convocatorias
+comprueba que haya equipo y PDF oficiales. En resultados busca una tabla, una salida de texto o
+una salida guardada de Jupyter y resume el estado de las aprobaciones. La comprobación incluye el
+total de pares de frase y obra, incluso mientras hay pares pendientes. `siguiente`,
+`motivo_siguiente` y `alternativas` orientan al usuario según el estado actual. La exportación usa Pandoc para guardar un DOCX en `exportacion/`. `preparar_citas_vivas` copia el borrador con las claves que Zotero guarda en `citationKey` o en `extra`, las de Better BibTeX.
 
 ## Secciones sin modelo
 
